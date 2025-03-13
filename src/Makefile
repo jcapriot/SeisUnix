@@ -99,9 +99,6 @@ xtcwp_	:
 xmcwp_	:
 	cd ./Xmcwp; $(MAKE)
 
-complex	:
-	cd ./Complex; $(MAKE)
-
 utils	:
 	cd ./cwputils; $(MAKE)
 

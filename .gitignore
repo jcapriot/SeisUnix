@@ -17,3 +17,5 @@ sac
 *.a
 
 junk*
+
+.idea/

@@ -24,7 +24,7 @@ par_lib = library(
     'par',
     par_lib_src,
     include_directories: par_include_dir,
-    dependencies: cwp_dep
+    dependencies: su_cwp_dep
 )
 
 su_par_dep = declare_dependency(

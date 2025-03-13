@@ -90,7 +90,7 @@ main(int argc, char **argv)
 	
 	/* Initialize */
 	initargs(argc, argv);
-	requestdoc(1);
+	requestdoc(1, sdoc);
 
 
 	/* Set parameters */

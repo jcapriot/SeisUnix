@@ -19,6 +19,8 @@ Function Prototype:
 int fgettr(FILE *fp, segy *tp);
 int fvgettr(FILE *fp, segy *tp);
 int fgettra(FILE *fp, segy *tp, int itr);
+segy* new_trace(int ns);
+int del_trace(segy *tp);
 
 *****************************************************************************
 Returns:
@@ -88,7 +90,7 @@ code using XDR
 *********************************************/
 
 #include "su_xdr.h"
-#include "header.h"
+#include "segy.h"
 
 static struct insegyinfo {
 	FILE *infp;		     /* FILE * ptr for search	 */
@@ -334,7 +336,7 @@ int fgettra(FILE *fp, segy *tp, int itr)
 code without  XDR 
 ***********************************************************/
 
-#include "header.h"
+#include "segy.h"
 
 static struct insegyinfo {
 	FILE *infp;		  /* FILE * ptr for search	 */
@@ -366,6 +368,7 @@ int dataread(segy *tp, struct insegyinfo *iptr, cwp_Bool fixed_length)
 {
 	unsigned int nsread = fixed_length?iptr->nsfirst:tp->ns;
 	unsigned int databytes = infoptr->bytesper*nsread;
+    tp->data = realloc1float(tp->data, nsread);
 	int nread = (int) efread((char *) (&((tp->data)[0])),1, databytes,
 			   iptr->infp);
 
@@ -398,7 +401,8 @@ int fgettr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length) {
 	infoptr->infp = fp;  /* save FILE * ptr */
 	infoptr->itr = 0;
 	infoptr->ntr = -1;
-	
+
+	/* ignoring file type as we control this from python
 	switch (infoptr->ftype = filestat(fileno(fp))) {
 	 case DIRECTORY:
 	    err("%s: segy input can't be a directory", __FILE__);
@@ -407,9 +411,10 @@ int fgettr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length) {
 	    err("%s: segy input can't be tty", __FILE__);
 
 	 default:
-	    /* all others are ok */
+	    // all others are ok
 	    break;
 	}
+	*/
 
 /*--------------------------------------------------------------------*\
    Check for the presence of a line header and set a flag if one is
@@ -563,7 +568,9 @@ int fgettr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length) {
 	    }
 	}
 
+    printf("right here\n");
 	nread += dataread(tp, infoptr, fixed_length);
+	printf("after read here\n");
 
 	if (fixed_length && (tp->ns != infoptr->nsfirst)){
 	 err("%s: on trace #%ld number of samples in header (%d) differs from number for first trace (%d)"

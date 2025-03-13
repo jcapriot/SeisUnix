@@ -5,7 +5,6 @@
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 
 
 /*********************** self documentation **********************/
@@ -119,11 +118,12 @@ given to CWP in 2008.
 		erewind(nheaderfp);
         	erewind(ntracefp);
                 fread (&tr,HDRBYTES, 1, nheaderfp);
+
                 fread (tr.data,FSIZE, *nt, ntracefp);
 		gethval(&tr, indx, n_val);
 	}
 		
-	
+
 
         /* Store traces in tmpfile while getting a count */
 	tracefp = etmpfile();

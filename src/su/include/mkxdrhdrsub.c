@@ -15,8 +15,6 @@
 
 #include "segy.h"
 
-#include "hdr.h"
-
 segy tr;
 
 int main()

@@ -22,6 +22,8 @@
  */ 
 
 #include <limits.h>
+#include <stddef.h>
+#include "su.h"
 
 #ifndef SEGY_H
 #define SEGY_H
@@ -578,9 +580,110 @@ typedef struct {	/* segy - trace identification header */
 			*/
 #endif
 
-	float  data[SU_NFLTS];
+	float *data;
 
 } segy;
+
+static struct {
+	char *key;	char *type;	int offs;
+} hdr[] = {
+    {"tracl", "i", offsetof(segy, tracl)},
+    {"tracr", "i", offsetof(segy, tracr)},
+    {"fldr", "i", offsetof(segy, fldr)},
+    {"tracf", "i", offsetof(segy, tracf)},
+    {"ep", "i", offsetof(segy, ep)},
+    {"cdp", "i", offsetof(segy, cdp)},
+    {"cdpt", "i", offsetof(segy, cdpt)},
+    {"trid", "h", offsetof(segy, trid)},
+    {"nvs", "h", offsetof(segy, nvs)},
+    {"nhs", "h", offsetof(segy, nhs)},
+    {"duse", "h", offsetof(segy, duse)},
+    {"offset", "i", offsetof(segy, offset)},
+    {"gelev", "i", offsetof(segy, gelev)},
+    {"selev", "i", offsetof(segy, selev)},
+    {"sdepth", "i", offsetof(segy, sdepth)},
+    {"gdel", "i", offsetof(segy, gdel)},
+    {"sdel", "i", offsetof(segy, sdel)},
+    {"swdep", "i", offsetof(segy, swdep)},
+    {"gwdep", "i", offsetof(segy, gwdep)},
+    {"scalel", "h", offsetof(segy, scalel)},
+    {"scalco", "h", offsetof(segy, scalco)},
+    {"sx", "i", offsetof(segy, sx)},
+    {"sy", "i", offsetof(segy, sy)},
+    {"gx", "i", offsetof(segy, gx)},
+    {"gy", "i", offsetof(segy, gy)},
+    {"counit", "h", offsetof(segy, counit)},
+    {"wevel", "h", offsetof(segy, wevel)},
+    {"swevel", "h", offsetof(segy, swevel)},
+    {"sut", "h", offsetof(segy, sut)},
+    {"gut", "h", offsetof(segy, gut)},
+    {"sstat", "h", offsetof(segy, sstat)},
+    {"gstat", "h", offsetof(segy, gstat)},
+    {"tstat", "h", offsetof(segy, tstat)},
+    {"laga", "h", offsetof(segy, laga)},
+    {"lagb", "h", offsetof(segy, lagb)},
+    {"delrt", "h", offsetof(segy, delrt)},
+    {"muts", "h", offsetof(segy, muts)},
+    {"mute", "h", offsetof(segy, mute)},
+    {"ns", "u", offsetof(segy, ns)},
+    {"dt", "u", offsetof(segy, dt)},
+    {"gain", "h", offsetof(segy, gain)},
+    {"igc", "h", offsetof(segy, igc)},
+    {"igi", "h", offsetof(segy, igi)},
+    {"corr", "h", offsetof(segy, corr)},
+    {"sfs", "h", offsetof(segy, sfs)},
+    {"sfe", "h", offsetof(segy, sfe)},
+    {"slen", "h", offsetof(segy, slen)},
+    {"styp", "h", offsetof(segy, styp)},
+    {"stas", "h", offsetof(segy, stas)},
+    {"stae", "h", offsetof(segy, stae)},
+    {"tatyp", "h", offsetof(segy, tatyp)},
+    {"afilf", "h", offsetof(segy, afilf)},
+    {"afils", "h", offsetof(segy, afils)},
+    {"nofilf", "h", offsetof(segy, nofilf)},
+    {"nofils", "h", offsetof(segy, nofils)},
+    {"lcf", "h", offsetof(segy, lcf)},
+    {"hcf", "h", offsetof(segy, hcf)},
+    {"lcs", "h", offsetof(segy, lcs)},
+    {"hcs", "h", offsetof(segy, hcs)},
+    {"year", "h", offsetof(segy, year)},
+    {"day", "h", offsetof(segy, day)},
+    {"hour", "h", offsetof(segy, hour)},
+    {"minute", "h", offsetof(segy, minute)},
+    {"sec", "h", offsetof(segy, sec)},
+    {"timbas", "h", offsetof(segy, timbas)},
+    {"trwf", "h", offsetof(segy, trwf)},
+    {"grnors", "h", offsetof(segy, grnors)},
+    {"grnofr", "h", offsetof(segy, grnofr)},
+    {"grnlof", "h", offsetof(segy, grnlof)},
+    {"gaps", "h", offsetof(segy, gaps)},
+    {"otrav", "h", offsetof(segy, otrav)},
+#ifdef SLTSU_SEGY_H
+    {"d1", "f", offsetof(segy, d1)},
+    {"f1", "f", offsetof(segy, f1)},
+    {"d2", "f", offsetof(segy, d2)},
+    {"f2", "f", offsetof(segy, f2)},
+    {"ungpow", "f", offsetof(segy, ungpow)},
+    {"unscale", "f", offsetof(segy, unscale)},
+    {"mark", "h", offsetof(segy, mark)},
+    {"mutb", "h", offsetof(segy, mutb)},
+    {"dz", "f", offsetof(segy, dz)},
+    {"fz", "f", offsetof(segy, fz)},
+    {"n2", "h", offsetof(segy, n2)},
+    {"shortpad", "h", offsetof(segy, shortpad)},
+    {"ntr", "i", offsetof(segy, ntr)},
+#else
+    {"d1", "f", offsetof(segy, d1)},
+    {"f1", "f", offsetof(segy, f1)},
+    {"d2", "f", offsetof(segy, d2)},
+    {"f2", "f", offsetof(segy, f2)},
+    {"ungpow", "f", offsetof(segy, ungpow)},
+    {"unscale", "f", offsetof(segy, unscale)},
+    {"ntr", "i", offsetof(segy, ntr)},
+    {"mark", "h", offsetof(segy, mark)},
+    {"shortpad", "h", offsetof(segy, shortpad)},
+#endif
+};
 
 
 typedef struct {	/* bhed - binary header */
@@ -813,6 +916,10 @@ typedef struct {	/* bhed - binary header */
 
 #define ISSEISMIC(id) (( (id)==TUNK || (id)==TREAL || (id)==TDEAD || (id)==TDUMMY || (id)==TBREAK || (id)==UPHOLE || (id)==SWEEP || (id)==TIMING || (id)==WBREAK || (id)==NFGUNSIG || (id)==FFGUNSIG || (id)==SPSENSOR || (id)==TVERT || (id)==TXLIN || (id)==TINLIN || (id)==ROTVERT || (id)==TTRANS || (id)==TRADIAL || (id)==ACOR ) ? cwp_true : cwp_false ) 
 
+#define MAXSEGY (sizeof(segy) + SU_NFLTS * sizeof(float))
+#define SU_NKEYS (sizeof(hdr)/sizeof(hdr[0])) /* Number of key header words */
+#define HDRBYTES (sizeof(segy) - sizeof(float *)) /* Bytes in the trace header */
+
 /* FUNCTION PROTOTYPES */
 #ifdef __cplusplus /* if C++, specify external linkage to C functions */
 extern "C" {
@@ -852,5 +959,4 @@ void tabplot(segy *tp, int itmin, int itmax);
 #ifdef __cplusplus /* if C++, end external linkage specification */
 }
 #endif
-
 #endif

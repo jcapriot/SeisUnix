@@ -47,7 +47,6 @@ Authors: SEP: Einar Kjartansson, Stew Levin CWP: Shuki Ronen, Jack Cohen
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 
 #ifndef TEST
 
@@ -69,7 +68,7 @@ extern bhed  su_binary_hdr;
  */
 
 #include "su_xdr.h"
-#include "header.h"
+#include "segy.h"
 
 static struct outsegyinfo {
 	FILE *outfp;		      /* FILE * ptr for search		*/
@@ -227,7 +226,6 @@ code without XDR
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 
 static char hdr_str[88];
 static int i=0;
@@ -290,15 +288,17 @@ void fputtr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length)
 		infoptr->outfp = fp;
 		infoptr->itr = 0;
 
+        /* ignoring file type as we control this from the package
 		switch (infoptr->ftype = filestat(fileno(fp))) {
 		case DIRECTORY:
 			err("%s: segy output can't be a directory", __FILE__);
 		case TTY:
 			err("%s: segy output can't be tty", __FILE__);
 		default:
-			/* the rest are ok */
+			// the rest are ok
 		break;
 		}
+		*/
 
 		/* Sanity check the segy header */
 		infoptr->nsfirst = tp->ns;
@@ -321,7 +321,7 @@ void fputtr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length)
 
    Reginald H. Beardsley			    rhb@acm.org
 \*--------------------------------------------------------------------*/
-	      
+
 		if (!getparint( "lheader" ,&out_line_hdr )) out_line_hdr=0;
 
 		if( out_line_hdr ){
@@ -332,7 +332,7 @@ void fputtr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length)
 
 		   }else{
 		     memset( su_text_hdr ,0 ,sizeof(su_text_hdr) );
-		     sprintf( hdr_str ,"%-80s" 
+		     sprintf( hdr_str ,"%-80s"
 			    ,"C 1 CLIENT CWP/SU default text header " );
 		     strncat( su_text_hdr ,hdr_str ,80 );
 		     for( i=1; i<40; i++ ){
@@ -365,7 +365,7 @@ void fputtr_internal(FILE *fp, segy *tp, cwp_Bool fixed_length)
 
 	(void) efwrite(tp, 1,HDRBYTES, infoptr->outfp);
 	datawrite(tp, infoptr, fixed_length);
-	
+
 	++infoptr->itr;
 	lastfp = infoptr->outfp;
 }

@@ -6,7 +6,6 @@
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 
 
 /*********************** self documentation **********************/

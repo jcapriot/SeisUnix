@@ -63,7 +63,6 @@ Authors: CWP: Jack K. Cohen, Shuki Ronen
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 
 
 int vtoi(register cwp_String type, Value val)

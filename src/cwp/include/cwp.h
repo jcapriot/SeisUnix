@@ -18,10 +18,6 @@
 #include <limits.h>
 #include <float.h>
 
-#include <fcntl.h>      /* non-ANSI */
-#include <unistd.h>     /* non-ANSI */
-#include <sys/types.h>  /* non-ANSI */
-
 #ifdef CADDR_T_NOT_DEFINED
 typedef char *          caddr_t;
 #endif
@@ -33,7 +29,7 @@ typedef char *cwp_String;
 typedef enum {BADFILETYPE = -1,
         TTY, DISK, DIRECTORY, TAPE, PIPE, FIFO, SOCKET, SYMLINK} FileType;
 
-#if defined(CRAY) || defined(OVERRIDE_CWP_COMPLEX)
+#if defined(CRAY) || defined(OVERRIDE_CWP_COMPLEX) || defined(_WIN32)
 typedef struct _complexStruct { /* complex number */
 	float r,i;
 }  cwp_complex;

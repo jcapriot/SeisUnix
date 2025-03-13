@@ -23,7 +23,6 @@ Authors:  zhiming li  and j. dulac ,   unocal
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 #include "bheader.h"
 
 

@@ -5,7 +5,6 @@
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 #include <signal.h>
 
 /*********************** self documentation **********************/

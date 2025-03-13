@@ -96,6 +96,21 @@ short elco_scalar(int ncoords, double c[]);
 double from_segy_elco_multiplier(short segy_scalar);
 double to_segy_elco_multiplier(short segy_scalar); /* reciprocal of from */
 
+
+//BEGIN SU MAIN functions
+
+// filters
+void su_bfhighpass(int zerophase, int npoles, float f3db, size_t nt, float *data_in, float *data_out);
+void su_bflowpass(int zerophase, int npoles, float f3db, size_t nt, float *data_in, float *data_out);
+
+// synthetics
+void su_synlv(float *data,
+	float xs, float zs, float xg, float zg,
+	size_t nt, float dt, float ft,
+	float v00, float dvdx, float dvdz,
+	int ls, int er, int ob, Wavelet *w, int nr, Reflector *r, int lhd, int nhd, float *hd
+);
+
 #ifdef __cplusplus /* if C++, end external linkage specification */
 }
 #endif

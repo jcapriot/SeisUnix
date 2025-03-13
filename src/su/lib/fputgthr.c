@@ -43,7 +43,6 @@ given to CWP in 2008.
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
 
 
 /* segy tr; */

@@ -4,9 +4,9 @@
 /* SUBFILT: $Revision: 1.22 $ ; $Date: 2012/11/28 22:13:13 $	*/
 
 #include "su.h"
-#include "segy.h"
 
 /*********************** self documentation **********************/
+/*
 char *sdoc[] = {
 " 								",
 " SUBFILT - apply Butterworth bandpass filter 			",
@@ -66,6 +66,7 @@ char *sdoc[] = {
 " For simple zero phase filtering with sin squared tapering use ",
 " \"sufilter\".						        ",
 NULL};
+*/
 
 /* Credits:
  *	CWP: Dave Hale c. 1993 for bf.c subs and test drivers
@@ -88,175 +89,45 @@ NULL};
  */
 /**************** end self doc ***********************************/
 
+void su_bfhighpass(int zerophase, int npoles, float f3db, size_t nt, float *data_in, float *data_out){
 
+    if (data_out == NULL){
+        data_out = data_in;
+    }
+    bfhighpass(npoles,f3db,nt,data_in,data_out);
+    if (zerophase) {
+    register int i;
+        for (i=0; i<nt/2; ++i) { /* reverse trace in place */
+        register float tmp = data_out[i];
+        data_out[i] = data_out[nt-1 - i];
+        data_out[nt-1 - i] = tmp;
+    }
+        bfhighpass(npoles,f3db,nt,data_out,data_out);
+        for (i=0; i<nt/2; ++i) { /* flip trace back */
+        register float tmp = data_out[i];
+        data_out[i] = data_out[nt-1 - i];
+        data_out[nt-1 - i] = tmp;
+    }
+    }
+}
 
-segy tr;
-
-int
-main(int argc, char **argv)
-{
-	int zerophase;		/* flag for zero phase filtering	*/
-	int locut;		/* flag for low cut filtering		*/
-	int hicut;		/* flag for high cut filtering		*/
-	float fstoplo;		/* left lower corner frequency		*/
-	float fpasslo;		/* left upper corner frequency		*/
-	float fpasshi;		/* right lower corner frequency		*/
-	float fstophi;		/* right upper corner frequency		*/
-	float astoplo;		/* amp at fstoplo			*/
-	float apasslo;		/* amp at fpasslo			*/
-	float apasshi;		/* amp at fpasshi			*/
-	float astophi;		/* amp at fstophi			*/
-	int npoleslo=0;		/* poles in low cut filter		*/
-	int npoleshi=0;		/* poles in high cut filter		*/
-	float f3dblo=0.0;	/* 3 db point of low cut filter		*/
-	float f3dbhi=0.0;	/* 3 db point of high cut filter	*/
-	float dt;		/* sample spacing			*/
-	float nyq;		/* nyquist frequency			*/
-	int nt;			/* number of points on input trace	*/
-	int verbose;		/* design info flag 			*/
-	cwp_Bool seismic;	/* is this seismic data?		*/
-	cwp_Bool is_npoleslo=cwp_false;		/* is npoleslo set */
-	cwp_Bool is_npoleshi=cwp_false;		/* is npoleshi set */
-
-	
-	/* Initialize */
-	initargs(argc, argv);
-	requestdoc(1);
-
-
-	/* Get info from first trace */ 
-	if (!gettr(&tr))  err("can't get first trace");
-	seismic = ISSEISMIC(tr.trid); 
-		 
-	if (!seismic)
-		warn("input is not seismic data, trid=%d", tr.trid);
-	nt = tr.ns;
-	if (!getparfloat("dt", &dt))	dt = ((double) tr.dt)/1000000.0;
-	if (!dt) err("dt field is zero and not getparred");
-	nyq = 0.5/dt;
-
-
-	/* Get design frequencies and amplitudes */
-	if (!getparint("verbose", &verbose))	verbose = 0;
-	if (!getparint("zerophase", &zerophase)) zerophase = 1;
-	if (!getparint("locut", &locut))	locut = 1;
-	if (!getparint("hicut", &hicut))	hicut = 1;
-	if (!getparfloat("fstoplo", &fstoplo))	fstoplo = .10 * nyq;
-	if (!getparfloat("fpasslo", &fpasslo))	fpasslo = .15 * nyq;
-	if (!getparfloat("fpasshi", &fpasshi))	fpasshi = .40 * nyq;
-	if (!getparfloat("fstophi", &fstophi))	fstophi = .55 * nyq;
-	if (locut) {
-		if (fstoplo <= 0.0)      err("fstoplo must be positive");
-		if (fstoplo > fpasslo)  err("fstoplo must be < fpasslo");
-	}
-	if (hicut) {
-		if (fpasshi > fstophi)  err("fpasshi must be < fstophi");
-		if (fstophi > nyq)  err("fstophi must be < nyquist (%f)", nyq);
-	}
-	if (!getparfloat("astoplo", &astoplo))	astoplo = .05;
-	if (!getparfloat("apasslo", &apasslo))	apasslo = .95;
-	if (!getparfloat("apasshi", &apasshi))	apasshi = .95;
-	if (!getparfloat("astophi", &astophi))	astophi = .05;
-	if (astoplo > apasslo || apasshi < astophi)
-		err("Bad amplitude parameters");
-		
-		
-	/* Normalize frequencies to [0, 0.5] for bfdesign */
-	fstoplo *= dt;
-	fpasslo *= dt;
-	fstophi *= dt;
-	fpasshi *= dt;
-	
-	
-	/* Adapt user frequencies if zerophase selected */
-	if (zerophase) {	
-		astoplo = sqrt(astoplo);
-		apasslo = sqrt(apasslo);
-		astophi = sqrt(astophi);
-		apasshi = sqrt(apasshi);
-	}
-
-	if(getparint("npoleslo",&npoleslo)) 	is_npoleslo=cwp_true;
-	if(getparint("npoleshi",&npoleshi)) 	is_npoleshi=cwp_true;
-
-	if (is_npoleslo) { 
-		if (!getparfloat("f3dblo", &f3dblo))	f3dblo = .15 * nyq;
-        	f3dblo *= dt;
-	} else { /* Use bdesign to make lo cut filters */
-	  if (locut) bfdesign(fpasslo,apasslo,fstoplo,astoplo,&npoleslo,&f3dblo);
-	}
-	
-	if (is_npoleshi) {
-		if (!getparfloat("f3dbhi", &f3dbhi))	f3dbhi = .40 * nyq;
-        	f3dbhi *= dt;
-	} else { /* Use bdesign to make hi cut filters */
-	   if (hicut) bfdesign(fpasshi,apasshi,fstophi,astophi,&npoleshi,&f3dbhi);
-	}
-
-
-	/* Give verbose info if requested */
-	if (verbose && locut) {
-		if (zerophase) {
-			warn("low-cut filter: npoles = %d, 3db point = %f(Hz)",
-				2*npoleslo, f3dblo/dt);
-		} else {
-			warn("low-cut filter: npoles = %d, 3db point = %f(Hz)",
-				npoleslo, f3dblo/dt);
-		}
-	}
-	if (verbose && hicut) {
-		if (zerophase) {
-			warn("high-cut filter: npoles = %d, 3db point = %f(Hz)",
-				2*npoleshi, f3dbhi/dt);
-		} else {
-			warn("high-cut filter: npoles = %d, 3db point = %f(Hz)",
-				npoleshi, f3dbhi/dt);
-
-		}
-	}
-
-	/* Main loop over traces */
-	do {
-		/* low-cut (high pass) filter */
-		if (locut) {
-		    bfhighpass(npoleslo,f3dblo,nt,tr.data,tr.data);
-		    if (zerophase) {
-			register int i;
-		        for (i=0; i<nt/2; ++i) { /* reverse trace in place */
-				register float tmp = tr.data[i];
-				tr.data[i] = tr.data[nt-1 - i];
-				tr.data[nt-1 - i] = tmp;
-			}
-		        bfhighpass(npoleslo,f3dblo,nt,tr.data,tr.data);
-		        for (i=0; i<nt/2; ++i) { /* flip trace back */
-				register float tmp = tr.data[i];
-				tr.data[i] = tr.data[nt-1 - i];
-				tr.data[nt-1 - i] = tmp;
-			}
-		    }
-		}
-
-		/* high-cut (low pass) filter */
-		if (hicut) {
-		    bflowpass(npoleshi,f3dbhi,nt,tr.data,tr.data);
-		    if (zerophase) {
-			register int i;
-			for (i=0; i<nt/2; ++i) { /* reverse trace */
-				register float tmp = tr.data[i];
-				tr.data[i] = tr.data[nt-1 - i];
-				tr.data[nt-1 - i] = tmp;
-			}
-			bflowpass(npoleshi,f3dbhi,nt,tr.data,tr.data);
-		        for (i=0; i<nt/2; ++i) { /* flip trace back */
-				register float tmp = tr.data[i];
-				tr.data[i] = tr.data[nt-1 - i];
-				tr.data[nt-1 - i] = tmp;
-			}
-		    }
-		}
-		
-		puttr(&tr);
-	} while (gettr(&tr));
-
-	return(CWP_Exit());
+void su_bflowpass(int zerophase, int npoles, float f3db, size_t nt, float *data_in, float *data_out){
+    if (data_out == NULL){
+        data_out = data_in;
+    }
+    bflowpass(npoles,f3db,nt,data_in,data_out);
+    if (zerophase) {
+        register int i;
+        for (i=0; i<nt/2; ++i) { /* reverse trace */
+            register float tmp = data_out[i];
+            data_out[i] = data_out[nt-1 - i];
+            data_out[nt-1 - i] = tmp;
+        }
+        bflowpass(npoles,f3db,nt,data_out,data_out);
+            for (i=0; i<nt/2; ++i) { /* flip trace back */
+            register float tmp = data_out[i];
+            data_out[i] = data_out[nt-1 - i];
+            data_out[nt-1 - i] = tmp;
+        }
+    }
 }

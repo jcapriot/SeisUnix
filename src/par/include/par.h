@@ -105,20 +105,8 @@ void syserr (char *fmt, ...);
 void warn (char *fmt, ...);
 
 /* self documentation */
-void pagedoc (void);
-void requestdoc (int i);
-
-/* system calls with error trapping */
-int ecreat(char *path, int perms);
-int efork(void);
-int eopen(char *path, int flags, int perms);
-int eclose(int fd);
-int eunlink(char *path);
-off_t elseek(int fd, off_t offset, int origin);
-int epipe(int fd[2]);
-
-ssize_t eread(int fd, char *buf, size_t nbytes);
-ssize_t ewrite(int fd, char *buf, size_t nbytes);
+void pagedoc (char *sdoc[]);
+void requestdoc (int i, char *sdoc[]);
 
 /* system subroutine calls with error trapping */
 FILE *efopen(const char *file, const char *mode);
@@ -212,8 +200,10 @@ float eatof(char *s);
 double eatod(char *s);
 
 /* file type checking */
+/*
 FileType filestat(int fd);
 char *printstat(int fd);
+*/
 
 /* Hale's modeling code */
 void decodeReflectors (int *nrPtr,

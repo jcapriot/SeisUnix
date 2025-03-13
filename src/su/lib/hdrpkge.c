@@ -73,8 +73,6 @@ swaphval: CWP: John Stockwell
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
-#include "hdr.h"
 #include "bhdr.h"
 #include "tapesegy.h"
 #include "tapehdr.h"

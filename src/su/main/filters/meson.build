@@ -3,7 +3,7 @@ su_filter_srcs = files(
     #'succfilt.c',
     #'sudeghost.c',
     #'sudipfilt.c',
-    #'sufilter.c',
+    'sufilter.c',
     #'sufrac.c',
     #'sufwatrim.c',
     #'suk1k2filter.c',

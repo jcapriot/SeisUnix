@@ -10,6 +10,7 @@
 #include <float.h>
 
 /*********************** self documentation *****************************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUGAIN - apply various types of gain				  	",
@@ -74,6 +75,8 @@ char *sdoc[] = {
 "									",
 "      option etpow only becomes active if epow is nonzero		",
 NULL};
+#endif
+
 
 /* Credits:
  *	SEP: Jon Claerbout
@@ -88,698 +91,93 @@ NULL};
  */
 /**************** end self doc *******************************************/
 
-/* subroutine prototypes */
-void gain(float *data, float tpow, float epow, float etpow, float gpow, float vred,
-	  int agc, int gagc, int qbal, int pbal, int mbal, float scale, float bias,
-	  register float trap, register float clip, float qclip, int iwagc,
-	  register float tmin, register float dt, int nt,
-	  int maxbal ,float pclip ,float nclip );
-void do_tpow(float *data, float tpow, float vred, register float tmin,
-	     register float dt, int nt);
-void do_epow(float *data, float epow, float etpow, register float tmin, register float dt,
-	     int nt);
-void do_trap(float *data, register float trap, register int nt);
-void do_clip(float *data, register float clip, register int nt);
-void do_nclip(float *data, register float nclip, register int nt);
-void do_pclip(float *data, register float pclip, register int nt);
-void do_qclip(float *data, float qclip, int nt);
-void do_qbal(float *data, float qclip, int nt);
-void do_agc(float *data, int iwagc, int nt);
-void do_gagc(float *data, int iwagc, int nt);
-float quant(float *a, int k, int n);
-static void closefiles(void);
 
-#define TPOW     0.0
-#define EPOW     0.0
-#define ETPOW    1.0
-#define GPOW     1.0
-#define TRAP     0.0
-#define CLIP     0.0
-#define QCLIP    1.0
-#define SCALE    1.0
-#define BIAS     0.0
-#define WAGC     0.5
-#define VRED     0.0
-
-/* Globals (so can trap signal) defining temporary disk files */
-char tracefile[BUFSIZ];	/* filename for the file of traces	*/
-char headerfile[BUFSIZ];/* filename for the file of headers	*/
-FILE *tracefp;		/* fp for trace storage file		*/
-FILE *headerfp;		/* fp for header storage file		*/
-
-segy tr;
-
-int
-main(int argc, char **argv)
-{
-	int verbose;	/* flag for echoing info			*/
-	int jon;	/* flag to get Claerbout values		 	*/
-	int agc;	/* agc flag				     	*/
-	int gagc;	/* gaussian agc flag			    	*/
-	int pbal;	/* power balance flag			   	*/
-	int qbal;	/* quantile balance flag			*/
-	int mbal=0;     /* mean balance flag			    	*/
-	float tpow;     /* exponent of t				*/
-	float epow;     /* deattenutation coefficient		   	*/
-	float etpow;    /* deattenutation power of t			*/
-	float gpow;     /* dynamic compression power		    	*/
-	float vred;	/* data reducing velocity in meters per second	*/
-	float trap;     /* zero any larger value magnitude than trapval */
-	float clip;     /* clip any larger value magnitude than clipval */
-	float pclip;    /* clip any value greater than clipval		*/
-	float nclip;    /* clip any value less than clipval		*/
-	float qclip;    /* clip at qth quantile (100qth percentile)     */
-	float scale;    /* overall scale factor				*/
-	float norm;     /* reciprocal of scale factor			*/
-	float bias=0.0; /* overall bias  value				*/
-	float wagc;     /* size of agc window in seconds		*/
-	int iwagc=0;    /* ... half window in samples		   	*/
-	int nt;	 /* number of samples on trace		   		*/
-	float tmin;     /* delay recording time in secs		 	*/
-	float dt;	/* sample rate in secs			  	*/
-	float *data;	/* the data					*/
-	int panel;	/* gain trace by trace or whole data set?	*/
-
-	int maxbal=0;   /* max balance flag			     	*/
-
-	int mark;	/* mark flag					*/
-
-
-	char *tmpdir;		/* directory path for tmp files		*/
-	cwp_Bool istmpdir=cwp_false;/* true for user given path		*/
-
-
-	/* Initialize */
-	initargs(argc, argv);
-	requestdoc(1);
-	
-
-	/* Look for user-supplied tmpdir */
-	if (!getparstring("tmpdir",&tmpdir) &&
-	    !(tmpdir = getenv("CWP_TMPDIR"))) tmpdir="";
-	if (!STREQ(tmpdir, "") && access(tmpdir, WRITE_OK))
-		err("you can't write in %s (or it doesn't exist)", tmpdir);
-
-
-	/* Get nt from first trace */
-	if (!gettr(&tr)) err("can't get first trace");
-	nt   = (int) tr.ns;
-	dt = ((double) tr.dt)/1000000.0;   /* microsecs to secs */
-	tmin = tr.delrt/1000.0;		   /* millisecs to secs */
-	if (!dt) getparfloat("dt", &dt);
-	if (!dt) MUSTGETPARFLOAT("dt", &dt);
-
-
-	/* Get parameters */
-	if (!getparfloat ("tpow" , &tpow))	tpow     = TPOW;
-	if (!getparfloat ("epow" , &epow))	epow     = EPOW;
-	if (!getparfloat ("etpow" , &etpow))	etpow    = ETPOW;
-	if (!getparfloat ("gpow" , &gpow))	gpow     = GPOW;
-	if (!getparfloat ("vred" , &vred))	vred     = VRED;
-	if (!getparfloat ("trap" , &trap))	trap     = TRAP;
-	if (!getparfloat ("clip" , &clip))	clip     = CLIP;
-	if (!getparfloat ("pclip" , &pclip))    pclip    = FLT_MAX;
-	if (!getparfloat ("nclip" , &nclip))    nclip    = -FLT_MAX;
-	if (!getparfloat ("qclip", &qclip))     qclip    = QCLIP;
-	if (!getparfloat ("scale", &scale))     scale    = SCALE;
-	if (!getparfloat ("norm",  &norm)) 	norm     = 0.0;
-	if (!getparfloat ("bias",  &bias))	bias     = BIAS;
-	if (!getparfloat ("wagc" , &wagc))	wagc     = WAGC;
-	if (!getparint   ("agc"  , &agc))	agc	= 0;
-	if (!getparint   ("gagc" , &gagc))	gagc     = 0;
-	if (!getparint   ("pbal" , &pbal))	pbal     = 0;
-	if (!getparint   ("qbal" , &qbal))	qbal     = 0;
-	if (!getparint   ("mbal" , &mbal))	mbal     = 0;
-	if (!getparint   ("panel", &panel))     panel    = 0;
-	if (!getparint   ("jon"  , &jon))	jon	= 0;
-	if (!getparint("verbose", &verbose))	verbose  = 0;
-	if (!getparint   ("maxbal" , &maxbal))	maxbal   = 0;
-	if (!getparint   ("mark" , &mark))	mark     = 0;
-	
-        checkpars();
-
-	/* Data validation */
-	if (vred < 0.0) err("vred = %f, must be positive", vred);
-	if (trap < 0.0) err("trap = %f, must be positive", trap);
-	if (clip < 0.0) err("clip = %f, must be positive", clip);
-	if (qclip < 0.0 || qclip > 1.0) 
-		err("qclip = %f, must be between 0 and 1", qclip);
-	if (agc || gagc) {
-		/* iwagc = NINT(wagc/dt); */
-		iwagc = NINT(wagc/dt);
-		if (iwagc < 1) err("wagc=%g must be positive", wagc);
-		if (iwagc > nt) err("wagc=%g too long for trace", wagc);
-		iwagc >>= 1;  /* windows are symmetric, so work with half -- right shift by one bit */
-                if (verbose) warn("half window: %d samples",iwagc);
-	}
-	if (jon) { 
-		tpow  = 2.0;
-		gpow  = 0.5;
-		qclip = 0.95;
-	}
-
-	if (norm) {
-		scale /= norm;
-	}
-
-	/* Main loop over traces */
-	if (!panel) { /* trace by trace */
-		data = ealloc1float(nt);
-		do {
-			memcpy((void *)data, (const void *) tr.data, nt*FSIZE);
-
-			if (!(tr.mark || mark) ) {
-				gain(data, tpow, epow, etpow, gpow, vred, agc, gagc,
-				     qbal, pbal, mbal, scale, bias, trap, clip,
-				     qclip, iwagc, tmin, dt, nt, maxbal, pclip,
-				     nclip );
-			} else if ( (mark) && (tr.mark) ) {
-				gain(data, tpow, epow, etpow, gpow, vred, agc, gagc,
-				     qbal, pbal, mbal, scale, bias, trap, clip,
-				     qclip, iwagc, tmin, dt, nt, maxbal, pclip,
-				     nclip );
-			}
-
-			memcpy((void *)tr.data, (const void *) data, nt*FSIZE);
-			puttr(&tr);
-
-		} while(gettr(&tr));
-	} else { /* do whole data set at once */
-		int itr, ntr = 0;
-		
-		/* Store traces, headers in tempfiles while getting a count */
-		if (STREQ(tmpdir,"")) {
-			tracefp = etmpfile();
-			headerfp = etmpfile();
-			if (verbose) warn("using tmpfile() call");
-		} else { /* user-supplied tmpdir */
-		char directory[BUFSIZ];
-		strcpy(directory, tmpdir);
-		strcpy(tracefile, temporary_filename(directory));
-		strcpy(headerfile, temporary_filename(directory));
-		/* Handle user interrupts */
-		signal(SIGINT, (void (*) (int)) closefiles);
-		signal(SIGQUIT, (void (*) (int)) closefiles);
-		signal(SIGHUP,  (void (*) (int)) closefiles);
-		signal(SIGTERM, (void (*) (int)) closefiles);
-		tracefp = efopen(tracefile, "w+");
-		headerfp = efopen(headerfile, "w+");
-			istmpdir=cwp_true;		
-		if (verbose) warn("putting temporary files in %s", directory);
-	}
-		do {
-			++ntr;
-			efwrite(&tr, HDRBYTES, 1, headerfp);
-			efwrite(tr.data, FSIZE, nt, tracefp);
-		} while (gettr(&tr));
-		erewind(tracefp);
-		erewind(headerfp);
-		data = ealloc1float(nt*ntr);
-		
-		/* Load traces into data and close tmpfile */
-		efread(data, FSIZE, nt*ntr, tracefp);
-		efclose(tracefp);
-		if (istmpdir) eremove(tracefile);
-	
-		gain(data, tpow, epow, etpow, gpow, vred, agc, gagc, qbal,
-		     pbal, mbal, scale, bias, trap, clip, qclip,
-		     iwagc, tmin, dt, nt*ntr, maxbal, pclip, nclip );
-
-		for (itr = 0; itr < ntr; itr++) {
-			memcpy((void *) tr.data, (const void *) (data+itr*nt),
-				nt*FSIZE);
-			efread(&tr, 1, HDRBYTES, headerfp);
-			puttr(&tr);
-		}
-		efclose(headerfp);
-		if (istmpdir) eremove(headerfile);
-	}
-	
-	free1(data);
-	
-	return(CWP_Exit());
-}
-
-
-/* Multiply by t^tpow */
-void do_tpow(
-	float *data,		/* the data			*/
-	float tpow,	     /* multiply data by t^tpow	*/
-	float vred,		/* reducing velocity		*/
-	register float tmin,    /* first time on record	 */
-	register float dt,	/* sampling rate in seconds     */
-	int nt		  /* number of samples	    */
-)
-{
-	static cwp_Bool first = cwp_true;   /* first entry flag     */
-	static float *tpowfac;	  /* tpow values	  */
-	register int i;		 /* counter		*/
-	register float tred;	/* reduced time in seconds	*/
-
-	if (first) { /* first entry, set up array of tpow factors */
-		tpowfac = ealloc1float(nt);
-
-		/* protect against negative tpow */
-		tpowfac[0] = (tmin == 0.0) ? 0.0 : pow(tmin, tpow);
-		for (i = 1; i < nt; ++i) 
-			tpowfac[i] = pow(tmin + i*dt, tpow);
-
-		first = cwp_false;
-		/* for (i = 0; i < nt; ++i)
-		   fprintf(stderr,"%d %f\n",i,tpowfac[i]); */
-	} /* end first entry */
-
-	if ( vred > 0.0 ) {	/* recompute array of tpowfac for each trace */
-		tred = (float)tr.offset / vred;
-		if ( tred < 0.0 ) tred *= -1.0;	/* remove sign */
-		for (i = 1; i < nt; ++i)
-			tpowfac[i] = pow(tmin + tred + i*dt, tpow);
-	} /* fprintf(stderr,"%f %f %f\n",tred,tmin,tmin+(nt-1)*dt); */
-
-	for (i = 0; i < nt; ++i)  data[i] *= tpowfac[i];
-}
-
-
-/* Exponential deattenuation  with deattenuation factor epow */
-/* and with  with deattenuation  power etpow */
-void do_epow(
-	float *data,		/* the data			*/
-	float epow,	     /* coefficient of t in exponent */
-	float etpow,	     /* exponent of t in exponent */
-	register float tmin,    /* first time on record	 */
-	register float dt,	/* sampling rate in seconds     */
-	int nt		  /* number of samples	    */
-)
-{
-	register int i;		 /* counter		*/
-	static cwp_Bool first = cwp_true;   /* first entry flag     */
-	static float *epowfac;	  /* exponent stretchs    */
-	static float *etpowfac;	  /* etpow values	  */
-
-	if (first) {
-		epowfac = ealloc1float(nt);
-		etpowfac = ealloc1float(nt);
-
-
-		/* protect against negative tpow */
-		etpowfac[0] = (tmin == 0.0) ? 0.0 : pow(tmin, etpow);
-		for (i = 1; i < nt; ++i) 
-			etpowfac[i] = pow(tmin + i*dt, etpow);
-
-		for (i = 0; i < nt; i++) 
-			epowfac[i] = exp(epow * etpowfac[i]);
-
-		first = cwp_false;
-	}
-
-	for (i = 0; i < nt; ++i)  data[i] *= epowfac[i];
-}
-
-
-/* Zero out outliers */
-void do_trap(
-	float *data,		/* the data			*/
-	register float trap,    /* zero if magnitude > trap     */
-	register int nt	 /* number of samples	    */
-)
-{
-	register float *dataptr = data;
-
-	while (nt--) {
-		if (ABS(*dataptr) > trap) *dataptr = 0.0;
-		dataptr++;
-	}
-}
-
-
-/* Hard clip outliers */
-void do_clip(
-	float *data,		/* the data				*/
-	register float clip,    /* hard clip if magnitude > clip	*/
-	register int nt	 /* number of samples		    */
-)
-{
-	register float *dataptr = data;
-	register float mclip = -clip;
-
-	while (nt--) {
-		if (*dataptr > clip) {
-			*dataptr = clip;
-		} else if (*dataptr < mclip) {
-			*dataptr = mclip;
-		}
-		dataptr++;
-	}
-}
-
-
-
-/* Hard clip maxima */
-void do_pclip(
-	float *data,		/* the data				*/
-	register float pclip,    /* hard clip if magnitude > clip	*/
-	register int nt	 /* number of samples		    */
-)
-{
-	register float *dataptr = data;
-
-	while (nt--) {
-		if (*dataptr > pclip) {
-			*dataptr = pclip;
-		}
-		dataptr++;
-	}
-}
-
-
-/* Hard clip minima */
-void do_nclip(
-	float *data,		/* the data				*/
-	register float nclip,    /* hard clip if magnitude > clip	*/
-	register int nt	 /* number of samples		    */
-)
-{
-	register float *dataptr = data;
-
-	while (nt--) {
-		if (*dataptr < nclip) {
-			*dataptr = nclip;
-		}
-		dataptr++;
-	}
-}
-
-
-/* Quantile clip on magnitudes of trace values */
-void do_qclip(
-	float *data,	/* the data			*/
-	float qclip,    /* quantile at which to clip    */
-	int nt	  /* number of sample points	*/
-)
-{
-	register int i;
-	static cwp_Bool first = cwp_true;   /* first entry flag	     */
-	static float *absdata;	  /* absolute value trace	 */
-	static int iq;		  /* index of qclipth quantile    */
-	float clip;		     /* ... value of rank[iq]	*/
-
-	if (first) {
-		absdata = ealloc1float(nt);
-		iq = (int) (qclip * nt - 0.5); /* round, don't truncate */
-		first = cwp_false;
-	}
-
-	/* Clip on value corresponding to qth quantile */
-	for (i = 0; i < nt; ++i)  absdata[i] = ABS(data[i]);
-	clip = quant(absdata, iq, nt);
-	do_clip(data, clip, nt);
-}
-
-
-/* Quantile balance */
-void do_qbal(
-	float *data,	/* the data			*/
-	float qclip,    /* quantile at which to clip    */
-	int nt	  /* number of sample points	*/
-)
-{
-	register int i;
-	static cwp_Bool first = cwp_true;   /* first entry flag	     */
-	static float *absdata;	  /* absolute value trace	 */
-	static int iq;		  /* index of qclipth quantile    */
-	float bal;			/* value used to balance trace  */
-
-	if (qclip == 1.0) { /* balance by max magnitude on trace */
-		bal = ABS(data[0]);
-		for (i = 1; i < nt; ++i)  bal = MAX(bal, ABS(data[i]));
-
-		if (bal == 0.0) {
-			return;
-		} else {
-			for (i = 0; i < nt; ++i)  data[i] /= bal;
-			return;
-		}
-	} else if (first) {
-		absdata = ealloc1float(nt);
-		iq = (int) (qclip * nt - 0.5); /* round, don't truncate */
-		first = cwp_false;
-	}
-
-	/* Balance by quantile value (qclip < 1.0) */
-	for (i = 0; i < nt; ++i)  absdata[i] = ABS(data[i]);
-	bal = quant(absdata, iq, nt);
-
-	if (bal == 0.0) {
-		return;
-	} else {
-		for (i = 0; i < nt; ++i)  data[i] /= bal;
-		do_clip(data, 1.0, nt);
-		return;
-	}
-}
-
-
-/* Automatic Gain Control--standard box */
-void do_agc(float *data, int iwagc, int nt)
-{
-	static cwp_Bool first = cwp_true;
-	static float *agcdata;
-	register int i,j;
-	static float *d2;	/* square of input data		 */
-	register float val;
-	register float sum;
-	register int nwin;
-	register float rms;
-
-
-	/* allocate room for agc'd data and square of data */
-	if (first) {
-		first = cwp_false;
-		agcdata = ealloc1float(nt);
-		d2 = ealloc1float(nt);
-	}
-
-	/* Compute square of data */
-	for (i = 0; i < nt; ++i) {
-		val = data[i];
-		d2[i] = val * val;
-	}
-
-	/* intialize first half window and gain first sample */
-	sum = 0.0;
-	for (i = 0; i < iwagc; ++i) {
-		sum += d2[i];
-	}
-	nwin = iwagc;  
-	rms = sum/nwin;
-	/* rms = 0 implies data[0]=0 */
-        if (rms == 0) {
-		agcdata[0]=0;
-	} else {
-		agcdata[0]=data[i]/sqrt(rms);
-	}	
- 
-	/* ramping on : increase sum and nwin & gain data until reaching 2*iwagc-1 window */
-        /* processing samples from 1 to iwagc-1 */
-	for (i = 1; i < iwagc; ++i) {
-		sum += d2[i+iwagc-1];
-		++nwin;
-		rms = sum/nwin;
-		/* rms = 0 implies data[i]=0 */
-                if (rms == 0) {
-                	agcdata[i]=0;
-		} else {
-			agcdata[i]=data[i]/sqrt(rms);
-		}	
- 	}
-
-	/*  full 2*iagc rms window -- gain data */
-	/* compute sum from 0 at each sample -- decreasing sum give inaccurate results, even negative RMS */
-	/* processing samples from iwagc to nt-iwagc-1 */
-	++nwin;
-	for (i = iwagc; i < nt-iwagc; ++i) {
-		sum=0;
-                for (j = i-iwagc; j < i+iwagc; ++j) {
-			sum +=d2[j];
-                }
-		rms = sum/nwin;
-                if (rms == 0) {
-                	agcdata[i]=0;
-		} else {
-			agcdata[i]=data[i]/sqrt(rms);
-		}	
- 	}
-
-	/* ramping off -- decrease nwin -- gain data */
-	/* compute sum from 0 at each sample -- decreasing sum give inaccurate results, even negative RMS */
-	/* processing samples from nt-iwagc to nt-1 */
-	for (i = nt-iwagc; i < nt; ++i) {
-		sum=0;
-                for (j = i-iwagc; j < nt; ++j) {
-			sum +=d2[j];
-                }
-		--nwin;
-		rms = sum/nwin;
-                if (data[i] == 0) {
-                	agcdata[i]=0;
-		} else {
-			agcdata[i]=data[i]/sqrt(rms);
-		}	
- 	}
-
-	/* copy data back into trace */
-	memcpy( (void *) data, (const void *) agcdata, nt*FSIZE);
-
-	return;
-}
-
+/* Library version of SUGAIN
+ *
+ * The main program is not part of the library, the functions below are what it does to a trace.
+ *
+ * Compared to sugain.c the lookup tables and scratch arrays are arguments, instead of function level
+ * statics that are allocated and filled by the first trace to come through (those could not be shared
+ * between traces of different lengths, or used from more than one thread). The caller owns all the memory.
+ * The reducing velocity is handled by the caller, by choosing the reduced time `tred` of su_gain_tpow_table().
+ */
 
 #define EPS     3.8090232	/* exp(-EPS*EPS) = 5e-7, "noise" level  */
 
-/* Automatic Gain Control--gaussian taper */
-void do_gagc(float *data, int iwagc, int nt)
+static float quant(float *a, int k, int n);
+static void do_trap(float *data, register float trap, register int nt);
+static void do_clip(float *data, register float clip, register int nt);
+static void do_nclip(float *data, register float nclip, register int nt);
+static void do_pclip(float *data, register float pclip, register int nt);
+static void do_qclip(float *data, float qclip, int nt, float *absdata);
+static void do_qbal(float *data, float qclip, int nt, float *absdata);
+static void do_agc(float *data, int iwagc, int nt, float *agcdata, float *d2);
+static void do_gagc(float *data, int iwagc, int nt, float *agcdata, float *w, float *d2, float *s);
+
+/* Table of t^tpow for nt samples starting at time tmin, with sample interval dt.
+ * tred is the reduced time (|offset|/vred), or 0 for no reduction. */
+void su_gain_tpow_table(float *tpowfac, int nt, float tmin, float dt, float tpow, float tred)
 {
-	static cwp_Bool first=cwp_true; /* first entry flag		 */
-	static float *agcdata;  /* agc'd data			   */
-	static float *w;	/* Gaussian window weights		*/
-	static float *d2;	/* square of input data		 */
-	static float *s;	/* weighted sum of squares of the data  */
-	float u;		/* related to reciprocal of std dev     */
-	float usq;		/* u*u				  */
+	register int i;
 
-
-	if (first) {
-		first = cwp_false;
-
-		/* Allocate room for agc'd data */
-		agcdata = ealloc1float(nt);
-
-		/* Allocate and compute Gaussian window weights */
-		w = ealloc1float(iwagc);  /* recall iwagc is HALF window */
-		u = EPS / ((float) iwagc);
-		usq = u*u;
-		{
-			register int i;
-			float floati;
-
-			for (i = 1; i < iwagc; ++i) {
-				floati = (float) i;
-				w[i] = exp(-(usq*floati*floati));
-			}
-		}
-
-		/* Allocate sum of squares and weighted sum of squares */
-		d2 = ealloc1float(nt);
-		s  = ealloc1float(nt);
-	}
-
-
-	/* Agc the trace */
-	{
-		register int i, j, k;
-		register float val;
-		register float wtmp;
-		register float stmp;
-
-		/* Put sum of squares of data in d2 and */
-		/* initialize s to d2 to get center point set */
-		for (i = 0; i < nt; ++i) {
-			val = data[i];
-			s[i] = d2[i] = val * val;
-		}
-
-		/* Compute weighted sum s; use symmetry of Gaussian */
-		for (j = 1; j < iwagc; ++j) {
-			wtmp = w[j];
-			for (i = j; i < nt; ++i)  s[i] += wtmp*d2[i-j]; 
-			k = nt - j;
-			for (i = 0; i < k; ++i)   s[i] += wtmp*d2[i+j]; 
-		}
-
-		for (i = 0; i < nt; ++i) {
-			stmp = s[i];
-			agcdata[i] = (!stmp) ? 0.0 : data[i]/sqrt(stmp);
-		}
-
-		/* Copy data back into trace */
-		memcpy( (void *) data, (const void *) agcdata, nt*FSIZE);
-	}
-
-
-	return;
+	/* protect against negative tpow */
+	tpowfac[0] = (tmin == 0.0) ? 0.0 : pow(tmin, tpow);
+	for (i = 1; i < nt; ++i)
+		tpowfac[i] = pow(tmin + tred + i*dt, tpow);
 }
 
-
-/*
- * QUANT - find k/n th quantile of a[]
- *
- * Works by reordering a so a[j] < a[k] if j < k.
- *
- * Parameters:
- *    a	 - data
- *    k	 - indicates quantile
- *    n	 - number of points in data
- *
- * This is Hoare's algorithm worked over by SEP (#10, p100) and Brian.
- */
-
-float quant(float *a, int k, int n)
+/* Table of exp(epow * t^etpow) for nt samples starting at time tmin, with sample interval dt */
+void su_gain_epow_table(float *epowfac, int nt, float tmin, float dt, float epow, float etpow)
 {
-	register int i, j;
-	int low, hi;
-	register float ak, aa;
+	register int i;
+	float etpowfac;
 
-	low = 0; hi = n-1;
-
-	while (low < hi) {
-		ak = a[k];
-		i = low;
-		j = hi;
-		do {
-			while (a[i] < ak) i++;
-			while (a[j] > ak) j--;
-			if (i <= j) {
-				aa = a[i]; a[i] = a[j]; a[j] = aa;
-				i++;
-				j--;
-			}
-		} while (i <= j);
-
-		if (j < k) low = i;
-
-		if (k < i) hi = j;
+	/* protect against negative etpow */
+	etpowfac = (tmin == 0.0) ? 0.0 : pow(tmin, etpow);
+	epowfac[0] = exp(epow * etpowfac);
+	for (i = 1; i < nt; ++i) {
+		etpowfac = pow(tmin + i*dt, etpow);
+		epowfac[i] = exp(epow * etpowfac);
 	}
-
-	return(a[k]);
 }
 
-/*
- * GAIN - apply all the various gains
+/* Apply all the various gains to data[nt]. This is gain() from sugain.c.
  *
+ * tpowfac, epowfac: tables from the functions above (only used if tpow, or epow, are not 0)
+ *
+ * The scratch arrays, which the program has as statics, are:
+ * absdata[nt]	used by qclip and qbal
+ * agcdata[nt]	used by agc and gagc
+ * d2[nt]	used by agc and gagc
+ * w[iwagc]	used by gagc
+ * s[nt]	used by gagc
  */
-void gain(float *data, float tpow, float epow, float etpow, float gpow, float vred,
+void su_gain(float *data, float tpow, float epow, float gpow,
 	  int agc, int gagc, int qbal, int pbal, int mbal, float scale, float bias,
 	  register float trap, register float clip, float qclip, int iwagc,
-	  register float tmin, register float dt, int nt,
-	  int maxbal ,float pclip ,float nclip )
+	  int nt, int maxbal, float pclip, float nclip,
+	  const float *tpowfac, const float *epowfac,
+	  float *absdata, float *agcdata, float *d2, float *w, float *s)
 {
-    float f_two  = 2.0;
-    float f_one  = 1.0;
-    float f_half = 0.5;
-    register int i;
+	float f_two  = 2.0;
+	float f_one  = 1.0;
+	float f_half = 0.5;
+	register int i;
 
 	if (bias) {
 		for (i = 0; i < nt; ++i)  data[i]+=bias ;
 	}
+
 	if (tpow) {
-		do_tpow(data, tpow, vred, tmin, dt, nt);
+		for (i = 0; i < nt; ++i)  data[i] *= tpowfac[i];
 	}
+
 	if (epow) {
-		do_epow(data, epow, etpow, tmin, dt, nt);
+		for (i = 0; i < nt; ++i)  data[i] *= epowfac[i];
 	}
+
 	if (!CLOSETO(gpow, f_one)) {
 		register float val;
-
 		if (CLOSETO(gpow, f_half)) {
 			for (i = 0; i < nt; ++i) {
 				val = data[i];
@@ -801,39 +199,42 @@ void gain(float *data, float tpow, float epow, float etpow, float gpow, float vr
 			}
 		}
 	}
-	if (agc)		   do_agc(data, iwagc, nt);
-	if (gagc)		  do_gagc(data, iwagc, nt);
+
+	if (agc)		   do_agc(data, iwagc, nt, agcdata, d2);
+	if (gagc)		   do_gagc(data, iwagc, nt, agcdata, w, d2, s);
 	if (trap > 0.0)	    do_trap(data, trap, nt);
 	if (clip > 0.0)	    do_clip(data, clip, nt);
 	if (pclip < FLT_MAX )	do_pclip(data, pclip, nt);
 	if (nclip > -FLT_MAX )     do_nclip(data, nclip, nt);
-	if (qclip < 1.0 && !qbal)  do_qclip(data, qclip, nt);
-	if (qbal)		  do_qbal(data, qclip, nt);
+	if (qclip < 1.0 && !qbal)  do_qclip(data, qclip, nt, absdata);
+	if (qbal)		  do_qbal(data, qclip, nt, absdata);
+
 	if (pbal) {
 		register int i;
 		register float val;
 		register float rmsq = 0.0;
-		
+
 		/* rmsq = sqrt (SUM( a()*a() ) / nt) */
 		for (i = 0; i < nt; ++i) {
 			val = data[i];
 			rmsq += val * val;
 		}
 		rmsq = sqrt(rmsq / nt);
-
 		if (rmsq) {
 			for (i = 0; i < nt; ++i)
 				data[i] /= rmsq;
 		}
 	}
+
 	if (mbal) {
 		register int i;
 		register float mean = 0.0;
-		
+
 		/* mean = SUM (data[i] / nt) */
 		for (i = 0; i < nt; ++i) {
 			mean+=data[i];
 		}
+
 		/* compute the mean */
 		mean/=nt;
 
@@ -847,7 +248,7 @@ void gain(float *data, float tpow, float epow, float etpow, float gpow, float vr
 	if (maxbal) {
 		register int i;
 		register float max = data[0];
-		
+
 		/* max */
 		for (i = 0; i < nt; ++i) {
 			if( data[i] > max ) max = data[i];
@@ -857,21 +258,310 @@ void gain(float *data, float tpow, float epow, float etpow, float gpow, float vr
 		for (i = 0; i < nt; ++i) data[i]-=max;
 	}
 
-
 	if (!CLOSETO(scale, f_one)) {
 		register int i;
-
 		for (i = 0; i < nt; ++i)  data[i] *= scale;
 	}
 }
 
-/* for graceful interrupt termination */
-static void closefiles(void)
+/* Zero out outliers */
+static void do_trap(
+	float *data,		/* the data			*/
+	register float trap,    /* zero if magnitude > trap     */
+	register int nt	 /* number of samples	    */
+)
 {
-	efclose(headerfp);
-	efclose(tracefp);
-	eremove(headerfile);
-	eremove(tracefile);
-	exit(EXIT_FAILURE);
+	register float *dataptr = data;
+
+	while (nt--) {
+		if (ABS(*dataptr) > trap) *dataptr = 0.0;
+		dataptr++;
+	}
 }
 
+/* Hard clip outliers */
+static void do_clip(
+	float *data,		/* the data				*/
+	register float clip,    /* hard clip if magnitude > clip	*/
+	register int nt	 /* number of samples		    */
+)
+{
+	register float *dataptr = data;
+	register float mclip = -clip;
+
+	while (nt--) {
+		if (*dataptr > clip) {
+			*dataptr = clip;
+		} else if (*dataptr < mclip) {
+			*dataptr = mclip;
+		}
+		dataptr++;
+	}
+}
+
+/* Hard clip maxima */
+static void do_pclip(
+	float *data,		/* the data				*/
+	register float pclip,    /* hard clip if magnitude > clip	*/
+	register int nt	 /* number of samples		    */
+)
+{
+	register float *dataptr = data;
+
+	while (nt--) {
+		if (*dataptr > pclip) {
+			*dataptr = pclip;
+		}
+		dataptr++;
+	}
+}
+
+/* Hard clip minima */
+static void do_nclip(
+	float *data,		/* the data				*/
+	register float nclip,    /* hard clip if magnitude > clip	*/
+	register int nt	 /* number of samples		    */
+)
+{
+	register float *dataptr = data;
+
+	while (nt--) {
+		if (*dataptr < nclip) {
+			*dataptr = nclip;
+		}
+		dataptr++;
+	}
+}
+
+/* Quantile clip on magnitudes of trace values (absdata is scratch space for nt floats) */
+static void do_qclip(
+	float *data,	/* the data			*/
+	float qclip,    /* quantile at which to clip    */
+	int nt,	  /* number of sample points	*/
+	float *absdata
+)
+{
+	register int i;
+	int iq;			/* index of qclipth quantile    */
+	float clip;		/* ... value of rank[iq]	*/
+
+	iq = (int) (qclip * nt - 0.5); /* round, don't truncate */
+
+	/* Clip on value corresponding to qth quantile */
+	for (i = 0; i < nt; ++i)  absdata[i] = ABS(data[i]);
+	clip = quant(absdata, iq, nt);
+	do_clip(data, clip, nt);
+}
+
+/* Quantile balance (absdata is scratch space for nt floats) */
+static void do_qbal(
+	float *data,	/* the data			*/
+	float qclip,    /* quantile at which to clip    */
+	int nt,	  /* number of sample points	*/
+	float *absdata
+)
+{
+	register int i;
+	int iq;			/* index of qclipth quantile    */
+	float bal;		/* value used to balance trace  */
+
+	if (qclip == 1.0) { /* balance by max magnitude on trace */
+		bal = ABS(data[0]);
+		for (i = 1; i < nt; ++i)  bal = MAX(bal, ABS(data[i]));
+		if (bal == 0.0) {
+			return;
+		} else {
+			for (i = 0; i < nt; ++i)  data[i] /= bal;
+			return;
+		}
+	}
+
+	iq = (int) (qclip * nt - 0.5); /* round, don't truncate */
+
+	/* Balance by quantile value (qclip < 1.0) */
+	for (i = 0; i < nt; ++i)  absdata[i] = ABS(data[i]);
+	bal = quant(absdata, iq, nt);
+	if (bal == 0.0) {
+		return;
+	} else {
+		for (i = 0; i < nt; ++i)  data[i] /= bal;
+		do_clip(data, 1.0, nt);
+		return;
+	}
+}
+
+/* Automatic Gain Control--standard box (agcdata and d2 are scratch space for nt floats) */
+static void do_agc(float *data, int iwagc, int nt, float *agcdata, float *d2)
+{
+	register int i,j;
+	register float val;
+	register float sum;
+	register int nwin;
+	register float rms;
+
+	/* Compute square of data */
+	for (i = 0; i < nt; ++i) {
+		val = data[i];
+		d2[i] = val * val;
+	}
+
+	/* intialize first half window and gain first sample */
+	sum = 0.0;
+	for (i = 0; i < iwagc; ++i) {
+		sum += d2[i];
+	}
+	nwin = iwagc;
+	rms = sum/nwin;
+
+	/* rms = 0 implies data[0]=0 */
+	if (rms == 0) {
+		agcdata[0]=0;
+	} else {
+		/* (The original has data[i] here, where i == iwagc is left over from the loop above.
+		 * That is not the first sample, so it was a typo for data[0]) */
+		agcdata[0]=data[0]/sqrt(rms);
+	}
+
+	/* ramping on : increase sum and nwin & gain data until reaching 2*iwagc-1 window */
+	/* processing samples from 1 to iwagc-1 */
+	for (i = 1; i < iwagc; ++i) {
+		sum += d2[i+iwagc-1];
+		++nwin;
+		rms = sum/nwin;
+
+		/* rms = 0 implies data[i]=0 */
+		if (rms == 0) {
+			agcdata[i]=0;
+		} else {
+			agcdata[i]=data[i]/sqrt(rms);
+		}
+	}
+
+	/*  full 2*iagc rms window -- gain data */
+	/* compute sum from 0 at each sample -- decreasing sum give inaccurate results, even negative RMS */
+	/* processing samples from iwagc to nt-iwagc-1 */
+	++nwin;
+	for (i = iwagc; i < nt-iwagc; ++i) {
+		sum=0;
+		for (j = i-iwagc; j < i+iwagc; ++j) {
+			sum +=d2[j];
+		}
+		rms = sum/nwin;
+		if (rms == 0) {
+			agcdata[i]=0;
+		} else {
+			agcdata[i]=data[i]/sqrt(rms);
+		}
+	}
+
+	/* ramping off -- decrease nwin -- gain data */
+	/* compute sum from 0 at each sample -- decreasing sum give inaccurate results, even negative RMS */
+	/* processing samples from nt-iwagc to nt-1 */
+	for (i = nt-iwagc; i < nt; ++i) {
+		sum=0;
+		for (j = i-iwagc; j < nt; ++j) {
+			sum +=d2[j];
+		}
+		--nwin;
+		rms = sum/nwin;
+		if (data[i] == 0) {
+			agcdata[i]=0;
+		} else {
+			agcdata[i]=data[i]/sqrt(rms);
+		}
+	}
+
+	/* copy data back into trace */
+	memcpy( (void *) data, (const void *) agcdata, nt*FSIZE);
+	return;
+}
+
+/* Automatic Gain Control--gaussian taper
+ * (agcdata, d2 and s are scratch space for nt floats, w for iwagc floats) */
+static void do_gagc(float *data, int iwagc, int nt, float *agcdata, float *w, float *d2, float *s)
+{
+	float u;		/* related to reciprocal of std dev     */
+	float usq;		/* u*u				  */
+
+	/* Compute Gaussian window weights */
+	u = EPS / ((float) iwagc);
+	usq = u*u;
+	{
+		register int i;
+		float floati;
+		for (i = 1; i < iwagc; ++i) {
+			floati = (float) i;
+			w[i] = exp(-(usq*floati*floati));
+		}
+	}
+
+	/* Agc the trace */
+	{
+		register int i, j, k;
+		register float val;
+		register float wtmp;
+		register float stmp;
+
+		/* Put sum of squares of data in d2 and */
+		/* initialize s to d2 to get center point set */
+		for (i = 0; i < nt; ++i) {
+			val = data[i];
+			s[i] = d2[i] = val * val;
+		}
+
+		/* Compute weighted sum s; use symmetry of Gaussian */
+		for (j = 1; j < iwagc; ++j) {
+			wtmp = w[j];
+			for (i = j; i < nt; ++i)  s[i] += wtmp*d2[i-j];
+			k = nt - j;
+			for (i = 0; i < k; ++i)   s[i] += wtmp*d2[i+j];
+		}
+
+		for (i = 0; i < nt; ++i) {
+			stmp = s[i];
+			agcdata[i] = (!stmp) ? 0.0 : data[i]/sqrt(stmp);
+		}
+
+		/* Copy data back into trace */
+		memcpy( (void *) data, (const void *) agcdata, nt*FSIZE);
+	}
+	return;
+}
+
+/*
+ * QUANT - find k/n th quantile of a[]
+ *
+ * Works by reordering a so a[j] < a[k] if j < k.
+ *
+ * Parameters:
+ *    a	 - data
+ *    k	 - indicates quantile
+ *    n	 - number of points in data
+ *
+ * This is Hoare's algorithm worked over by SEP (#10, p100) and Brian.
+ */
+static float quant(float *a, int k, int n)
+{
+	register int i, j;
+	int low, hi;
+	register float ak, aa;
+
+	low = 0; hi = n-1;
+	while (low < hi) {
+		ak = a[k];
+		i = low;
+		j = hi;
+		do {
+			while (a[i] < ak) i++;
+			while (a[j] > ak) j--;
+			if (i <= j) {
+				aa = a[i]; a[i] = a[j]; a[j] = aa;
+				i++;
+				j--;
+			}
+		} while (i <= j);
+		if (j < k) low = i;
+		if (k < i) hi = j;
+	}
+	return(a[k]);
+}

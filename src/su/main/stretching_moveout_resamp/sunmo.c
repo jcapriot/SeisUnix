@@ -7,6 +7,7 @@
 #include "segy.h"
 
 /*********************** self documentation ******************************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									     ",
 " SUNMO - NMO for an arbitrary velocity function of time and CDP	     ",
@@ -60,6 +61,8 @@ char *sdoc[] = {
 " The version of sunmo with experimental anisotropy support is \"sunmo_a\"   ",
 "									     ",
 NULL};
+#endif
+
 
 /* Credits:
  *	SEP: Shuki Ronen, Chuck Sword
@@ -85,338 +88,132 @@ NULL};
  */
 /**************** end self doc *******************************************/
 
-static void interpovv (int nt, int ncdp, float *cdp, 
-	float **ovv, float cdpt, float *ovvt );
 
-segy tr;
+/* Library version of SUNMO
+ *
+ * The main program is not part of the library. It reads the velocity functions and works out the sloth (1/v^2)
+ * at the sample times of each trace, for the CDP of the trace. Doing that is left to the caller, and what is here
+ * is what is done to a trace once the sloth, and the offset, are known:
+ *
+ *	su_nmo_tables:	times t(tn), the stretch, and the mute (these only change if the sloth or the offset do)
+ *	su_nmo:		the NMO (or the inverse NMO) of a trace, with those tables
+ *
+ * All the arrays are the caller's, none are allocated here (the tables and the work array are made by
+ * the main program).
+ *
+ * Differences from the program:
+ *  - In the inverse NMO the first sample that is not muted can come out negative, and is used as an index. It is
+ *    kept from being negative.
+ *
+ * nt must be at least 2 (4 for the inverse NMO).
+ */
 
-int
-main(int argc, char **argv)
+/* The tables for NMO, or the inverse NMO, of traces of nt samples that start at time ft and are dt apart, at offset
+ * `offset`, and where the sloth (1/v^2) is ovvt[nt].
+ *
+ * smute: samples with NMO stretch exceeding smute are zeroed. upward: scan upward to find the first sample to kill.
+ * sscale: the stretch is going to be applied to the amplitudes (so the table for it is made for the inverse NMO).
+ *
+ * ttn[nt]: time t(tn) for NMO, in samples. atn[nt]: amplitude a(tn) for NMO (the inverse of the stretch factor).
+ * tnt[nt]: time tn(t) for the inverse NMO, in samples, and at[nt] amplitude a(t); (only used for the inverse NMO)
+ * itmute: samples with indices less than this are zeroed
+ */
+void su_nmo_tables(int nt, float dt, float ft, float offset, const float *ovvt, float smute, int upward,
+	int invert, int sscale, float *ttn, float *atn, float *tnt, float *at, int *itmute_out)
 {
-	int nt;			/* number of time samples per trace */
-	float dt;		/* time sampling interval */
-	float ft;		/* time of first sample */
-	int it;			/* time sample index */
+	int it, itmute;
+	float tn, temp, tsq, osmute;
 
-	int ncdp;		/* number of cdps specified */
-	float *cdp=NULL;	/* array[ncdp] of cdps */
-	int icdp;		/* index into cdp array */
-	int jcdp;		/* index into cdp array */
-
-	int nvnmo;		/* number of vnmos specified */
-	float *vnmo=NULL;	/* array[nvnmo] of vnmos */
-	int ntnmo;		/* number of tnmos specified */
-	float *tnmo=NULL;	/* array[ntnmo] of tnmos */
-	float **ovv=NULL;	/* array[ncdp][nt] of sloth */
-				/*      i.e. (1/velocity^2) functions */
-	float *ovvt=NULL;	/* array[nt] of sloth for a particular trace */
-
-	float smute;		/* zero samples with NMO stretch exceeding */
-				/*  smute */
-	float osmute;		/* 1/smute */
-	int lmute;		/* length in samples of linear ramp for mute */
-	int itmute=0;		/* zero samples with indices less than itmute */
-	int sscale;		/* if non-zero, apply NMO stretch scaling */
-	int invert;		/* if non-zero, do inverse NMO */
-	
-	long oldoffset;		/* offset of previous trace */
-	long oldcdp;		/* cdp of previous trace */
-
-	int newsloth;		/* if non-zero, new sloth function was */
-				/* computed */
-
-	float tn;		/* NMO time (time after NMO correction) */
-	float v;		/* velocity */
-	float *qtn=NULL;	/* NMO-corrected trace q(tn) */
-	float *ttn=NULL;	/* time t(tn) for NMO */
-	float *atn=NULL;	/* amplitude a(tn) for NMO */
-	float *qt=NULL;		/* inverse NMO-corrected trace q(t) */
-	float *tnt=NULL;	/* time tn(t) for inverse NMO */
-	float *at=NULL;		/* amplitude a(t) for inverse NMO */
-	float acdp;		/* temporary used to sort cdp array */
-
-	float *aovv;		/* temporary used to sort ovv array */
-	float temp;		/* temporary float */
-	float tsq;		/* temporary float */
-	int upward;		/* scans upward if it's nonzero. */
-
-	float offset;		/* value of offset honoring scalel */
-
-	char *voutfile="";	/* name of interpolated output vel file */
-	FILE *voutfp=NULL;	/* ... its file pointer */
-	cwp_Bool isvoutfile=cwp_false; /* is output vel file specified? */
-	float voutt[1];	/* output velocities */
-
-	
-	/* hook up getpar */
-	initargs(argc, argv);
-	requestdoc(1);
-
-	/* get information from the first header */
-	if (!gettr(&tr)) err("can't get first trace");
-	nt = tr.ns;
-	dt = ((double) tr.dt)/1000000.0;
-	ft = tr.delrt/1000.0;
-
-	/* if specified, open output velocity file */
-	getparstring("voutfile",&voutfile);
-	if (*voutfile!='\0') {
-		isvoutfile=cwp_true;
-		
-		if((voutfp=fopen(voutfile,"w"))==NULL)
-                        err("cannot open voutfile=%s\n",voutfile);
+	/* compute time t(tn) (normalized) */
+	temp = ((float) offset*offset)/(dt*dt);
+	for (it=0,tn=ft/dt; it<nt; ++it,tn+=1.0) {
+		tsq = temp*ovvt[it];
+		ttn[it] = sqrt (tn*tn + tsq);
 	}
-	
 
+	/* compute inverse of stretch factor a(tn) */
+	atn[0] = ttn[1]-ttn[0];
+	for (it=1; it<nt; ++it)
+		atn[it] = ttn[it]-ttn[it-1];
 
-	/* get velocity functions, linearly interpolated in time */
-	ncdp = countparval("cdp");
-	if (ncdp>0) {
-		if (countparname("vnmo")!=ncdp)
-			err("a vnmo array must be specified for each cdp");
-		if (countparname("tnmo")!=ncdp)
-			err("a tnmo array must be specified for each cdp");
+	/* determine index of first sample to survive mute */
+	osmute = 1.0/smute;
+	if(!upward) {
+		for (it=0; it<nt-1 && atn[it]<osmute; ++it);
 	} else {
-		ncdp = 1;
-		if (countparname("vnmo")>1)
-			err("only one (or no) vnmo array must be specified");
-		if (countparname("tnmo")>1)
-			err("only one (or no) tnmo array must be specified");
+		/* scan samples from bottom to top */
+		for (it=nt-1; it>0 && atn[it]>=osmute; --it);
 	}
-	cdp = ealloc1float(ncdp);
-	if (!getparfloat("cdp",cdp)) cdp[0] = tr.cdp;
-	ovv = ealloc2float(nt,ncdp);
+	itmute = it;
 
+	/* if inverse NMO will be performed */
+	if (invert) {
+		/* compute tn(t) from t(tn) */
+		yxtoxy(nt-itmute,1.0,ft/dt+itmute,&ttn[itmute],
+			nt-itmute,1.0,ft/dt+itmute,
+			ft/dt-nt,ft/dt+nt,&tnt[itmute]);
 
-	for (icdp=0; icdp<ncdp; ++icdp) {
+		/* adjust mute time */
+		itmute = 1.0+ttn[itmute]-ft/dt;
+		itmute = MIN(nt-2,itmute);
+		itmute = MAX(0,itmute);	/* (the program does not have this) */
 
-		nvnmo = countnparval(icdp+1,"vnmo");
-		ntnmo = countnparval(icdp+1,"tnmo");
-
-		if (nvnmo!=ntnmo && !(ncdp==1 && nvnmo==1 && ntnmo==0))
-			err("number of vnmo and tnmo values must be equal");
-
-		if (nvnmo==0) nvnmo = 1;
-		if (ntnmo==0) ntnmo = nvnmo;
-
-		/* equal numbers of parameters vnmo, tnmo */
-		vnmo = ealloc1float(nvnmo);
-		tnmo = ealloc1float(nvnmo);
-
-		if (!getnparfloat(icdp+1,"vnmo",vnmo)) vnmo[0] = 1500.0;
-		if (!getnparfloat(icdp+1,"tnmo",tnmo)) tnmo[0] = 0.0;
-		for (it=1; it<ntnmo; ++it)
-			if (tnmo[it]<=tnmo[it-1])
-				err("tnmo values must increase monotonically");
-		for (it=0,tn=ft; it<nt; ++it,tn+=dt) {
-			intlin(ntnmo,tnmo,vnmo,vnmo[0],vnmo[nvnmo-1],1,&tn,&v);
-			ovv[icdp][it] = 1.0/(v*v);
+		/* compute a(t) */
+		if (sscale) {
+			for (it=itmute+1; it<nt; ++it)
+				at[it] = tnt[it]-tnt[it-1];
+			at[itmute] = at[itmute+1];
 		}
-
-		free1float(vnmo);
-		free1float(tnmo);
 	}
-
-	/* sort (by insertion) sloth and anis functions by increasing cdp */
-	for (jcdp=1; jcdp<ncdp; ++jcdp) {
-		acdp = cdp[jcdp];
-		aovv = ovv[jcdp];
-		for (icdp=jcdp-1; icdp>=0 && cdp[icdp]>acdp; --icdp) {
-			cdp[icdp+1] = cdp[icdp];
-			ovv[icdp+1] = ovv[icdp];
-		}
-		cdp[icdp+1] = acdp;
-		ovv[icdp+1] = aovv;
-	}
-
-	/* get other optional parameters */
-	if (!getparfloat("smute",&smute)) smute = 1.5;
-	if (smute<=0.0) err("smute must be greater than 0.0");
-	if (!getparint("lmute",&lmute)) lmute = 25;
-	if (!getparint("sscale",&sscale)) sscale = 1;
-	if (!getparint("invert",&invert)) invert = 0;
-	if (!getparint("upward",&upward)) upward = 0;
-        checkpars();
-
-	/* allocate workspace */
-	ovvt = ealloc1float(nt);
-	ttn = ealloc1float(nt);
-	atn = ealloc1float(nt);
-	qtn = ealloc1float(nt);
-	tnt = ealloc1float(nt);
-	at = ealloc1float(nt);
-	qt = ealloc1float(nt);
-
-	/* interpolate sloth and anis function for first trace */
-	interpovv(nt,ncdp,cdp,ovv,(float)tr.cdp,ovvt);
-
-	/* if specified output output velocity for first trace */
-	if(isvoutfile) {
-			for (it=0; it<nt; ++it) {	
-				float veltemp=ovvt[it];
-				voutt[0]=sqrt(1.0/veltemp);
-				efwrite(voutt,FSIZE,1,voutfp);
-			}
-	}
-
-	/* set old cdp and old offset for first trace */
-	oldcdp = tr.cdp;
-	oldoffset = tr.offset-1; /* here offset is used as a marker */
-				 /* there is no need to have it honor scalel */
-
-	/* loop over traces */
-	do {
-		/* if necessary, compute new sloth and anis function */
-		if (tr.cdp!=oldcdp && ncdp>1) {
-			interpovv(nt,ncdp,cdp,ovv,(float)tr.cdp,
-				  ovvt);
-			newsloth = 1;
-			/* if specified output output velocity */
-			if(isvoutfile) {
-				for (it=0; it<nt; ++it) {	
-					float veltemp=ovvt[it];
-					voutt[0]=sqrt(1.0/veltemp);
-					efwrite(voutt,FSIZE,1,voutfp);
-				}
-			}
-		} else {
-			newsloth = 0;
-		}
-
-		/* if sloth function or offset has changed */
-		if (newsloth || tr.offset!=oldoffset) {
-
-			offset = (float) (tr.offset);
-			
-
-			/* compute time t(tn) (normalized) */
-			temp = ((float) offset*offset)/(dt*dt);
-			for (it=0,tn=ft/dt; it<nt; ++it,tn+=1.0) {
-				tsq = temp*ovvt[it];
-				ttn[it] = sqrt (tn*tn + tsq);
-
-	
-			}
-			/* compute inverse of stretch factor a(tn) */
-			atn[0] = ttn[1]-ttn[0];
-			for (it=1; it<nt; ++it)
-				atn[it] = ttn[it]-ttn[it-1];
-			
-			/* determine index of first sample to survive mute */
-			osmute = 1.0/smute;
-			if(!upward) {
-				for (it=0; it<nt-1 && atn[it]<osmute; ++it);
-			} else {
-				/* scan samples from bottom to top */
-				for (it=nt-1; it>0 && atn[it]>=osmute; --it);
-			}
-			itmute = it;
-			
-
-			/* if inverse NMO will be performed */
-			if (invert) {
-							
-				/* compute tn(t) from t(tn) */
-				yxtoxy(nt-itmute,1.0,ft/dt+itmute,&ttn[itmute],
-					nt-itmute,1.0,ft/dt+itmute,
-					ft/dt-nt,ft/dt+nt,&tnt[itmute]);
-			
-				/* adjust mute time */
-				itmute = 1.0+ttn[itmute]-ft/dt;
-				itmute = MIN(nt-2,itmute);
-								
-				/* compute a(t) */
-				if (sscale) {
-					for (it=itmute+1; it<nt; ++it)
-						at[it] = tnt[it]-tnt[it-1];
-					at[itmute] = at[itmute+1];
-				}
-			}
-		}
-		
-		/* if forward (not inverse) nmo */
-		if (!invert) {
-	
-			/* do nmo via 8-point sinc interpolation */
-			ints8r(nt,1.0,ft/dt,tr.data,0.0,0.0,
-				nt-itmute,&ttn[itmute],&qtn[itmute]);
-			
-			/* apply mute */
-			for (it=0; it<itmute; ++it)
-				qtn[it] = 0.0;
-			
-			/* apply linear ramp */
-			for (it=itmute; it<itmute+lmute && it<nt; ++it)
-				qtn[it] *= (float)(it-itmute+1)/(float)lmute;
-			
-			/* if specified, scale by the NMO stretch factor */
-			if (sscale)
-				for (it=itmute; it<nt; ++it)
-					qtn[it] *= atn[it];
-			
-			/* copy NMO corrected trace to output trace */
-			memcpy( (void *) tr.data,
-					(const void *) qtn, nt*sizeof(float));
-		
-		/* else inverse nmo */
-		} else {
-	
-			/* do inverse nmo via 8-point sinc interpolation */
-			ints8r(nt,1.0,ft/dt,tr.data,0.0,0.0,
-				nt-itmute,&tnt[itmute],&qt[itmute]);
-			
-			/* apply mute */
-			for (it=0; it<itmute; ++it)
-				qt[it] = 0.0;
-			
-			/* if specified, undo NMO stretch factor scaling */
-			if (sscale)
-				for (it=itmute; it<nt; ++it)
-					qt[it] *= at[it];
-			
-			/* copy inverse NMO corrected trace to output trace */
-			memcpy( (void *) tr.data,
-					(const void *) qt,nt*sizeof(float));
-		}
-
-		/* write output trace */
-		puttr(&tr);
-
-		/* remember offset and cdp */
-		oldoffset = tr.offset;
-		oldcdp = tr.cdp;
-
-	} while (gettr(&tr));
-
-	if (isvoutfile) efclose(voutfp);
-	return(CWP_Exit());
+	*itmute_out = itmute;
 }
 
-
-/* linearly interpolate/extrapolate sloth between cdps */
-static void interpovv (int nt, int ncdp, float *cdp, float **ovv, 
-	float cdpt, float *ovvt)
+/* NMO (or inverse NMO) of data[nt], in place, with the tables from su_nmo_tables.
+ *
+ * lmute: length (in samples) of the linear ramp for the stretch mute (forward NMO only)
+ * sscale: divide the output samples by the NMO stretch factor
+ * q[nt]: scratch space
+ */
+void su_nmo(float *data, int nt, float dt, float ft, int itmute, int lmute, int sscale, int invert,
+	const float *ttn, const float *atn, const float *tnt, const float *at, float *q)
 {
-	static int index=0;
 	int it;
-	float a1,a2;
 
-	/* if before first cdp, constant extrapolate */
-	if (cdpt<=cdp[0]) {
-		for (it=0; it<nt; ++it)
-			ovvt[it] = ovv[0][it];
-	
-	/* else if beyond last cdp, constant extrapolate */
-	} else if (cdpt>=cdp[ncdp-1]) {
-		for (it=0; it<nt; ++it)
-			ovvt[it] = ovv[ncdp-1][it];
-	
-	/* else, linearly interpolate */
+	/* if forward (not inverse) nmo */
+	if (!invert) {
+		/* do nmo via 8-point sinc interpolation */
+		ints8r(nt,1.0,ft/dt,data,0.0,0.0,
+			nt-itmute,(float *) &ttn[itmute],&q[itmute]);
+
+		/* apply mute */
+		for (it=0; it<itmute; ++it)
+			q[it] = 0.0;
+
+		/* apply linear ramp */
+		for (it=itmute; it<itmute+lmute && it<nt; ++it)
+			q[it] *= (float)(it-itmute+1)/(float)lmute;
+
+		/* if specified, scale by the NMO stretch factor */
+		if (sscale)
+			for (it=itmute; it<nt; ++it)
+				q[it] *= atn[it];
+
+	/* else inverse nmo */
 	} else {
-		xindex(ncdp,cdp,cdpt,&index);
-		a1 = (cdp[index+1]-cdpt)/(cdp[index+1]-cdp[index]);
-		a2 = (cdpt-cdp[index])/(cdp[index+1]-cdp[index]);
-		for (it=0; it<nt; ++it)
-			ovvt[it] = a1*ovv[index][it]+a2*ovv[index+1][it];
+		/* do inverse nmo via 8-point sinc interpolation */
+		ints8r(nt,1.0,ft/dt,data,0.0,0.0,
+			nt-itmute,(float *) &tnt[itmute],&q[itmute]);
+
+		/* apply mute */
+		for (it=0; it<itmute; ++it)
+			q[it] = 0.0;
+
+		/* if specified, undo NMO stretch factor scaling */
+		if (sscale)
+			for (it=itmute; it<nt; ++it)
+				q[it] *= at[it];
 	}
+
+	/* copy the result to the trace */
+	memcpy( (void *) data, (const void *) q, nt*sizeof(float));
 }

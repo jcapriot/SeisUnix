@@ -122,6 +122,12 @@ void su_op_saf(float *data, int nt, float *tmp);
 void su_op_freq(float *data, int nt, float dt, float *tmp, float *tmp1);
 void su_op_despike(float *data, int nt, int nw, float *tmp, float *tomed);
 
+// stretching_moveout_resamp
+void su_nmo_tables(int nt, float dt, float ft, float offset, const float *ovvt, float smute, int upward,
+	int invert, int sscale, float *ttn, float *atn, float *tnt, float *at, int *itmute_out);
+void su_nmo(float *data, int nt, float dt, float ft, int itmute, int lmute, int sscale, int invert,
+	const float *ttn, const float *atn, const float *tnt, const float *at, float *q);
+
 // synthetics
 void su_synlv(float *data,
 	float xs, float zs, float xg, float zg,

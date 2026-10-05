@@ -52,9 +52,10 @@ NULL};
 
 /* Library version of SUFILTER
  *
- * The main program is not part of the library. polygonalFilter() is the one in sufilter.c, and su_filter()
- * is what the program does to every trace. The program builds its filter from the first trace, here the
- * caller builds it with polygonalFilter() and passes it in.
+ * The main program is not part of the library. polygonalFilter() is the one in sufilter.c. The program builds its
+ * filter from the first trace, here the caller builds it (for whatever number of points it transforms) and does the
+ * filtering, which is a Fourier transform, a multiplication with the filter, and an inverse Fourier transform. Note
+ * that the filter has the 1/nfft of the (unnormalized) pfa transforms in it.
  */
 
 /* Prototype of function used internally */
@@ -143,28 +144,4 @@ Author:  CWP: John Stockwell   1992
 	for(icount=intfr[npoly-1]+1; icount<nf; ++icount){
 		filter[icount] = amps[npoly-1] * onfft;
 	}
-}
-
-/* Filter data[nt] in the frequency domain, with a filter from polygonalFilter() for nfft points
- * (nfft is from npfaro(nt, ...), and so is at least nt).
- *
- * rt: scratch space for nfft floats
- * ct: scratch space for nfft/2+1 complex numbers
- */
-void su_filter(float *data, int nt, int nfft, const float *filter, float *rt, complex *ct)
-{
-	int i;
-	int nf = nfft/2 + 1;
-
-	/* Load trace into rt (zero-padded) */
-	memcpy((void *) rt, (const void *) data, nt*FSIZE);
-	memset((void *) (rt + nt), 0 , (nfft-nt)*FSIZE);
-
-	/* FFT, filter, inverse FFT */
-	pfarc(1, nfft, rt, ct);
-	for (i = 0; i < nf; ++i)  ct[i] = crmul(ct[i], filter[i]);
-	pfacr(-1, nfft, ct, rt);
-
-	/* Load traces back in, recall filter had nfft factor */
-	for (i = 0; i < nt; ++i)  data[i] = rt[i];
 }

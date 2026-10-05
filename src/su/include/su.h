@@ -115,7 +115,6 @@ void su_gain(float *data, float tpow, float epow, float gpow,
 
 // filters (sufilter)
 void polygonalFilter(float *f, float *amps, int npoly, int nfft, float dt, float *filter, int *intfr);
-void su_filter(float *data, int nt, int nfft, const float *filter, float *rt, complex *ct);
 
 // operations (suop)
 void su_op_saf(float *data, int nt, float *tmp);

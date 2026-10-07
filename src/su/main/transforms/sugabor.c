@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "									",
@@ -375,4 +376,34 @@ Author:  CWP: John Stockwell,   Oct 1994
         }
 
 
+}
+#endif
+
+/* Library version of SUGABOR
+ *
+ * The main program is not part of the library, and its transforms are not either. su_gabor_filter() is its gaussianFilter(): the
+ * filter in frequency of one center frequency fcent (a Gaussian exp(-4 alpha f^2) in the band of the width band about it), for
+ * the nfft // 2 + 1 frequencies of the transform of nfft samples that are dt apart, times scale (1 / nfft for the inverse
+ * transform that is not scaled).
+ */
+void su_gabor_filter(float fcent, float dt, int nfft, float alpha, float band, float scale, float *filter)
+{
+	int i, iflower, ifupper, nf;
+	float df, f;
+
+	nf = nfft/2 + 1;
+	df = 1.0 / (nfft * dt);
+
+	/* integerized min, max frequencies defining filter window */
+	iflower = NINT((fcent - band/2)/df);
+	if (iflower < 0) iflower = 0;
+	ifupper = NINT((fcent + band/2)/df);
+	if (ifupper > nf) ifupper = nf;
+
+	for (i = 0; i < nf; ++i) filter[i] = 0.0;
+	for (i = 0; i < nf; ++i) {
+		f = i * df - fcent;
+		if (iflower <= i && i <= ifupper)
+			filter[i] = exp(-4.0 * alpha * f * f) * scale;
+	}
 }

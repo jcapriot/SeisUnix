@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "									",
@@ -188,4 +189,35 @@ main(int argc, char **argv)
 
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUFRAC
+ *
+ * The filter that sufrac makes for the nf frequencies of a transform of nfft samples of a trace that is dt apart: the
+ * complex power ((sign) i w)^power with the phase shift of phasefac * PI, times scale (sufrac has 1 / nfft, because its inverse
+ * transform is not scaled).
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+void su_frac_filter(int nf, int nfft, float dt, float power, float sign, float phasefac, float scale, float *filt)
+{
+	int i;
+	float omega, amp;
+	float phase = phasefac * PI;
+	float domega = 2.0 * PI / (nfft * dt);
+	float arg = sign * 0.5 * PI * power + phase;
+	float exr = cos(arg);
+	float exi = sin(arg);
+
+	for (i = 0; i < nf; ++i) {
+		omega = i * domega;
+		/* kludge to handle omega=0 case for power < 0 */
+		if (power < 0 && i == 0) omega = FLT_MAX;
+		amp = pow(omega, power) * scale;
+		filt[2*i] = exr * amp;
+		filt[2*i+1] = exi * amp;
+	}
 }

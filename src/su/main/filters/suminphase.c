@@ -8,6 +8,7 @@
 #include "segy.h"
 #include "cwp.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "									",
@@ -195,5 +196,65 @@ Author:   Bruce VerWest 2009
 		cx[i] = crmul(cwp_cexp(cx[i]),rmax);
 	}
 }
+#endif
 
+/* Library version of SUMINPHASE
+ *
+ * The spectral factorization (kolmogoroff() of suminphase.c) is made of two functions of the spectrum that go on each side of the
+ * two transforms of it that are the caller's:
+ *
+ *  1. su_kolmogoroff_log() turns the n values of the spectrum into log(r^2), where r is the amplitude over the largest one but at
+ *     least pnoise, and gives the largest amplitude;
+ *  2. the caller transforms that (with the sign sign2), and su_kolmogoroff_fold() scales it by 1 / n and keeps only its causal
+ *     part: the first and the middle value halved, and the second half 0;
+ *  3. the caller transforms that (with the sign sign1), and su_kolmogoroff_exp() gives exp of it times the largest amplitude.
+ *
+ * (They have n complex values: n floats pairs.)
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+float su_kolmogoroff_log(int n, float pnoise, float *cx)
+{
+	int i;
+	float r, rmax = 0.0;
 
+	for (i = 0; i < n; ++i) {
+		r = sqrt(cx[2*i]*cx[2*i] + cx[2*i+1]*cx[2*i+1]);
+		if (r > rmax) rmax = r;
+	}
+	if (rmax == 0.0) rmax = 1.0;
+	for (i = 0; i < n; ++i) {
+		r = sqrt(cx[2*i]*cx[2*i] + cx[2*i+1]*cx[2*i+1]) / rmax;
+		if (r < pnoise) r = pnoise;
+		cx[2*i] = log(r*r);
+		cx[2*i+1] = 0.0;
+	}
+	return rmax;
+}
+
+void su_kolmogoroff_fold(int n, float *cx)
+{
+	int i;
+	float scale = 1.0 / n;
+
+	for (i = 0; i < 2*n; ++i) cx[i] *= scale;
+	cx[0] *= 0.5;
+	cx[1] *= 0.5;
+	cx[2*(n/2)] *= 0.5;
+	cx[2*(n/2)+1] *= 0.5;
+	for (i = 2*(n/2+1); i < 2*n; ++i) cx[i] = 0.0;
+}
+
+void su_kolmogoroff_exp(int n, float rmax, float *cx)
+{
+	int i;
+	float e;
+
+	for (i = 0; i < n; ++i) {
+		e = exp(cx[2*i]);
+		cx[2*i] = e * cos(cx[2*i+1]) * rmax;
+		cx[2*i+1] = e * sin(cx[2*i+1]) * rmax;
+	}
+}

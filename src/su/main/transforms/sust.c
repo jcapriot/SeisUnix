@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <time.h>
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "									",
@@ -304,4 +305,50 @@ static double gaussa(int n, int m)
 { 
     return exp(-2. * PI * PI * m * m / (n * n));
 } 
+#endif
 
+/* Library version of SUST (the Stockwell transform)
+ *
+ * The main program is not part of the library, and its Fourier transforms are not either: the transform of the trace is
+ * h[len] (complex, floats in pairs, in the convention of the SU transform with exp(+i w t) in the kernel), and the inverse of
+ * the row of the S transform is the complex transform with the sign -1 of the g[len] that su_st_row() gives. The amplitude of the
+ * row is the modulus of that over len.
+ *
+ *  su_st_analytic()  makes the transform of the analytic signal (the positive frequencies twice, the negative ones 0)
+ *  su_st_row()       the spectrum for the row n (the frequency n): the shifted spectrum times the Gaussian of the row
+ */
+void su_st_analytic(int len, float *h)
+{
+	int i, l2;
+
+	l2 = (len + 1) / 2;
+	for (i = 1; i < l2; i++) {
+		h[2*i] *= 2.;
+		h[2*i+1] *= 2.;
+	}
+	l2 = len / 2 + 1;
+	for (i = l2; i < len; i++) {
+		h[2*i] = 0.0;
+		h[2*i+1] = 0.0;
+	}
+}
+
+/* the Fourier transform of a Gaussian: negative frequencies wrap around */
+static double gaussa(int n, int m)
+{
+	return exp(-2. * PI * PI * m * m / (n * n));
+}
+
+void su_st_row(int len, int n, const float *h, float *g)
+{
+	int i, k;
+	double s;
+
+	for (i = 0; i < len; i++) {
+		s = gaussa(n, MIN(i, len - i));
+		k = n + i;
+		k %= len;
+		g[2*i] = h[2*k] * s;
+		g[2*i+1] = h[2*k+1] * s;
+	}
+}

@@ -8,6 +8,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 									",
@@ -711,6 +712,157 @@ Author:	UGM (Geophysics Students): Agung Wiyono, 2005
 	/* Memori free */
 	free1float(temp);
 }
+#endif
 
+/* Library version of SUATTRIBUTES
+ *
+ * The main program is not part of the library. Each attribute (mode) is a function of the complex trace re + i im, where im is the
+ * Hilbert transform of the trace re (the caller does that, with hilbert()). They put n values in out[], and work in single
+ * precision as the program does.
+ *
+ *   su_attr_envelope   amp
+ *   su_attr_phase      phase, unwrapped if unwrap is not 0
+ *   su_attr_freq       freq, instantaneous frequency
+ *   su_attr_normamp    normamp, the cosine of the phase
+ *   su_attr_fdenv      fdenv, the first derivative of the envelope
+ *   su_attr_sdenv      sdenv, the second derivative of the envelope
+ *   su_attr_bandwidth  bandwidth (Barnes 1992)
+ *   su_attr_q          q (Barnes 1992)
+ *
+ * Compared to suattributes.c bandwidth and q are for the n samples of the trace (the program runs them over 2 n - 1,
+ * past the arrays), and the helper functions work in place without allocating.
+ */
 
+/* the first derivative of f[n]: a centered difference, and leading and lagging differences at the ends */
+void su_attr_differentiate(int n, float h, float *f)
+{
+	int i;
+	float h2 = 2*h;
+	float previous, current, first;
 
+	if (n < 2) {
+		if (n == 1) f[0] = 0.0;
+		return;
+	}
+	previous = f[0];
+	first = (f[1] - f[0])/h;
+	for (i = 1; i < n-1; ++i) {
+		current = f[i];
+		f[i] = (f[i+1] - previous)/h2;
+		previous = current;
+	}
+	f[n-1] = (f[n-1] - previous)/h;
+	f[0] = first;
+}
+
+/* unwrap the phase, which is assumed to be increasing: if its change from one sample to the next differs from the one
+ * before by PI/w or more, use the previous change. Nothing is done if w is 0. */
+void su_attr_unwrap_phase(int n, float w, float *phase)
+{
+	int i;
+	float pibyw, original, dphase, previous_dphase, sum;
+
+	if (w == 0 || n < 1) return;
+	pibyw = PI/w;
+	original = phase[0];
+	previous_dphase = 0.0;
+	sum = phase[0];
+	for (i = 1; i < n; ++i) {
+		float current = phase[i];
+		dphase = ABS(current - original);
+		if (ABS(dphase - previous_dphase) >= pibyw) dphase = previous_dphase;
+		sum += dphase;
+		phase[i] = sum;
+		original = current;
+		previous_dphase = dphase;
+	}
+}
+
+static float modulus(float re, float im)
+{
+	return sqrt(re*re + im*im);
+}
+
+static void wrapped_phase(int n, const float *re, const float *im, float *phase)
+{
+	int i;
+	for (i = 0; i < n; ++i) {
+		if (re[i]*re[i] + im[i]*im[i]) phase[i] = atan2(im[i], re[i]);
+		else phase[i] = 0.0;
+	}
+}
+
+void su_attr_envelope(int n, const float *re, const float *im, float *out)
+{
+	int i;
+	for (i = 0; i < n; ++i) out[i] = modulus(re[i], im[i]);
+}
+
+void su_attr_phase(int n, const float *re, const float *im, float unwrap, float *out)
+{
+	wrapped_phase(n, re, im, out);
+	if (unwrap != 0) su_attr_unwrap_phase(n, unwrap, out);
+}
+
+/* instantaneous frequency: the derivative of the unwrapped phase over 2 PI, with the values above the Nyquist frequency folded back */
+void su_attr_freq(int n, const float *re, const float *im, float dt, float unwrap, float *out)
+{
+	int i;
+	float fnyq = 0.5 / dt;
+
+	wrapped_phase(n, re, im, out);
+	if (unwrap != 0) su_attr_unwrap_phase(n, unwrap, out);
+	su_attr_differentiate(n, 2.0*PI*dt, out);
+	for (i = 0; i < n; ++i)
+		if (out[i] > fnyq) out[i] = 2 * fnyq - out[i];
+}
+
+void su_attr_normamp(int n, const float *re, const float *im, float *out)
+{
+	int i;
+	wrapped_phase(n, re, im, out);
+	for (i = 0; i < n; ++i) out[i] = cos(out[i]);
+}
+
+void su_attr_fdenv(int n, const float *re, const float *im, float dt, float *out)
+{
+	su_attr_envelope(n, re, im, out);
+	su_attr_differentiate(n, 2.0*PI*dt, out);
+}
+
+void su_attr_sdenv(int n, const float *re, const float *im, float dt, float *out)
+{
+	su_attr_envelope(n, re, im, out);
+	su_attr_differentiate(n, 2.0*PI*dt, out);
+	su_attr_differentiate(n, 2.0*PI*dt, out);
+}
+
+/* |d(envelope)/dt| / (2 PI envelope), 0 where there is no envelope; scratch[n] is used */
+void su_attr_bandwidth(int n, const float *re, const float *im, float dt, float *out, float *scratch)
+{
+	int i;
+	su_attr_envelope(n, re, im, scratch);
+	su_attr_envelope(n, re, im, out);
+	su_attr_differentiate(n, dt, out);
+	for (i = 0; i < n; ++i) {
+		if (2.0*PI*scratch[i] != 0.0) out[i] = ABS(out[i]/(2.0*PI*scratch[i]));
+		else out[i] = 0.0;
+	}
+}
+
+/* -PI f(t) envelope / d(envelope)/dt, 0 where that is 0; scratch[2 n] is used */
+void su_attr_q(int n, const float *re, const float *im, float dt, float unwrap, float *out, float *scratch)
+{
+	int i;
+	float *envelope = scratch;
+	float *derivative = scratch + n;
+
+	su_attr_envelope(n, re, im, envelope);
+	su_attr_envelope(n, re, im, derivative);
+	su_attr_differentiate(n, dt, derivative);
+	su_attr_freq(n, re, im, dt, unwrap, out);
+	for (i = 0; i < n; ++i) {
+		if (derivative[i] != 0.0) out[i] = -1*PI*out[i]*envelope[i]/derivative[i];
+		else out[i] = 0.0;
+	}
+}

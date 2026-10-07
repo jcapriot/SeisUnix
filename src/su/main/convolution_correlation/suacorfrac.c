@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "									",
@@ -186,5 +187,43 @@ complex dopow(complex u, float a, float b)
 
 	return cmplx(amp*cos(phs),amp*sin(phs));	
 }
+#endif
 
+/* Library version of SUACORFRAC
+ *
+ * The fractional autocorrelation of the nf frequencies of a spectrum: each is multiplied by |S|^a exp(-i b arg(S)) (so that the
+ * amplitude goes to the power 1 + a, and the phase to 1 - b times itself), and with sym the sign of every other frequency is
+ * changed. The (a, b) = (1, 1) is the autocorrelation, (1, -1) the autoconvolution.
+ *
+ * Compared to dopow() of suacorfrac.c the phase is changed also when a is 0 (dopow returns 1 then). A frequency where the spectrum is 0
+ * is 0.
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+void su_acorfrac_spectrum(int nf, float *ct, float a, float b, int sym)
+{
+	int i;
+	float ur, ui, amp, phs, fr, fi;
 
+	for (i = 0; i < nf; ++i) {
+		ur = ct[2*i];
+		ui = ct[2*i+1];
+		if (ur == 0.0 && ui == 0.0) {
+			fr = 0.0;
+			fi = 0.0;
+		} else {
+			amp = (a == 0.0) ? 1.0 : exp(0.5*a*log(ur*ur+ui*ui));
+			phs = -b*atan2(ui, ur);
+			fr = amp*cos(phs);
+			fi = amp*sin(phs);
+		}
+		ct[2*i] = ur*fr - ui*fi;
+		ct[2*i+1] = ur*fi + ui*fr;
+		if (sym && ISODD(i)) {
+			ct[2*i] = -ct[2*i];
+			ct[2*i+1] = -ct[2*i+1];
+		}
+	}
+}

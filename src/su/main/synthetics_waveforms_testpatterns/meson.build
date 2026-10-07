@@ -1,4 +1,5 @@
 synthetics_srcs = files(
+    'suvibro.c',
     #'sukdsyn2d.c',
     'susynlv.c',
 )

@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 									",
@@ -158,4 +159,39 @@ main(int argc, char **argv)
 
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUWFFT
+ *
+ * The flattening of the nf frequencies of a spectrum: each is divided by the weighted sum w0 |S(f - df)| + w1 |S(f)| + w2 |S(f + df)| of
+ * the amplitudes, and the first and the last by their own amplitude (suwfft reads past the ends there). Where that is 0 the
+ * value is 0.
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+void su_wfft_flatten(int nf, const float *ct, float w0, float w1, float w2, float *out)
+{
+	int i;
+	float c, previous, current, next;
+
+	for (i = 0; i < nf; ++i) {
+		current = sqrt(ct[2*i]*ct[2*i] + ct[2*i+1]*ct[2*i+1]);
+		if (i == 0 || i == nf-1) {
+			c = current;
+		} else {
+			previous = sqrt(ct[2*(i-1)]*ct[2*(i-1)] + ct[2*(i-1)+1]*ct[2*(i-1)+1]);
+			next = sqrt(ct[2*(i+1)]*ct[2*(i+1)] + ct[2*(i+1)+1]*ct[2*(i+1)+1]);
+			c = w0*previous + w1*current + w2*next;
+		}
+		if (c != 0.0) {
+			out[2*i] = ct[2*i] / c;
+			out[2*i+1] = ct[2*i+1] / c;
+		} else {
+			out[2*i] = 0.0;
+			out[2*i+1] = 0.0;
+		}
+	}
 }

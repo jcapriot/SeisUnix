@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 								",
@@ -185,4 +186,41 @@ main(int argc, char **argv)
 
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUSTACK
+ *
+ * The main program is not part of the library. What it does with the traces of a gather is two functions. A trace has n samples of
+ * ncomp floats each (1 for a real trace, 2 for a complex one, the real and imaginary part next to each other).
+ *
+ *  su_stack_add()        adds a trace to the sums sum[n * ncomp], and counts the samples that were not 0 in nnz[n]
+ *  su_stack_normalize()  divides each sample by the number of values that were not 0 to the power normpow
+ *                        (normpow 0 is no division, a sample that was always 0 is left)
+ */
+void su_stack_add(int n, int ncomp, const float *x, float *sum, int *nnz)
+{
+	int i, c, nonzero;
+
+	for (i = 0; i < n; ++i) {
+		nonzero = 0;
+		for (c = 0; c < ncomp; ++c) {
+			float datum = x[i*ncomp+c];
+			if (datum != 0.0) nonzero = 1;
+			sum[i*ncomp+c] += datum;
+		}
+		if (nonzero) ++nnz[i];
+	}
+}
+
+void su_stack_normalize(int n, int ncomp, float *sum, const int *nnz, float normpow)
+{
+	int i, c;
+
+	for (i = 0; i < n; ++i) {
+		if (nnz[i]) {
+			float divisor = pow(nnz[i], normpow);
+			for (c = 0; c < ncomp; ++c) sum[i*ncomp+c] /= divisor;
+		}
+	}
 }

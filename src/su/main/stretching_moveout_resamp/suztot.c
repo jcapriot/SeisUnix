@@ -7,6 +7,7 @@
 #include "segy.h"
 #include "header.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation ******************************/
 char *sdoc[] = {
 "									",
@@ -254,4 +255,44 @@ Author: CWP: based on zttz by Dave Hale (c. 1992)
 	/* for t values from lt down to ft, calculate z(t) */
 	for (it=nt-1,t=lt; t>=tz[nz-1]; it--,t-=dt)
 		zt[it] = lt*vlz/2.0 + vlz*(t-tz[nz-1])/2.0;
+}
+#endif
+
+/* Library version of SUZTOT
+ *
+ * The main program is not part of the library. su_ztot_table() is what it does to find the depth of each time sample,
+ * z(t), which the trace is then resampled at (with ints8r).
+ *
+ * v[nz]  the velocity at each of the depths fz + i dz
+ * zt[nt] the output: the depth of each of the times ft + i dt
+ * t[nz]  scratch
+ *
+ * Compared to suztot.c the depths after the last one are the last depth plus what the last velocity goes in the extra time
+ * (suztot has lt vlz / 2 for the last depth, which is the depth of the last time and not of the last depth), and the loops
+ * that extrapolate stay in zt[].
+ */
+void su_ztot_table(int nz, float dz, float fz, const float *v, int nt, float dt, float ft, float *zt, float *t)
+{
+	int iz, it;
+	float time;
+	float vfz = v[0];		/* velocity at the first depth sample */
+	float vlz = v[nz-1];		/* velocity at the last depth sample */
+	float lt = ft + (nt-1)*dt;	/* last time */
+	float lz = fz + (nz-1)*dz;	/* last depth */
+
+	/* t(z) from v(z) */
+	t[0] = 2.0*fz/v[0];
+	for (iz = 1; iz < nz; ++iz)
+		t[iz] = t[iz-1] + 2.0*dz/v[iz-1];
+
+	/* switch from t(z) to z(t) */
+	yxtoxy(nz, dz, fz, t, nt, dt, ft, 0.0, 0.0, zt);
+
+	/* for t values before the first one, use the first velocity to calculate z(t) */
+	for (it = 0, time = ft; it < nt && time <= t[0]; ++it, time += dt)
+		zt[it] = vfz*time/2.0;
+
+	/* for t values from lt down to the last one, calculate z(t) */
+	for (it = nt-1, time = lt; it >= 0 && time >= t[nz-1]; it--, time -= dt)
+		zt[it] = lz + vlz*(time - t[nz-1])/2.0;
 }

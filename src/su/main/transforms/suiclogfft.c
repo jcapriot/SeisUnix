@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 								",
@@ -153,4 +154,35 @@ main(int argc, char **argv)
 
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUICLOGFFT (and SUICEPSTRUM)
+ *
+ * The exponential of the complex log spectrum of nf frequencies: exp(re) (cos im, sin im), 0 where the real part is 0, and
+ * with the sign of every other frequency changed if sym (which centers the transformed trace).
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+void su_iclogfft_spectrum(int nf, const float *clog, int sym, float *ct)
+{
+	int i;
+	float e;
+
+	for (i = 0; i < nf; ++i) {
+		if (clog[2*i]) {
+			e = exp(clog[2*i]);
+			ct[2*i] = e * cos(clog[2*i+1]);
+			ct[2*i+1] = e * sin(clog[2*i+1]);
+			if (sym && ISODD(i)) {
+				ct[2*i] = -ct[2*i];
+				ct[2*i+1] = -ct[2*i+1];
+			}
+		} else {
+			ct[2*i] = 0.0;
+			ct[2*i+1] = 0.0;
+		}
+	}
 }

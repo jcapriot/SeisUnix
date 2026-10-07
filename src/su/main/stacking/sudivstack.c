@@ -8,6 +8,7 @@
 #include "header.h"
 
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "                                                                       ",
@@ -299,3 +300,94 @@ main(int argc,char **argv)
     return(CWP_Exit());
 
 } /* end main loop */
+#endif
+
+/* Library version of SUDIVSTACK
+ *
+ * The main program is not part of the library. What it does with the traces of a gather is:
+ *
+ *  su_divstack_power()   the power of a trace (ncomp floats per sample) in windows of ntwin samples, the average of the squares
+ *                        or with peak the largest, interpolated linearly from the end of one window to the end of the next
+ *                        (the first window is constant)
+ *  su_divstack_add()     adds the trace divided by that power to sumdata[], and the inverse power to sumscale[], where the
+ *                        power is not 0
+ *  su_divstack_finish()  the stack: sumdata / sumscale (where that is 0 it is 1)
+ */
+static float window_power(const float *x, int ncomp, int first, int last, int peak)
+{
+	int i, c;
+	float total = 0.0, maxval = 0.0, power;
+
+	for (i = first; i < last; ++i) {
+		power = 0.0;
+		for (c = 0; c < ncomp; ++c) power += x[i*ncomp+c] * x[i*ncomp+c];
+		total += power;
+		if (power > maxval) maxval = power;
+	}
+	return peak ? maxval : total / (last - first);
+}
+
+void su_divstack_power(int nt, int ncomp, int ntwin, int peak, const float *x, float *intp)
+{
+	int i, j;
+	float avepwa, avepwb;
+	float xin[2], yin[2], xout[1], yout[1];
+
+	avepwa = window_power(x, ncomp, 0, MIN(ntwin, nt), peak);
+	for (i = 0; i < MIN(ntwin, nt); ++i) intp[i] = avepwa;
+
+	/* middle windows */
+	j = 1;
+	while (ntwin * (j + 1) < nt) {
+		avepwb = window_power(x, ncomp, ntwin * j, ntwin * (j + 1), peak);
+		xin[0] = (ntwin * j) - 1;
+		xin[1] = (ntwin * (j + 1)) - 1;
+		yin[0] = avepwa;
+		yin[1] = avepwb;
+		for (i = ntwin * j; i < ntwin * (j + 1); ++i) {
+			xout[0] = i;
+			intlin(2, xin, yin, avepwa, avepwb, 1, xout, yout);
+			intp[i] = yout[0];
+		}
+		avepwa = avepwb;
+		j++;
+	}
+
+	/* last window */
+	if (ntwin < nt) {
+		avepwb = window_power(x, ncomp, ntwin * j, nt, peak);
+		xin[0] = (ntwin * j) - 1;
+		xin[1] = nt - 1;
+		yin[0] = avepwa;
+		yin[1] = avepwb;
+		for (i = ntwin * j; i < nt; ++i) {
+			xout[0] = i;
+			intlin(2, xin, yin, avepwa, avepwb, 1, xout, yout);
+			intp[i] = yout[0];
+		}
+	}
+}
+
+void su_divstack_add(int nt, int ncomp, const float *x, const float *intp, float *sumdata, float *sumscale)
+{
+	int i, c;
+
+	for (i = 0; i < nt; ++i) {
+		if (intp[i] != 0.0) {
+			for (c = 0; c < ncomp; ++c) sumdata[i*ncomp+c] += x[i*ncomp+c] / intp[i];
+			sumscale[i] += 1 / intp[i];
+		}
+	}
+}
+
+void su_divstack_finish(int nt, int ncomp, const float *sumdata, const float *sumscale, float *out)
+{
+	int i, c;
+	float scale;
+
+	for (i = 0; i < nt; ++i) {
+		scale = sumscale[i];
+		if (scale == 0.0) scale = 1.0;
+		for (c = 0; c < ncomp; ++c) out[i*ncomp+c] = sumdata[i*ncomp+c] / scale;
+	}
+}

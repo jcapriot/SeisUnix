@@ -9,6 +9,7 @@
 #include <time.h>
 #include <signal.h>
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation ******************************/
 char *sdoc[] = {
 " 									",
@@ -347,4 +348,185 @@ static void closefiles(void)
 	efclose(bandoutfp);
 	eremove(bandoutfile);
 	exit(EXIT_FAILURE);
+}
+#endif
+
+/* Library version of the random numbers of SUADDNOISE, SUJITTER and SURANDSPIKE
+ *
+ * The programs use the generators of the cwp library (franuni() and frannor(), which keep their state in static variables, so
+ * that there is only one of each). These are the same generators with the state in a su_rng that the caller has, so that every
+ * stage has its own random numbers, which are those of SU for the same seed:
+ *
+ *  su_rng_seed_uniform() seeds it like sranuni(), and su_rng_uniform() is franuni(): a float in [0, 1)
+ *  su_rng_seed_normal()  seeds it like srannor(), and su_rng_normal() is frannor(): a float with a N(0, 1) distribution
+ *
+ * (A su_rng is seeded for one of them. The normal generator is made from the uniform one.)
+ */
+
+/* constants used to generate uniform random numbers (16777216=2^24) */
+#define RNG_CS 362436.0/16777216.0
+#define RNG_CD 7654321.0/16777216.0
+#define RNG_CM 16777213.0/16777216.0
+#define RNG_NBITS 24
+
+/* constants for the normal random number generator */
+#define RNG_AA 12.37586
+#define RNG_B 0.4878992
+#define RNG_C 12.67706
+#define RNG_C1 0.9689279
+#define RNG_C2 1.301198
+#define RNG_PC 0.01958303
+#define RNG_XN 2.776994
+#define RNG_OXN 0.3601016
+
+static const float rng_v[]={
+	0.3409450, 0.4573146, 0.5397793, 0.6062427, 0.6631691,
+	0.7136975, 0.7596125, 0.8020356, 0.8417227, 0.8792102, 0.9148948,
+	0.9490791, 0.9820005, 1.0138492, 1.0447810, 1.0749254, 1.1043917,
+	1.1332738, 1.1616530, 1.1896010, 1.2171815, 1.2444516, 1.2714635,
+	1.2982650, 1.3249008, 1.3514125, 1.3778399, 1.4042211, 1.4305929,
+	1.4569915, 1.4834526, 1.5100121, 1.5367061, 1.5635712, 1.5906454,
+	1.6179680, 1.6455802, 1.6735255, 1.7018503, 1.7306045, 1.7598422,
+	1.7896223, 1.8200099, 1.8510770, 1.8829044, 1.9155830, 1.9492166,
+	1.9839239, 2.0198430, 2.0571356, 2.0959930, 2.1366450, 2.1793713,
+	2.2245175, 2.2725185, 2.3239338, 2.3795007, 2.4402218, 2.5075117,
+	2.5834658, 2.6713916, 2.7769943, 2.7769943, 2.7769943, 2.7769943
+};
+
+void su_rng_seed_uniform(su_rng *r, int seed)
+{
+	int ii, jj, i1, j01, k1, l1, m1;
+	float s, t;
+
+	/* convert seed to four smallish positive integers */
+	i1 = (ABS(seed)%177)+1;
+	j01 = (ABS(seed)%167)+1;
+	k1 = (ABS(seed)%157)+1;
+	l1 = (ABS(seed)%147)+1;
+
+	/* generate random bit pattern in array based on given seed */
+	for (ii = 0; ii < 17; ii++) {
+		s = 0.0;
+		t = 0.5;
+
+		/* loop over bits in the float mantissa */
+		for (jj = 0; jj < RNG_NBITS; jj++) {
+			m1 = (((i1*j01)%179)*k1)%179;
+			i1 = j01;
+			j01 = k1;
+			k1 = m1;
+			l1 = (53*l1+1)%169;
+			if (((l1*m1)%64) >= 32) s += t;
+			t *= 0.5;
+		}
+		r->u[ii] = s;
+	}
+
+	/* initialize generators */
+	r->i = 16;
+	r->j = 4;
+	r->c = RNG_CS;
+}
+
+float su_rng_uniform(su_rng *r)
+{
+	float uni;
+
+	/* basic generator is Fibonacci */
+	uni = r->u[r->i] - r->u[r->j];
+	if (uni < 0.0) uni += 1.0;
+	r->u[r->i] = uni;
+	r->i--;
+	if (r->i < 0) r->i = 16;
+	r->j--;
+	if (r->j < 0) r->j = 16;
+
+	/* second generator is congruential */
+	r->c -= RNG_CD;
+	if (r->c < 0.0) r->c += RNG_CM;
+
+	/* combination generator */
+	uni -= r->c;
+	if (uni < 0.0) uni += 1.0;
+	return uni;
+}
+
+void su_rng_seed_normal(su_rng *r, int seed)
+{
+	int ii, jj, ia, ib, ic, id;
+	float s, t;
+
+	r->i = 16;
+	r->j = 4;
+	r->c = RNG_CS;
+	ia = ABS(seed)%32707;
+	ib = 1111;
+	ic = 1947;
+	for (ii = 0; ii < 17; ii++) {
+		s = 0.0;
+		t = 0.5;
+		for (jj = 0; jj < 64; jj++) {
+			id = ic-ia;
+			if (id < 0) {
+				id += 32707;
+				s += t;
+			}
+			ia = ib;
+			ib = ic;
+			ic = id;
+			t *= 0.5;
+		}
+		r->u[ii] = s;
+	}
+}
+
+/* a uniform number from the Fibonacci generator alone, which is what the normal generator uses */
+static float rng_fibonacci(su_rng *r)
+{
+	float uni = r->u[r->i] - r->u[r->j];
+	if (uni < 0.0) uni += 1.0;
+	r->u[r->i] = uni;
+	if (--r->i < 0) r->i = 16;
+	if (--r->j < 0) r->j = 16;
+	return uni;
+}
+
+float su_rng_normal(su_rng *r)
+{
+	int k;
+	float uni, vni, rnor, x, y, s, bmbx, xnmx;
+
+	/* uni is uniform on [0,1) */
+	uni = rng_fibonacci(r);
+
+	/* vni is uniform on [-1,1) */
+	vni = uni+uni-1.0;
+
+	/* k is in range [0,63] */
+	k = ((int)(r->u[r->i]*128))%64;
+
+	/* fast part */
+	rnor = vni*rng_v[k+1];
+	if (ABS(rnor) <= rng_v[k]) return rnor;
+
+	/* slow part */
+	x = (ABS(rnor)-rng_v[k])/(rng_v[k+1]-rng_v[k]);
+	y = rng_fibonacci(r);
+	s = x+y;
+	if (s <= RNG_C2) {
+		if (s <= RNG_C1) return rnor;
+		bmbx = RNG_B-RNG_B*x;
+		if (y <= RNG_C-RNG_AA*exp(-0.5*bmbx*bmbx)) {
+			if (exp(-0.5*rng_v[k+1]*rng_v[k+1])+y*RNG_PC/rng_v[k+1] <= exp(-0.5*rnor*rnor)) return rnor;
+			do {
+				y = rng_fibonacci(r);
+				x = RNG_OXN*log(y);
+				y = rng_fibonacci(r);
+			} while (-2.0*log(y) <= x*x);
+			xnmx = RNG_XN-x;
+			return (rnor >= 0.0 ? ABS(xnmx) : -ABS(xnmx));
+		}
+	}
+	bmbx = RNG_B-RNG_B*x;
+	return (rnor >= 0.0 ? ABS(bmbx) : -ABS(bmbx));
 }

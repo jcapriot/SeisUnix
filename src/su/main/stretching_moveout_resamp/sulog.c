@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "								",
@@ -207,4 +208,49 @@ int nextpower(int p, int n)
 	if (!n) return 0;
 	for (nn = 1; nn < n; nn *= p);
 	return nn;
+}
+#endif
+
+/* Library version of SULOG (and SUILOG, which has the same two functions)
+ *
+ * The main program is not part of the library. What it does to a trace is a coordinate stretch with interpolation
+ * coefficients that are found once: su_lintrp() finds them (linear interpolation) for the fractional samples q of the input
+ * that each output sample is at, and su_stretch() applies them.
+ */
+
+/* the locations it[] and the linear weights w[2 * lq] for the lq output samples, at the fractional samples q[] of an input
+ * trace of lp samples. A sample that is outside of the trace (before 0 or from lp - 1) gets weights of 0. */
+void su_lintrp(const float *q, float *w, int *it, int lp, int lq)
+{
+	int i;
+	float delta;
+	for (i = 0; i < lq; i++) {
+		if (q[i] >= 0.0 && q[i] < lp - 1) {
+			it[i] = q[i];
+			delta = q[i] - it[i];
+			w[i*2] = 1.0 - delta;
+			w[i*2+1] = delta;
+		} else {
+			it[i] = 0;
+			w[i*2] = 0.0;
+			w[i*2+1] = 0.0;
+		}
+	}
+}
+
+/*  General coordinate stretch with predetermined coefficients
+ *
+ *         NW-1
+ * Q(T) =  SUM W(T,J)*P(IT(T)+J), FOR T=0,LQ-1
+ *         J=0
+ */
+void su_stretch(float *q, const float *p, const float *w, const int *it, int lq, int nw)
+{
+	int j, i;
+	for (i = 0; i < lq; i++) {
+		q[i] = 0.0;
+		for (j = 0; j < nw; j++) {
+			q[i] += w[i*nw+j] * p[it[i]+j];
+		}
+	}
 }

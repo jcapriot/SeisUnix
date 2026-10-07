@@ -4,6 +4,7 @@
 #include "su.h"
 #include "segy.h" 
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = { 
 " SUPGC   -   Programmed Gain Control--apply agc like function	",
@@ -93,4 +94,28 @@ int main (int argc, char **argv)
 
 	fclose(fp);
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUPGC
+ *
+ * The main program is not part of the library. su_pgc_gain() is how it finds the gain function that all of the traces are
+ * multiplied by, from the sum[nt] of the absolute values of the first icount traces: the number of samples of the window
+ * about each sample, which goes from sample j - lw to j + lw - 1, times icount, over the sum in it (1 where it is 0).
+ */
+void su_pgc_gain(int nt, const float *sum, int icount, int lw, float *g)
+{
+	int j, k, kk;
+	float total;
+
+	for (j = 0; j < nt; j++) {
+		total = 0.0;
+		kk = 0;
+		for (k = MAX(j-lw, 0); k < MIN(j+lw, nt); k++) {
+			kk++;
+			total += sum[k];
+		}
+		if (total == 0.0) total = 1.0;
+		g[j] = kk*icount/total;
+	}
 }

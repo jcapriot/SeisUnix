@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 									",
@@ -121,4 +122,27 @@ main(int argc, char **argv)
 	} while (gettr(&tr));
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUPHASE
+ *
+ * The linear manipulation of the phase of a spectrum of nf frequencies: the new phase of frequency i is a + b (old phase) + c i
+ * (a and b in radians, a and b are the SU parameters in radians), and the amplitude is kept.
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+void su_phase_spectrum(int nf, float *ct, float a, float b, float c)
+{
+	int i;
+	float amp, ph;
+
+	for (i = 0; i < nf; ++i) {
+		amp = sqrt(ct[2*i]*ct[2*i] + ct[2*i+1]*ct[2*i+1]);
+		ph = a + b*atan2(ct[2*i+1], ct[2*i]) + c*i;
+		ct[2*i] = amp*cos(ph);
+		ct[2*i+1] = amp*sin(ph);
+	}
 }

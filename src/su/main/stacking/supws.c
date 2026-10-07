@@ -6,6 +6,7 @@
 #include "segy.h"
 #include "header.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "									",
@@ -331,3 +332,62 @@ Author: Nils Maercklin,
 }
 
 /* END OF FILE */
+#endif
+
+/* Library version of SUPWS
+ *
+ * The main program is not part of the library. What it does with the traces of a gather is:
+ *
+ *  su_pws_accumulate()  adds a trace data[nt] to the ordinary stack stdata[], and the unit phasor of its analytic signal
+ *                       data + i hdata (hdata is the Hilbert transform) to the phase stack psct[2 nt]
+ *  su_pws_weights()     the weights of the phase stack: |psct| / ntr to the power pwr, smoothed over isl samples (if isl is not 0)
+ *  su_pws_apply()       the weighted stack: stdata times the weights over ntr
+ */
+void su_pws_accumulate(int nt, const float *data, const float *hdata, float *stdata, float *psct)
+{
+	int i;
+	float modulus, a;
+
+	for (i = 0; i < nt; ++i) {
+		modulus = sqrt(data[i]*data[i] + hdata[i]*hdata[i]);
+		a = modulus ? 1.0 / modulus : 0.0;
+		stdata[i] += data[i];
+		psct[2*i] += data[i] * a;
+		psct[2*i+1] += hdata[i] * a;
+	}
+}
+
+/* smooth data in a window of length isl samples (the ends are as they were) */
+static void do_smooth(float *data, int nt, int isl, float *tmpdata)
+{
+	int it, jt;
+	float sval;
+
+	for (it = 0; it < nt; it++) {
+		sval = 0.0;
+		if ((it >= isl/2) && (it < nt-isl/2)) {
+			for (jt = it-isl/2; jt < it+isl/2; jt++) sval += data[jt];
+			tmpdata[it] = sval / (float) isl;
+		} else {
+			tmpdata[it] = data[it];
+		}
+	}
+	for (it = 0; it < nt; it++) data[it] = tmpdata[it];
+}
+
+void su_pws_weights(int nt, const float *psct, int ntr, float pwr, int isl, float *psdata, float *scratch)
+{
+	int i;
+
+	for (i = 0; i < nt; ++i) {
+		psdata[i] = sqrt(psct[2*i]*psct[2*i] + psct[2*i+1]*psct[2*i+1]) / (float) ntr;
+		psdata[i] = pow(psdata[i], pwr);
+	}
+	if (isl) do_smooth(psdata, nt, isl, scratch);
+}
+
+void su_pws_apply(int nt, const float *psdata, int ntr, float *stdata)
+{
+	int i;
+	for (i = 0; i < nt; ++i) stdata[i] *= psdata[i] / (float) ntr;
+}

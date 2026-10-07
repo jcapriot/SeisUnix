@@ -8,6 +8,7 @@
 #include "header.h"
 #include "headcase.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "                                                                       ",
@@ -429,4 +430,35 @@ int bhighdd(double **all, int last, double *guy) {
 
   return low;
 }
+#endif
 
+/* Library version of SUSTACKUP
+ *
+ * The main program is not part of the library, the bookkeeping of the stacked traces by their keys is the caller's. What is done to
+ * each is:
+ *
+ *  su_stackup_add()     adds the n samples of a trace to the sums sum[] (in double precision) and counts in samplefold[] the
+ *                       samples that were not 0
+ *  su_stackup_finish()  each sample is the sum over the number of values that were not 0 (0 where there were none)
+ */
+void su_stackup_add(int n, const float *x, double *sum, float *samplefold)
+{
+	int i;
+
+	for (i = 0; i < n; ++i) {
+		if (x[i] != 0.0) {
+			sum[i] += x[i];
+			samplefold[i] += 1.0;
+		}
+	}
+}
+
+void su_stackup_finish(int n, const double *sum, const float *samplefold, float *out)
+{
+	int i;
+
+	for (i = 0; i < n; ++i) {
+		if (samplefold[i] > 0.0) out[i] = sum[i] / samplefold[i];
+		else out[i] = 0.0;
+	}
+}

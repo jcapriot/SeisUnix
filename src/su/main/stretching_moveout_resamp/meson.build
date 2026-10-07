@@ -1,4 +1,7 @@
 su_stretching_srcs = files(
+    'suztot.c',
+    'suttoz.c',
+    'sulog.c',
     'sunmo.c',
 )
 

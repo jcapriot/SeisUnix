@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 									",
@@ -254,4 +255,33 @@ main(int argc, char **argv)
 
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUCLOGFFT (and SUCEPSTRUM)
+ *
+ * The log amplitude and the (wrapped) phase of the nf frequencies of a spectrum, 0 where the spectrum is 0 (to CLOSETO of
+ * the square of its amplitude). The unwrapping of the phase is by the functions of cwp/lib/unwrapphase.c.
+ * The main program is not part of the library, and its Fourier transforms are not either: what it does between the
+ * transforms is. The spectra are arrays of floats, the real and the imaginary part of each frequency next to each
+ * other (the layout of a numpy complex64 array). The transforms are the caller's (the SU ones have exp(+i w t) in their
+ * forward kernel, which is the conjugate of numpy's).
+ */
+void su_clogfft_spectrum(int nf, const float *ct, float *log_amp, float *phase)
+{
+	int i;
+	float re, im, ampsqrd;
+
+	for (i = 0; i < nf; ++i) {
+		re = ct[2*i];
+		im = ct[2*i+1];
+		ampsqrd = re*re + im*im;
+		if (!CLOSETO(ampsqrd, 0.0)) {
+			log_amp[i] = 0.5*log(ampsqrd);
+			phase[i] = atan2(im, re);
+		} else {
+			log_amp[i] = 0.0;
+			phase[i] = 0.0;
+		}
+	}
 }

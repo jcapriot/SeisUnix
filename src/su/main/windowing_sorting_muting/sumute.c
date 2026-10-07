@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 	   								",
@@ -342,4 +343,97 @@ main(int argc, char **argv)
 	} while (gettr(&tr));
 	
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUMUTE
+ *
+ * The main program is not part of the library. Each mode of the mute is a function, that does what the program does to a trace:
+ *
+ *   su_mute_above     mode 0, mute above the time t
+ *   su_mute_below     mode 1, mute below the time t
+ *   su_mute_line      mode 2, a zone around a straight line (an air wave)
+ *   su_mute_hyperbola mode 3, a zone around a hyperbola
+ *   su_mute_polygon   mode 4, a zone around the time t, of the width tw
+ *
+ * data[nt] is the trace, with samples dt apart, from the time tmin. taper[ntaper] are the weights (see su_mute_taper)
+ * of the samples out of the muted part.
+ *
+ * Compared to sumute.c the weights are only put on samples that are on the trace (some were put past its ends), and the
+ * header values that it sets (muts and mute) and the interpolation of the mute times are for the caller.
+ */
+
+#define SQ(x) ((x))*((x))
+
+/* the weights of the taper, sine squared: the k-th is sin^2((k + 1) pi / (2 ntaper)) */
+void su_mute_taper(int ntaper, float *taper)
+{
+	int k;
+	for (k = 0; k < ntaper; ++k) {
+		float s = sin((k+1)*PI/(2*ntaper));
+		taper[k] = s*s;
+	}
+}
+
+void su_mute_above(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper)
+{
+	int i, nmute;
+
+	nmute = MIN(NINT((t - tmin)/dt), nt);
+	if (nmute > 0) memset((void *) data, 0, nmute*FSIZE);
+	for (i = 0; i < ntaper; ++i)
+		if (i+nmute > 0 && i+nmute < nt) data[i+nmute] *= taper[i];
+}
+
+void su_mute_below(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper)
+{
+	int i, nmute, nzero;
+
+	nmute = MAX(0, NINT((tmin + nt*dt - t)/dt));
+	nzero = MIN(nmute, nt);
+	if (nzero > 0) memset((void *) (data+nt-nzero), 0, nzero*FSIZE);
+	for (i = 0; i < ntaper; ++i)
+		if (nt > nmute+i && nmute+i > 0)
+			data[nt-nmute-1-i] *= taper[i];
+}
+
+/* mute nmute samples about the sample ntair, and taper away from them (modes 2, 3 and 4 do this) */
+static void mute_zone(float *data, int nt, int ntair, int nmute, int ntaper, const float *taper)
+{
+	int i, itaper, topmute, botmute;
+
+	topmute = MIN(MAX(0, ntair-nmute/2), nt);
+	botmute = MIN(nt, ntair+nmute/2);
+	if (botmute > topmute) memset((void *) (data+topmute), 0, (botmute-topmute)*FSIZE);
+	for (i = 0; i < ntaper; ++i) {
+		itaper = ntair-nmute/2-i;
+		if (itaper > 0 && itaper < nt) data[itaper] *= taper[i];
+	}
+	for (i = 0; i < ntaper; ++i) {
+		itaper = ntair+nmute/2+i;
+		if (itaper >= 0 && itaper < nt) data[itaper] *= taper[i];
+	}
+}
+
+void su_mute_line(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper,
+	float fval, float linvel, float tm0)
+{
+	int nmute = NINT((tmin+t)/dt);
+	int ntair = NINT(tm0/dt+fval/linvel/dt);
+	mute_zone(data, nt, ntair, nmute, ntaper, taper);
+}
+
+void su_mute_hyperbola(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper,
+	float fval, float linvel, float tm0)
+{
+	int nmute = NINT((tmin + t)/dt);
+	int ntair = NINT(sqrt( SQ((float)(tm0/dt))+SQ((float)(fval/linvel/dt)) ));
+	mute_zone(data, nt, ntair, nmute, ntaper, taper);
+}
+
+void su_mute_polygon(float *data, int nt, float t, float tw, float dt, int ntaper, const float *taper)
+{
+	int nmute = NINT(tw/dt);
+	int ntair = NINT(t/dt);
+	mute_zone(data, nt, ntair, nmute, ntaper, taper);
 }

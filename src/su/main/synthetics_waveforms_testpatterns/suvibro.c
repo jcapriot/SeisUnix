@@ -8,6 +8,7 @@
 
 #define TWOPI 2.0*PI
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "								",
@@ -448,5 +449,107 @@ Author: Tagir Galikeev				  Date:7 Oct 1994
 	  		}
 			tr.data[nt-i]  *= env;
 		}
+	}
+}
+#endif
+
+/* Library version of SUVIBRO
+ *
+ * The main program is not part of the library. Each kind of sweep is a function that puts the nt = T / dt + 1 samples of a sweep
+ * of the duration T in data[]:
+ *
+ *  su_vibro_linear     sweep=1, linear, from fs to fe
+ *  su_vibro_segments   sweep=2, linear segments: freq[isegm + 1] at the ends of the segments, time[isegm] their lengths
+ *  su_vibro_octave     sweep=3, a boost of swconst dB per octave
+ *  su_vibro_hertz      sweep=4, a boost of swconst dB per hertz
+ *  su_vibro_tpower     sweep=5, the time to the power swconst
+ *  su_vibro_taper      the taper of the ends, of a type (1 linear, 2 sine, 3 cosine, 4 and 5 gaussian) and t1 and t2 long
+ *
+ * phz is the initial phase, in radians. Compared to suvibro.c sweep=5 is the t-power sweep (the program makes the dB per hertz
+ * sweep), the dB per hertz sweep with 0 for the constant is a linear one (the program makes a constant), the end taper is
+ * on the last samples (the program has it one sample after them), and the functions do not write past nt samples.
+ */
+#define VIBRO_TWOPI (2.0*PI)
+
+void su_vibro_linear(float *data, int nt, float fs, float fe, float T, float dt, float phz)
+{
+	int i;
+	float rate = (fe-fs)/T;
+	float t;
+
+	for (i = 0; i < nt; i++) {
+		t = i*dt;
+		data[i] = cos(VIBRO_TWOPI*(fs+rate/2*t)*t + phz);
+	}
+}
+
+void su_vibro_segments(float *data, int nt, const float *freq, const float *time, int isegm, float T, float dt, float phz)
+{
+	int m, k, i, j;
+	float aa, ab, phi, phase;
+
+	for (i = 0; i < nt; i++) data[i] = 0.0;
+	m = 0;
+	k = 0;
+	phase = 0.;
+	for (i = 0; i < isegm; i++) {
+		k = k + m;
+		m = (int)( (float)nt / T * (float)time[i] );
+		aa = VIBRO_TWOPI*freq[i]*dt;
+		ab = PI*(freq[i+1]-freq[i])*(dt*dt) / time[i];
+		for (j = 0; j < m && j+k < nt; j++) {
+			phi = j*(ab*j+aa) + phase + phz;
+			data[j+k] = cos(phi);
+		}
+		phase = (ab*m+aa)*m + phase;
+	}
+}
+
+void su_vibro_octave(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz)
+{
+	int i;
+	float K1, K2, t, s, swcon;
+
+	if (swconst == -6.) swconst = -5.999;
+	swcon = swconst/6+1;
+	s = (swcon+1)/swcon;
+	K1 = (float)pow((double)fs, (double)swcon);
+	K2 = ((float)pow((double)fe, (double)swcon) - (float)pow((double)fs, (double)swcon)) / T;
+	for (i = 0; i < nt; i++) {
+		t = i*dt;
+		data[i] = cos(VIBRO_TWOPI/(s*K2)*pow((double)(K1+K2*t), (double)s) + phz);
+	}
+}
+
+void su_vibro_hertz(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz)
+{
+	int i;
+	float K1, K2, t;
+
+	if (swconst == 0) {
+		su_vibro_linear(data, nt, fs, fe, T, dt, phz);
+		return;
+	}
+	K1 = (float)20./(swconst*log(10.));
+	K2 = (float)(exp(swconst*log(10.)*(fe-fs)/20.) - 1.)/T;
+	if (K2 == 0) {
+		su_vibro_linear(data, nt, fs, fe, T, dt, phz);
+		return;
+	}
+	for (i = 0; i < nt; i++) {
+		t = i*dt;
+		data[i] = cos(VIBRO_TWOPI*(fs*t+K1/K2*((1.+t*K2)*log(1.+t*K2) - (1.+t*K2))) + phz);
+	}
+}
+
+void su_vibro_tpower(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz)
+{
+	int i;
+	float t, s;
+
+	for (i = 0; i < nt; i++) {
+		t = i*dt;
+		s = t/T;
+		data[i] = cos(VIBRO_TWOPI*t*(fs+(fe-fs)/(swconst+1.)*pow((double)s, (double)swconst)) + phz);
 	}
 }

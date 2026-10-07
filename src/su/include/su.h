@@ -99,9 +99,22 @@ double to_segy_elco_multiplier(short segy_scalar); /* reciprocal of from */
 
 //BEGIN SU MAIN functions
 
+// The programs of su/main are in the library as functions that do what the program does to a trace (or a gather)
+// and that have no static state: the lookup tables and scratch arrays are arguments that the caller owns.
+
 // filters
 void su_bfhighpass(int zerophase, int npoles, float f3db, size_t nt, float *data_in, float *data_out);
 void su_bflowpass(int zerophase, int npoles, float f3db, size_t nt, float *data_in, float *data_out);
+void polygonalFilter(float *f, float *amps, int npoly, int nfft, float dt, float *filter, int *intfr);
+void su_median_across(int n, int nwin, const float *rows, size_t stride, float *out, float *scratch);
+void su_mix_across(int n, int nwin, const float *rows, size_t stride, const float *w, float *out);
+void su_frac_filter(int nf, int nfft, float dt, float power, float sign, float phasefac, float scale, float *filt);
+void su_phase_spectrum(int nf, float *ct, float a, float b, float c);
+float su_kolmogoroff_log(int n, float pnoise, float *cx);
+void su_kolmogoroff_fold(int n, float *cx);
+void su_kolmogoroff_exp(int n, float rmax, float *cx);
+void su_tvband_filter(const float *f, int nfft, int nfreq, float dt, float scale, float *filter);
+void su_tvband_blend(int i0, int i1, const float *first, const float *second, float *out);
 
 // amplitudes
 void su_centsamp(float *rt, float *ct, float *mt, const float *time, int nt, float dt, int nvals_min);
@@ -113,9 +126,7 @@ void su_gain(float *data, float tpow, float epow, float gpow,
 	int nt, int maxbal, float pclip, float nclip,
 	const float *tpowfac, const float *epowfac,
 	float *absdata, float *agcdata, float *d2, float *w, float *s);
-
-// filters (sufilter)
-void polygonalFilter(float *f, float *amps, int npoly, int nfft, float dt, float *filter, int *intfr);
+void su_pgc_gain(int nt, const float *sum, int icount, int lw, float *g);
 
 // operations (suop)
 void su_op_saf(float *data, int nt, float *tmp);
@@ -123,10 +134,86 @@ void su_op_freq(float *data, int nt, float dt, float *tmp, float *tmp1);
 void su_op_despike(float *data, int nt, int nw, float *tmp, float *tomed);
 
 // stretching_moveout_resamp
+void su_lintrp(const float *q, float *w, int *it, int lp, int lq);
+void su_stretch(float *q, const float *p, const float *w, const int *it, int lq, int nw);
+void su_ttoz_table(int nt, float dt, float ft, const float *v, int nz, float dz, float fz, float *tz, float *z);
+void su_ztot_table(int nz, float dz, float fz, const float *v, int nt, float dt, float ft, float *zt, float *t);
 void su_nmo_tables(int nt, float dt, float ft, float offset, const float *ovvt, float smute, int upward,
 	int invert, int sscale, float *ttn, float *atn, float *tnt, float *at, int *itmute_out);
 void su_nmo(float *data, int nt, float dt, float ft, int itmute, int lmute, int sscale, int invert,
 	const float *ttn, const float *atn, const float *tnt, const float *at, float *q);
+
+// tapering
+float su_taper_envelope(int tap_type, float f, float min, float max);
+void su_taper_time(float t1, float t2, int tap_type, float dt, float *trace, int nt);
+void su_ramp(float *data, int nt, int ntaper1, int ntaper2);
+
+// windowing_sorting_muting
+void su_mute_taper(int ntaper, float *taper);
+void su_mute_above(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper);
+void su_mute_below(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper);
+void su_mute_line(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper,
+	float fval, float linvel, float tm0);
+void su_mute_hyperbola(float *data, int nt, float t, float tmin, float dt, int ntaper, const float *taper,
+	float fval, float linvel, float tm0);
+void su_mute_polygon(float *data, int nt, float t, float tw, float dt, int ntaper, const float *taper);
+
+// noise
+// random number generators that keep their state in a su_rng (see suaddnoise.c)
+typedef struct {
+	int i, j;
+	float c;
+	float u[17];
+} su_rng;
+void su_rng_seed_uniform(su_rng *r, int seed);
+float su_rng_uniform(su_rng *r);
+void su_rng_seed_normal(su_rng *r, int seed);
+float su_rng_normal(su_rng *r);
+
+// attributes_parameter_estimation
+void su_attr_differentiate(int n, float h, float *f);
+void su_attr_unwrap_phase(int n, float w, float *phase);
+void su_attr_envelope(int n, const float *re, const float *im, float *out);
+void su_attr_phase(int n, const float *re, const float *im, float unwrap, float *out);
+void su_attr_freq(int n, const float *re, const float *im, float dt, float unwrap, float *out);
+void su_attr_normamp(int n, const float *re, const float *im, float *out);
+void su_attr_fdenv(int n, const float *re, const float *im, float dt, float *out);
+void su_attr_sdenv(int n, const float *re, const float *im, float dt, float *out);
+void su_attr_bandwidth(int n, const float *re, const float *im, float dt, float *out, float *scratch);
+void su_attr_q(int n, const float *re, const float *im, float dt, float unwrap, float *out, float *scratch);
+
+// stacking
+void su_stack_add(int n, int ncomp, const float *x, float *sum, int *nnz);
+void su_stack_normalize(int n, int ncomp, float *sum, const int *nnz, float normpow);
+void su_divstack_power(int nt, int ncomp, int ntwin, int peak, const float *x, float *intp);
+void su_divstack_add(int nt, int ncomp, const float *x, const float *intp, float *sumdata, float *sumscale);
+void su_divstack_finish(int nt, int ncomp, const float *sumdata, const float *sumscale, float *out);
+void su_pws_accumulate(int nt, const float *data, const float *hdata, float *stdata, float *psct);
+void su_pws_weights(int nt, const float *psct, int ntr, float pwr, int isl, float *psdata, float *scratch);
+void su_pws_apply(int nt, const float *psdata, int ntr, float *stdata);
+void su_stackup_add(int n, const float *x, double *sum, float *samplefold);
+void su_stackup_finish(int n, const double *sum, const float *samplefold, float *out);
+
+// transforms
+void su_st_analytic(int len, float *h);
+void su_st_row(int len, int n, const float *h, float *g);
+void su_gabor_filter(float fcent, float dt, int nfft, float alpha, float band, float scale, float *filter);
+float su_cwt_wavelet(int nwavelet, float xmin, float xcenter, float xmax, float sigma, float *waveletsum);
+int su_cwt_filter(int nwavelet, const float *waveletsum, float scale, float dx, float width, float *filt);
+void su_cwt_trace(int ns, int nconv, const float *convolution, float scale, float *rt);
+void su_wfft_flatten(int nf, const float *ct, float w0, float w1, float w2, float *out);
+void su_clogfft_spectrum(int nf, const float *ct, float *log_amp, float *phase);
+void su_iclogfft_spectrum(int nf, const float *clog, int sym, float *ct);
+
+// convolution_correlation
+void su_acorfrac_spectrum(int nf, float *ct, float a, float b, int sym);
+
+// synthetics_waveforms_testpatterns
+void su_vibro_linear(float *data, int nt, float fs, float fe, float T, float dt, float phz);
+void su_vibro_segments(float *data, int nt, const float *freq, const float *time, int isegm, float T, float dt, float phz);
+void su_vibro_octave(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz);
+void su_vibro_hertz(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz);
+void su_vibro_tpower(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz);
 
 // synthetics
 void su_synlv(float *data,

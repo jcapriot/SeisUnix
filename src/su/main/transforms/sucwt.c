@@ -8,6 +8,7 @@
 #include "header.h"
 
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation ******************************/
 char *sdoc[] = {
 "									",
@@ -515,4 +516,61 @@ Author: CWP: John Stockwell (Nov 2004)
 		wavelet[i] = mult * (x*x/(sigma*sigma) - 1.0) 
 				* exp(- x*x/(2.0*sigma*sigma) );
 	}
+}
+#endif
+
+/* Library version of SUCWT
+ *
+ * The main program is not part of the library. What it does is in three functions:
+ *
+ *  su_cwt_wavelet()  the integral of the Mexican hat wavelet (the second derivative of a Gaussian) of nwavelet samples from xmin to xmax,
+ *                    the center at xcenter and the width sigma, times dx, in waveletsum[]. It returns dx
+ *  su_cwt_filter()   the filter (the integral of the wavelet, stretched by the scale, and flipped) of one scale, with
+ *                    its length, in filt[] (that has room for 1 + scale xmax samples, xmax = xmax - xmin)
+ *  su_cwt_trace()    what is done to the convolution of a trace with the filter: the part of it from nconv/2 - 1, the difference, and
+ *                    the factor -sqrt(scale)
+ *
+ * Compared to sucwt.c the wavelet starts at xmin (the program has it start at - xcenter, though its documentation says
+ * that xmin is where it starts).
+ */
+float su_cwt_wavelet(int nwavelet, float xmin, float xcenter, float xmax, float sigma, float *waveletsum)
+{
+	int i;
+	double dx, x, mult, total;
+
+	dx = (xmax - xmin)/(nwavelet - 1);
+	mult = (1.0/(sigma*sigma*sigma * sqrt(2.0*PI)));
+	total = 0.0;
+	for (i = 0; i < nwavelet; ++i) {
+		x = xmin + i*dx - xcenter;
+		total += mult * (x*x/(sigma*sigma) - 1.0) * exp(- x*x/(2.0*sigma*sigma));
+		waveletsum[i] = total * dx;
+	}
+	return dx;
+}
+
+int su_cwt_filter(int nwavelet, const float *waveletsum, float scale, float dx, float width, float *filt)
+{
+	int j, nconv, index;
+
+	nconv = 1 + (int)(scale * width);
+	for (j = 0; j < nconv; ++j) {
+		index = (int)(j / (scale * dx));
+		if (index > nwavelet - 1) index = nwavelet - 1;
+		filt[nconv - 1 - j] = waveletsum[index];
+	}
+	return nconv;
+}
+
+void su_cwt_trace(int ns, int nconv, const float *convolution, float scale, float *rt)
+{
+	int j, shift;
+
+	shift = nconv/2 - 1;
+	for (j = 0; j < ns; ++j)
+		rt[j] = (j + shift >= 0 && j + shift < ns) ? convolution[j + shift] : 0.0;
+	for (j = ns-1; j > 0; --j)
+		rt[j] = rt[j] - rt[j-1];
+	for (j = 0; j < ns; ++j)
+		rt[j] = -sqrt(scale) * rt[j];
 }

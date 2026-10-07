@@ -8,6 +8,7 @@
 
 #define TWOPI 2.0*PI
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "								",
@@ -295,4 +296,62 @@ Rewriten: Gerald Klein				  Date:31 Mar 2004
 		}
    }
    return;
+}
+#endif
+
+/* Library version of SUTAPER
+ *
+ * The main program is not part of the library. The envelope of the taper types, and what it does to a trace, are.
+ */
+
+#define EPS	3.8090232	/* exp(-EPS*EPS) = 5e-7, "noise" level  */
+				/* see sugain.c				*/
+
+/* The envelope of a taper (type: 1 linear, 2 sine, 3 cosine, 4 gaussian (+/-3.8), 5 gaussian (+/-2.0)) at f, which goes
+ * from 0 to 1 along the taper. Only the linear one goes between min and max (as sutaper does for the traces of a panel).
+ * An unknown type is -1. */
+float su_taper_envelope(int tap_type, float f, float min, float max)
+{
+	float x;
+	switch (tap_type) {
+	case 1: return min + (max - min) * f;
+	case 2: return sin(PI*f/2.);
+	case 3: return 0.5*(1.0-cos(PI*f));
+	case 4: x = EPS*(1-f);
+		return exp(-(x*x));
+	case 5: x = 2.0*(1-f);
+		return exp(-(x*x));
+	default: return -1.0;
+	}
+}
+
+/* Taper the start (t1) and the end (t2) of a trace of nt samples that are dt apart, with the taper of a type (1 to 5,
+ * the same as the weights of the traces, except that the linear taper goes from 0 to 1). t1, t2 and dt are in the same unit.
+ *
+ * Compared to taper() of sutaper.c the end taper has its first weight on the last sample of the trace (sutaper puts it
+ * on the sample after it, so the last sample has the weight that is meant for the one before). */
+void su_taper_time(float t1, float t2, int tap_type, float dt, float *trace, int nt)
+{
+	int i, nt1, nt2;
+	float f;
+
+	nt1 = (int)(t1 / dt + 1);
+	nt2 = (int)(t2 / dt + 1);
+	if (nt1 > nt) nt1 = nt;
+	if (nt2 > nt) nt2 = nt;
+
+	/* apply start taper */
+	if (nt1 > 1) {
+		for (i = 0; i < nt1; i++) {
+			f = (float) i / (float) nt1;
+			trace[i] *= su_taper_envelope(tap_type, f, 0.0, 1.0);
+		}
+	}
+	/* apply end taper */
+	if (nt2 > 1) {
+		for (i = 0; i < nt2; i++) {
+			f = (float) i / (float) nt2;
+			trace[nt-1-i] *= su_taper_envelope(tap_type, f, 0.0, 1.0);
+		}
+	}
 }

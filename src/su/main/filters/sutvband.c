@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 "                                                               ",
@@ -223,4 +224,51 @@ void makefilter(float *f, int nfft, int nfreq, float dt, float *filter)
           for (i = 0;       i < if1;   ++i)  filter[i] = 0.0; 
           for (i = if4 + 1; i < nfreq; ++i)  filter[i] = 0.0; 
         }
+}
+#endif
+
+/* Library version of SUTVBAND
+ *
+ * The main program is not part of the library, its transforms are not either. What it does with them is:
+ *
+ *  su_tvband_filter()  the filter of one time, for the nfreq frequencies of a transform of nfft samples that are dt apart: a bandpass
+ *                      with sine squared tapers, from the corner frequencies f[4] (times 1 / nfft for the inverse transform
+ *                      of the program, which is not scaled)
+ *  su_tvband_blend()   the fade from the trace that is filtered for one time to that for the next one, from sample i0 to i1
+ */
+void su_tvband_filter(const float *f, int nfft, int nfreq, float dt, float scale, float *filter)
+{
+	int i;
+	float df = 1.0 / (nfft * dt);
+	int nfreqm1 = nfreq - 1;
+	int if1 = MIN(NINT(f[0]/df), nfreqm1);
+	int if2 = MIN(NINT(f[1]/df), nfreqm1);
+	int if3 = MIN(NINT(f[2]/df), nfreqm1);
+	int if4 = MIN(NINT(f[3]/df), nfreqm1);
+	float c, s;
+
+	for (i = 0; i < nfreq; ++i) filter[i] = 0.0;
+	c = PI/2.0 / (if2 - if1 + 2);
+	for (i = if1; i <= if2; ++i) {
+		s = sin(c*(i - if1 + 1));
+		filter[i] = s * s * scale;
+	}
+	c = PI/2.0 / (if4 - if3 + 2);
+	for (i = if3; i <= if4; ++i) {
+		s = sin(c*(if4 - i + 1));
+		filter[i] = s * s * scale;
+	}
+	for (i = if2 + 1; i < if3; ++i) filter[i] = scale;
+}
+
+void su_tvband_blend(int i0, int i1, const float *first, const float *second, float *out)
+{
+	int i;
+	float fi0 = i0;
+	float a;
+
+	for (i = i0; i <= i1; ++i) {
+		a = (i1 > i0) ? (i - fi0)/(i1 - fi0) : 0.0;
+		out[i] = (1-a)*first[i] + a*second[i];
+	}
 }

@@ -1,4 +1,5 @@
 su_amplitude_srcs = files(
+    'supgc.c',
     'sugain.c',
     'sucentsamp.c',
 )

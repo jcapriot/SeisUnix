@@ -7,6 +7,7 @@
 #include "segy.h"
 #include <signal.h>
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 	   								",
@@ -484,4 +485,45 @@ static void closefiles(void)
 	eremove(headerfile);
 	eremove(tracefile);
 	exit(EXIT_FAILURE);
+}
+#endif
+
+/* Library version of SUMEDIAN (and of the mix of SUMIX)
+ *
+ * The main program is not part of the library. These are what it does at each time sample, over the traces in the window about a
+ * trace: the nwin traces are the rows of rows[], stride floats apart, and the n samples of each go to out[].
+ *
+ *  su_median_across()  the median value (nwin is odd)
+ *  su_mix_across()     the weighted sum, with the weights w[nwin] (which the caller has divided by the number of them)
+ */
+void su_median_across(int n, int nwin, const float *rows, size_t stride, float *out, float *scratch)
+{
+	int it, imix, jmix;
+	float tmp;
+	int middle = (nwin - 1)/2;
+
+	for (it = 0; it < n; ++it) {
+		for (imix = 0; imix < nwin; ++imix) scratch[imix] = rows[imix*stride + it];
+		/* a bubble sort, and the middle value */
+		for (imix = 0; imix < nwin-1; imix++) {
+			for (jmix = 0; jmix < nwin-1-imix; jmix++) {
+				if (scratch[jmix+1] < scratch[jmix]) {
+					tmp = scratch[jmix];
+					scratch[jmix] = scratch[jmix+1];
+					scratch[jmix+1] = tmp;
+				}
+			}
+		}
+		out[it] = scratch[middle];
+	}
+}
+
+void su_mix_across(int n, int nwin, const float *rows, size_t stride, const float *w, float *out)
+{
+	int it, imix;
+
+	for (it = 0; it < n; ++it) {
+		out[it] = 0.0;
+		for (imix = 0; imix < nwin; ++imix) out[it] += rows[imix*stride + it] * w[imix];
+	}
 }

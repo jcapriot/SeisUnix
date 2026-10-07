@@ -6,6 +6,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 									",
@@ -104,4 +105,22 @@ main(int argc, char **argv)
 	} while (gettr(&tr));
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SURAMP
+ *
+ * The main program is not part of the library. This is what it does to a trace: the first ntaper1 samples are multiplied by
+ * the weights 1/ntaper1, 2/ntaper1, ..., 1 and the last ntaper2 samples by 1, (ntaper2 - 1)/ntaper2, ..., 1/ntaper2.
+ * (The numbers of samples are found by the caller, from the times of the ramps.)
+ */
+void su_ramp(float *data, int nt, int ntaper1, int ntaper2)
+{
+	int i;
+	if (ntaper1 > nt) ntaper1 = nt;
+	if (ntaper2 > nt) ntaper2 = nt;
+	for (i = 0; i < ntaper1; ++i)
+		data[i] *= (float) (i+1)/ntaper1;
+	for (i = 0; i < ntaper2; ++i)
+		data[nt - ntaper2 + i] *= (float) (ntaper2 - i)/ntaper2;
 }

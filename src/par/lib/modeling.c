@@ -481,6 +481,29 @@ q		integral of velocity along raypath
 	}
 }
 
+/* The table of sinc coefficients of addsinc(), made once. addsinc() makes it the first time that it is called, which is not safe
+ * to do from several threads at once (it is a data race): the caller calls this once, before any threads use addsinc(). Once it
+ * is made it is only read. */
+static float sinc[101][8];
+static int nsinc=101,madesinc=0;
+
+void su_addsinc_table (void)
+{
+	int jsinc;
+	float frac;
+
+	if (madesinc) return;
+	for (jsinc=1; jsinc<nsinc-1; ++jsinc) {
+		frac = (float)jsinc/(float)(nsinc-1);
+		mksinc(frac,8,sinc[jsinc]);
+	}
+	for (jsinc=0; jsinc<8; ++jsinc)
+		sinc[0][jsinc] = sinc[nsinc-1][jsinc] = 0.0;
+	sinc[0][3] = 1.0;
+	sinc[nsinc-1][4] = 1.0;
+	madesinc = 1;
+}
+
 void addsinc (float time, float amp,
 	int nt, float dt, float ft, float *trace)
 /*****************************************************************************
@@ -498,25 +521,13 @@ Output:
 trace		array[nt] with sinc added to sample values
 *****************************************************************************/
 {
-	static float sinc[101][8];
-	static int nsinc=101,madesinc=0;
 	int jsinc;
 	float frac;
 	int itlo,ithi,it,jt;
 	float tn,*psinc;
 
-	/* if not made sinc coefficients, make them */
-	if (!madesinc) {
-		for (jsinc=1; jsinc<nsinc-1; ++jsinc) {
-			frac = (float)jsinc/(float)(nsinc-1);
-			mksinc(frac,8,sinc[jsinc]);
-		}
-		for (jsinc=0; jsinc<8; ++jsinc)
-			sinc[0][jsinc] = sinc[nsinc-1][jsinc] = 0.0;
-		sinc[0][3] = 1.0;
-		sinc[nsinc-1][4] = 1.0;
-		madesinc = 1;
-	}
+	/* if not made sinc coefficients, make them (see su_addsinc_table) */
+	if (!madesinc) su_addsinc_table();
 	tn = (time-ft)/dt;
 	jt = tn;
 	jsinc = (tn-jt)*(nsinc-1);

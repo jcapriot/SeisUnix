@@ -79,7 +79,7 @@ Author:  intlin(): Dave Hale, Colorado School of Mines, 06/02/89
          adapted for complex numbers: Hans Ecke 2002
 *****************************************************************************/
 {
-	static int idx;
+	int idx = 0;	/* (the guess for the search of xindex: not static, so that threads do not share it) */
 	int jout;
 	float x;
 

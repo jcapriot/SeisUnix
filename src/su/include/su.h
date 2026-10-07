@@ -216,6 +216,7 @@ void su_vibro_hertz(float *data, int nt, float fs, float fe, float T, float dt, 
 void su_vibro_tpower(float *data, int nt, float fs, float fe, float T, float dt, float swconst, float phz);
 
 // synthetics
+void su_addsinc_table(void);
 void su_synlv(float *data,
 	float xs, float zs, float xg, float zg,
 	size_t nt, float dt, float ft,

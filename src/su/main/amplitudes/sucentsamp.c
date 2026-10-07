@@ -4,6 +4,7 @@
 #include "su.h"
 #include "segy.h"
 
+#if 0 /* the program, which is not part of the library */
 /*********************** self documentation **********************/
 char *sdoc[] = {
 " 								",
@@ -258,4 +259,143 @@ main(int argc, char **argv)
 
 
 	return(CWP_Exit());
+}
+#endif
+
+/* Library version of SUCENTSAMP
+ *
+ * The main program is not part of the library, this is what it does to a trace.
+ *
+ * rt   the trace (nt samples), which is used as scratch: the samples where a lobe is split are halved
+ * ct   the output (nt samples), set to zero here and then given a spike, the area of the lobe, at the centroid of each lobe
+ * mt   scratch (nt samples)
+ * time the times of the samples (nt samples), (i + 1) * dt
+ * dt   the sample interval
+ * nvals_min  the least number of samples in a lobe that is kept
+ *
+ * Compared to sucentsamp.c the state that says where in a lobe the trace is starts again for each trace (it carried
+ * the state of the end of a trace into the start of the next one), a centroid that falls outside of the trace is dropped,
+ * and the spike is on the sample of the centroid (sucentsamp puts it one sample later, because its times start at dt).
+ */
+void su_centsamp(float *rt, float *ct, float *mt, const float *time, int nt, float dt, int nvals_min)
+{
+	float invdt = 1.0 / dt;
+	float hdt = 0.5 * dt;
+	int inflect = 0;
+	int zero_cross = 0;
+	int max_passed = 0;
+	float sum_amp;
+	float t_cen;
+	int isamp;
+	float a_cen, a_mom, t_mom, a_height, t_width;
+	int first, last, prev, small, nvals;
+	int i, k;
+
+	memset((void *) ct, 0, nt*FSIZE);
+	if (nt < 1) return;
+
+	first = 0;
+	mt[0] = fabs(rt[0]);
+	sum_amp = rt[0];
+	t_mom = time[0] * mt[0];
+
+	for (i = 1; i < nt; ++i) {
+		mt[i] = fabs(rt[i]);
+
+		/* test for zero-crossing or inflection point */
+		if (rt[i] * rt[i-1] > (float)0) {
+			if (mt[i] > mt[i-1]) {
+				if (max_passed) inflect = 1;
+			} else {
+				max_passed = 1;
+			}
+		} else {
+			zero_cross = 1;
+		}
+
+		/* if there is no zero-crossing or inflection point, accumulate the time moment and the sum of the lobe amplitude */
+		if (!zero_cross && !inflect) {
+			sum_amp = sum_amp + rt[i];
+			t_mom = t_mom + (time[i] * mt[i]);
+		} else {
+			/* otherwise the lobe has ended: find its amplitude centroid and store it as a centroid sample */
+			last = i - 1;
+
+			/* if an inflection point has been found divide it between the lobe and the next one */
+			if (inflect) {
+				last = i;
+				rt[last] = rt[last] * 0.5;
+				mt[last] = fabs(rt[last]);
+				sum_amp = sum_amp + rt[last];
+				t_mom = t_mom + (time[last] * mt[last]);
+			}
+
+			nvals = last - first + 1;
+
+			if (nvals == 1) {
+				/* check to see if the lobe is big enough to be included */
+				if (nvals >= nvals_min) {
+					ct[i] = rt[i] * 0.5;
+				}
+
+				first = i;
+
+				inflect = 0;
+				max_passed = 0;
+				zero_cross = 0;
+
+				sum_amp = rt[i];
+				t_mom = time[i] * mt[i];
+			} else {
+				a_height = mt[first];
+
+				if (mt[first] > mt[last]) {
+					a_height = mt[last];
+				}
+
+				t_width = time[last] - time[first] + dt;
+				a_mom = a_height * 0.5;
+				a_cen = t_width * a_height * a_mom;
+				small = first;
+
+				if (mt[first] > mt[last]) small = last;
+				for (k = 1; k < nvals; k++) {
+					prev = small;
+
+					if (prev == first) first = first + 1;
+					else last = last - 1;
+
+					small = first;
+					if (mt[first] > mt[last]) small = last;
+
+					a_height = rt[small] - rt[prev];
+					a_mom = rt[prev] + (a_height * 0.5);
+					t_width = t_width - dt;
+					a_cen = a_cen + a_mom*t_width*a_height;
+				}
+				if (sum_amp != 0.0) a_cen = a_cen / (sum_amp * dt);
+				else a_cen = 0.0;
+
+				/* determine the time centroid */
+				if (sum_amp != 0.0) t_cen = t_mom / fabs(sum_amp);
+				else t_cen = time[first];
+
+				/* start accumulating the amplitude sum and the time moment for the next lobe */
+				sum_amp = rt[i];
+				t_mom = time[i] * mt[i];
+
+				/* the sample that corresponds to t_cen gets the amplitude a_cen, if the lobe is big enough to be included
+				 * (the times are those of the samples starting at dt, so sample 0 is at time dt) */
+				isamp = (int) ((t_cen * invdt) + hdt) - 1;
+				if (nvals >= nvals_min && isamp >= 0 && isamp < nt) {
+					ct[isamp] = a_cen;
+				}
+
+				first = i;
+				inflect = 0;
+				max_passed = 0;
+				zero_cross = 0;
+			}
+		}
+	}
 }

@@ -316,6 +316,18 @@ More documentation about these subroutines on their headings, below.
 				FK  transform
 
 ******************************************************************************/
+/* The F-K slant stacks interpolate with ints8c, which makes its table of sinc coefficients (a function level static) the
+ * first time that it is called, which is not safe to do from several threads at once. Call this once, before any threads
+ * use the F-K routines: once the table is made it is only read. */
+void su_taup_tables (void)
+{
+	complex y, out;
+	float x = 0.0;
+
+	y = cmplx(0.0, 0.0);
+	ints8c(1, 1.0, 0.0, &y, y, y, 1, &x, &out);
+}
+
 void fwd_FK_sstack (float dt, int nt, int nx, float xmin, float dx, int np,
 	float pmin, float dp, float fmin, float **traces, float **out_traces)
 /******************************************************************************

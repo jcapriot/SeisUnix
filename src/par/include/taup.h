@@ -17,6 +17,8 @@
 #include "VND.h"
 
 /* function prototypes */
+void su_taup_tables (void);
+
 void fwd_FK_sstack (float dt, int nt, int nx, float xmin, float dx, int np,
 	float pmin, float dp, float fmin, float **traces, float **out_traces);
 

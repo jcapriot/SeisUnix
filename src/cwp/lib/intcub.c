@@ -75,7 +75,7 @@ to xin[0] or xin[nin-1], respectively.
 Author:  Dave Hale, Colorado School of Mines, 06/02/89
 *****************************************************************************/
 {
-	static int idx;
+	int idx=0;
 	int iout;
 	float delx;
 

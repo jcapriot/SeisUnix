@@ -118,6 +118,11 @@ void su_tvband_blend(int i0, int i1, const float *first, const float *second, fl
 
 // amplitudes
 void su_centsamp(float *rt, float *ct, float *mt, const float *time, int nt, float dt, int nvals_min);
+float su_dipdivcor_scale(void);
+void su_dipdivcor_table(int nt, int np, float dt, const float *tt, const float *vt, float *vs, float (*vind)[4],
+	float *divcor, int trans, int norm);
+void su_dipdivcor_filter(float k, float dpx, float dt, int np, int nw, int nt, const float *div,
+	const complex *p, complex *q, complex *kq, complex *qq);
 void su_gain_tpow_table(float *tpowfac, int nt, float tmin, float dt, float tpow, float tred);
 void su_gain_epow_table(float *epowfac, int nt, float tmin, float dt, float epow, float etpow);
 void su_gain(float *data, float tpow, float epow, float gpow,
@@ -142,6 +147,10 @@ void su_nmo_tables(int nt, float dt, float ft, float offset, const float *ovvt, 
 	int invert, int sscale, float *ttn, float *atn, float *tnt, float *at, int *itmute_out);
 void su_nmo(float *data, int nt, float dt, float ft, int itmute, int lmute, int sscale, int invert,
 	const float *ttn, const float *atn, const float *tnt, const float *at, float *q);
+void su_taupnmo_tables(int nt, float dt, float ft, float p, const float *vvt, float smute, float *ttn, float *atn,
+	int *itmute_out);
+void su_taupnmo(float *data, int nt, float dt, float ft, int itmute, int lmute, int sscale,
+	const float *ttn, const float *atn, float *q);
 
 // tapering
 float su_taper_envelope(int tap_type, float f, float min, float max);

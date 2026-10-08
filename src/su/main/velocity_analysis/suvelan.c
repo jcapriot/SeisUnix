@@ -7,6 +7,7 @@
 #include "segy.h"
 
 /*********************** self documentation **********************************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									     ",
 " SUVELAN - compute stacking velocity semblance for cdp gathers		     ",
@@ -69,6 +70,8 @@ char *sdoc[] = {
 " semblance traces every time cdp changes.  Therefore, the output will	     ",
 " be useful only if cdp gathers are input.				     ",
 NULL};
+#endif
+
 
 /* Credits:
  *	CWP, Colorado School of Mines:
@@ -82,240 +85,109 @@ NULL};
  */
 /**************** end self doc *******************************************/
 
-segy tr;
+/* Library version of SUVELAN
+ *
+ * The main program is not part of the library. It reads the gathers (the traces that have the same cdp), and writes nv
+ * semblance traces for each of them. Doing that is left to the caller, and what is here is the work of the program on
+ * the traces and the sums:
+ *
+ *	su_velan_accumulate:	NMO of a trace at each of the velocities, added to the sums for the semblance
+ *	su_velan_semblance:	the semblance of one velocity from its sums
+ *
+ * All the arrays are the caller's, none are allocated here. The sums are num[nv*nt], den[nv*nt] and nnz[nv*nt] (the row of
+ * each velocity after the other), that start at 0 for each gather.
+ *
+ * Differences from the program:
+ *  - The smoothing window of the semblance has nsmooth samples, where the program leaves out the last one (SURELAN,
+ *    which does the same job, has them all).
+ *  - A sample whose NMO time is not real (a velocity that has no moveout, see the return value) is left out, where the
+ *    program takes the square root of a negative number and uses what comes out as an index.
+ */
 
-int
-main(int argc, char **argv)
+/* NMO of a trace of nt samples that start at time ft and are dt apart, at offset `offset` and at the velocities
+ * fv + iv * dv, with linear interpolation (accurate enough for velocity analysis) and the sums for the semblance.
+ *
+ * anis1, anis2: the quartic term, and the extension of it in the denominator. smute: samples with NMO stretch exceeding
+ * smute are zeroed.
+ *
+ * Returns -1 if anis2 is too small for this offset (the program stops with an error), 1 if there is a velocity that has no
+ * moveout (the program warns: check anis1 and anis2), otherwise 0.
+ */
+int su_velan_accumulate(int nt, float dt, float ft, float offset, int nv, float dv, float fv, float anis1,
+	float anis2, float smute, const float *data, float *num, float *den, float *nnz)
 {
-	int nv;		/* number of velocities */
-	float dv;	/* velocity sampling interval */
-	float fv;	/* first velocity */
-        float anis1;    /* quartic term, or numerator of an extended one */
-        float anis2;    /* inside denominator of an extended quartic term */
-	int iv;		/* velocity index */
-	int dtratio;	/* ratio of output to input sampling intervals */
-	int nsmooth;	/* length in samples of num and den smoothing window */
-	int nt;		/* number of time samples per input trace */
-	float dt;	/* time sampling interval for input traces */
-	float ft;	/* time of first sample input and output */
-	int ntout;	/* number of output samples */
-	float dtout;	/* time sampling interval for output traces */
-	int it;		/* input time sample index */
-	int itout;	/* output time sample index */
-	int is;		/* time sample index for smoothing window */
-	int ismin;	/* lower limit on is */
-	int ismax;	/* upper limit on is */
-	int itmute;	/* time sample index of first sample not muted */
-	int iti;	/* time sample index used in linear interpolation */
-	float ti;	/* normalized time for linear interpolation */
-	float frac;	/* fractional distance from sample in interpolation */
-	int gottrace;	/* =1 if an input trace was read */
-	int verbose;	/* =1 for diagnostic print */
-	long cdp;	/* cdp from current input trace header */
-	long cdpprev;	/* cdp from previous input trace header */
-	float smute;	/* NMO stretch mute factor */
-	float offset;	/* offset from input trace header */
-	float offovs;	/* (offset/velocity)^2 */
-        float offan=0.0;    /* shift of tnmo due to anisotropy */
-	float tn;	/* time after NMO */
-	float tnmute;	/* mute time after NMO */
-	float nsum;	/* semblance numerator sum */
-	float dsum;	/* semblance denominator sum */
-	float v;	/* velocity */
-	float temp;	/* temporary scalar */
-	float *data;	/* array[nt] of input trace */
-	float *sem;	/* array[ntout] of semblance */
-	float **num;	/* array[nv][nt] of semblance numerators */
-	float **den;	/* array[nv][nt] of semblance denominators */
-	float **nnz;	/* array[nv][nt] for counting non-zero samples */
-	float pwr;      /* power of semblance */
+	int iv,it,itmute,iti;
+	float v,offovs,offan,tnmute,tn,ti,frac,temp,tsq;
+	int nomoveout = 0;
 
-	/* hook up getpar */
-	initargs(argc,argv);
-	requestdoc(0);
+	if ((1.0 + offset*offset*anis2) <= 0.0) return -1;
+	offan = (offset*offset*offset*offset*anis1) / (1.0 + offset*offset*anis2);
 
-	/* get parameters from the first trace */
-	if (!gettr(&tr)) err("can't get first trace");
-	nt = tr.ns;
-	dt = ((double) tr.dt)/1000000.0;
-	ft = tr.delrt/1000.0;
-	cdp = tr.cdp;
-	offset = tr.offset;
+	for (iv=0,v=fv; iv<nv; ++iv,v+=dv) {
+		float *pnum = num + (size_t) iv*nt;
+		float *pden = den + (size_t) iv*nt;
+		float *pnnz = nnz + (size_t) iv*nt;
 
-	/* get optional parameters */
-	if (!getparint("nv",&nv)) nv = 50;
-	if (!getparfloat("dv",&dv)) dv = 50.0;
-	if (!getparfloat("fv",&fv)) fv = 1500.0;
-	if (!getparfloat("anis1",&anis1)) anis1 = 0.0;
-	if (!getparfloat("anis2",&anis2)) anis2 = 0.0;
-	if (!getparfloat("smute",&smute)) smute = 1.5;
-	if (smute<=1.0) err("smute must be greater than 1.0");
-	if (!getparint("dtratio",&dtratio)) dtratio = 5;
-	if (!getparint("nsmooth",&nsmooth)) nsmooth = dtratio*2+1;
-	if (!getparint("verbose",&verbose)) verbose = 0;
-	if (!getparfloat("pwr",&pwr)) pwr = 1.0;
-	if (pwr < 0.0)   
-	  err("we are not looking for noise: pwr < 0");
-	if (pwr == 0.0)   
-	  err("we are creating an all-white semblance: pwr = 0");
+		/* compute offset/velocity squared */
+		offovs = (offset*offset)/(v*v) + offan;
+		if (offovs < 0.0) nomoveout = 1;
 
-        checkpars();
-	/* determine output sampling */
-	ntout = 1+(nt-1)/dtratio;   CHECK_NT("ntout",ntout);
-	dtout = dt*dtratio;
-	if (verbose) {
-		fprintf(stderr,
-			"\tnumber of output time samples is %d\n",ntout);
-		fprintf(stderr,
-			"\toutput time sampling interval is %g\n",dtout);
-		fprintf(stderr,
-			"\toutput time of first sample is %g\n",ft);
-	}
-
-	/* allocate memory */
-	data = ealloc1float(nt);
-	num = ealloc2float(nt,nv);
-	den = ealloc2float(nt,nv);
-	nnz = ealloc2float(nt,nv);
-	sem = ealloc1float(ntout);
-
-	/* zero accumulators */
-	for (iv=0; iv<nv; ++iv) {
-		for (it=0; it<nt; ++it) {
-			num[iv][it] = 0.0;
-			den[iv][it] = 0.0;
-			nnz[iv][it] = 0.0;
-		}
-	}
-
-	/* initialize flag */
-	gottrace = 1;
-
-	/* remember previous cdp */
-	cdpprev = tr.cdp;
-
-	/* loop over input traces */
-	while (gottrace|(~gottrace)/*True*/) { /* middle exit loop */
-
-		/* if got a trace */
-		if (gottrace) {
-
-			/* determine offset and cdp */
-			offset = tr.offset;
-			cdp = tr.cdp;
-                        if ((1.0 + offset*offset*anis2) <= 0.0)
-                           err ("anis2 too small");
-                        offan = (offset*offset*offset*offset*anis1) / 
-                                (1.0 + offset*offset*anis2);
-
-			/* get trace samples */
-			memcpy( (void *) data,
-				(const void *) tr.data,nt*sizeof(float));
+		/* determine mute time after nmo */
+		tnmute = sqrt(offovs/(smute*smute-1.0));
+		if (tnmute > ft) {
+			itmute = (tnmute-ft)/dt;
+		} else {
+			itmute = 0;
 		}
 
-		/* if cdp has changed or no more input traces */
-		if (cdp!=cdpprev || !gottrace) {
-
-			/* set output trace header fields */
-			tr.offset = 0;
-			tr.cdp = (int) cdpprev;
-			tr.ns = ntout;
-			tr.dt = dtout*1000000.0;
-
-			/* loop over velocities */
-			for (iv=0; iv<nv; ++iv) {
-
-				/* compute semblance quotients */
-				for (itout=0; itout<ntout; ++itout) {
-					it = itout*dtratio;
-					ismin = it-nsmooth/2;
-					ismax = it+nsmooth/2;
-					if (ismin<0) ismin = 0;
-					if (ismax>nt-1) ismax = nt-1;
-					nsum = dsum = 0.0;
-					for (is=ismin; is<ismax; ++is) {
-						nsum += num[iv][is]*
-							num[iv][is];
-						dsum += nnz[iv][is]*
-							den[iv][is];
-					}
-					sem[itout] = (dsum!=0.0?nsum/dsum:0.0);
-				}
-
-				/* powering the semblance */
-				if (pwr != 1.0) {
-				  for (itout=0; itout<ntout; ++itout)
-				    sem[itout] = pow (sem[itout], pwr);
-				};
-
-				/* output semblances */
-				memcpy((void *) tr.data,
-				       (const void *) sem,ntout*sizeof(float));
-				puttr(&tr);
-
-				/* zero accumulators */
-				for (it=0; it<nt; ++it) {
-					num[iv][it] = 0.0;
-					den[iv][it] = 0.0;
-					nnz[iv][it] = 0.0;
-				}
-			}
-
-			/* diagnostic print */
-			if (verbose) 
-				warn("semblance output for cdp=%d",cdpprev);
-
-			/* if no more input traces, break input trace loop */
-			if (!gottrace) break;
-
-			/* remember previous cdp */
-			cdpprev = cdp;
-		}
-
-		/* loop over velocities */
-		for (iv=0,v=fv; iv<nv; ++iv,v+=dv) {
-			
-			/* compute offset/velocity squared */
-			offovs = (offset*offset)/(v*v) + offan;
-                        /* decrease of traveltime with distance due to highly
-                           increasing velocity cannot be handled yet
-                        */
-                        if (offovs < 0.0)
-                           warn("no moveout; check anis1 and anis2");
-
-			/* determine mute time after nmo */
-			tnmute = sqrt(offovs/(smute*smute-1.0));
-			if (tnmute > ft) {
-				itmute = (tnmute-ft)/dt;
-			} else {
-				itmute = 0 ;
-			}
-			
-			/* do nmo via quick and dirty linear interpolation
-			   (accurate enough for velocity analysis) and
-			   accumulate semblance numerator and denominator
-			*/
-
-			for (it=itmute,tn=ft+itmute*dt; it<nt; ++it,tn+=dt) {
-				ti = (sqrt(tn*tn+offovs)-ft)/dt;
-				iti = ti;
-				if (iti<nt-1) {
-					frac = ti-iti;
-					temp = (1.0-frac)*data[iti]+
-						frac*data[iti+1];
-					if (temp!=0.0) {
-						num[iv][it] += temp;
-						den[iv][it] += temp*temp;
-						nnz[iv][it] += 1.0;
-					}
+		/* do nmo via quick and dirty linear interpolation
+		   (accurate enough for velocity analysis) and
+		   accumulate semblance numerator and denominator
+		*/
+		for (it=itmute,tn=ft+itmute*dt; it<nt; ++it,tn+=dt) {
+			tsq = tn*tn+offovs;
+			if (tsq < 0.0) continue;
+			ti = (sqrt(tsq)-ft)/dt;
+			iti = ti;
+			if (iti>=0 && iti<nt-1) {
+				frac = ti-iti;
+				temp = (1.0-frac)*data[iti]+frac*data[iti+1];
+				if (temp!=0.0) {
+					pnum[it] += temp;
+					pden[it] += temp*temp;
+					pnnz[it] += 1.0;
 				}
 			}
 		}
+	}
+	return nomoveout;
+}
 
-		/* get next trace (if there is one) */
-		if (!gettr(&tr)) gottrace = 0;
+/* The semblance of one velocity (or residual moveout), from its sums num[nt], den[nt] and nnz[nt]: ntout = 1+(nt-1)/dtratio
+ * samples, each from the sums of the nsmooth samples about it, to the power pwr.
+ */
+void su_velan_semblance(int nt, int ntout, int dtratio, int nsmooth, float pwr, const float *num, const float *den,
+	const float *nnz, float *sem)
+{
+	int itout,it,is,ismin,ismax;
+	float nsum,dsum;
 
+	for (itout=0; itout<ntout; ++itout) {
+		it = itout*dtratio;
+		ismin = it-nsmooth/2;
+		ismax = it+nsmooth/2;
+		if (ismin<0) ismin = 0;
+		if (ismax>nt-1) ismax = nt-1;
+		nsum = dsum = 0.0;
+		for (is=ismin; is<=ismax; ++is) {
+			nsum += num[is]*num[is];
+			dsum += nnz[is]*den[is];
+		}
+		sem[itout] = (dsum!=0.0?nsum/dsum:0.0);
 	}
 
-	return(CWP_Exit());
+	/* powering the semblance */
+	if (pwr != 1.0)
+		for (itout=0; itout<ntout; ++itout)
+			sem[itout] = pow(sem[itout], pwr);
 }

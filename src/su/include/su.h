@@ -160,6 +160,8 @@ void su_relan_accumulate(int nz, float dz, float fz, float offset, int nr, float
 // synthetics
 int su_goupillaudpo_tmax(int n, int l, int k);
 int su_goupillaudpo(int n, const float *r, int l, int k, int tmax, int pV, float *x, float *out, int *odd);
+int su_goupillaud_tmax(int n, int l, int k);
+int su_goupillaud(int n, const float *rin, int l, int k, int tmax, int pV, float *out, int *odd);
 int su_imp_nfft(int nt);
 void su_imp2d_trace(int nt, float dt, int nfft, float c, float rs, float rg, const float *tout, float *rt, complex *ct,
 	float *data);

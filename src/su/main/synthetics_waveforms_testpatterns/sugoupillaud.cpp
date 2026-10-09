@@ -4,6 +4,7 @@
 #include "segy.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "  									",
 " SUGOUPILLAUD - calculate 1D impulse response of	 		",
@@ -50,6 +51,8 @@ char *sdoc[] = {
 " is interpreted as a two-way traveltime thicknes of the layers. The sampling",
 " interval of the output seismogram is the same as that of the input file.",
 NULL};
+#endif
+
 
 /* 
  * Credits:
@@ -95,40 +98,98 @@ NULL};
 /**************** end self doc ***********************************/
 
 /* Prototypes of functions used internally */
-int  porder(double p[], int l);
-void pcomb(double alfa, double beta, double p1[], double p2[], 
+static int  porder(double p[], int l);
+static void pcomb(double alfa, double beta, double p1[], double p2[], 
 		int l1, int l2, double c[], int l);
-void prod(double p1[], double p2[], int l1, int l2, double pp[], int ll);
-void pratio(double p1[], double p2[], int l1, int l2, int L, 
+static void prod(double p1[], double p2[], int l1, int l2, double pp[], int ll);
+static void pratio(double p1[], double p2[], int l1, int l2, int L, 
 	 double q[], int lq);
-void pshift(double p[], int l, int k, double psh[], int ll);
-void recurs(int k, double q[], double p[], int n, double r[]);
-void rev(double p[], int l, double pr[] );
-void upsample(double p4[], int l, double p2[], int ll);
+static void pshift(double p[], int l, int k, double psh[], int ll);
+static void recurs(int k, double q[], double p[], int n, double r[]);
+static void rev(double p[], int l, double pr[] );
+static void upsample(double p4[], int l, double p2[], int ll);
 
 
-segy tr;
 
-int
-main(int argc, char **argv)
+/* Library version of SUGOUPILLAUD
+ *
+ * The main program is not part of the library. It reads the reflection coefficients of the first trace of its input, and writes
+ * one trace, the seismogram. Doing that is left to the caller, and what is here is what is worked out from the reflectivity:
+ *
+ *	su_goupillaud_tmax:	the default length of the seismogram
+ *	su_goupillaud:		the seismogram
+ *
+ * The computation is that of the program, as it is, with the polynomials of Robinson's recursions in double precision (the
+ * functions that do the arithmetic on them are below, and keep their own small temporary arrays).
+ *
+ * Differences from the program:
+ *  - The search for the order of a polynomial (porder, pratio) stops at the end of the array, where the program goes on reading
+ *    before it when all of the coefficients are 0.
+ *  - The parameters are checked here and a code is returned (the program stops with an error); the reflectivity is not changed.
+ *  - For a buried source (l>1) and a receiver at or below it (k>=l) the program's polynomial recursion (the d0 shaping) does not
+ *    give the response of the layers: the reflections of the source's upgoing wave from the surface and the interfaces above are
+ *    missing, and the downgoing wave of a pressure source has the wrong amplitude, so that it is not even consistent with
+ *    SUGOUPILLAUDPO to first order in the reflection coefficients. That case is computed here by stepping the waves through the
+ *    layers (buried_below), with the source as described in the sdoc: a downgoing spike 1 and an upgoing spike -pV just below the
+ *    top of layer l. For k=l the response is the average of that just below and just above the source, so that the two direct spikes
+ *    (1 and -pV) average to (1-pV)/2. The other cases (l=1, or k<l) are the program's, which agrees with this stepping exactly.
+ */
+
+/* The default number of output samples, for n interfaces and the source and receiver layers l, k */
+int su_goupillaud_tmax(int n, int l, int k)
 {
-  int n; /* number of subsurface interfaces */
-  int l, k; /* source and receiver layers*/
-  int tmax; /* number of output samples */
-  int pV; /* field-type flag*/
+  if (k<n+1) return (2*n+2-(l-1)-(k-1))/2;
+  return k;
+}
+
+/* The response, for a source at the top of the layer l>1 and a receiver at the top of the layer k>=l, by stepping the waves through
+ * the layers n+1 (the half-space) ... 1, in steps of the one-way time. kk=min(k,n+1) is the layer of the receiver; x[t] is its
+ * response at the step t (t=0 .. nx-1); for k>n+1 the caller delays it. r[0..n] has the pV already in it. */
+static void buried_below(int n, const double *r, int l, int kk, int avg, int pV, int nx, double *x)
+{
+  double *dprev = ealloc1double(n+2);	/* downgoing at the top of the layers, one step ago */
+  double *dnow = ealloc1double(n+2);
+  double *uarr = ealloc1double(n+2);	/* upgoing arriving at the top of the layers */
+  double *unext = ealloc1double(n+2);
+  int t, i;
+
+  for (i=0; i<n+2; ++i) dprev[i] = dnow[i] = uarr[i] = unext[i] = 0.0;
+  for (t=0; t<nx; ++t) {
+    for (i=0; i<n+2; ++i) dnow[i] = 0.0;
+    if (t==0) { dnow[l] = 1.0; uarr[l] -= pV; }
+    dnow[1] += -r[0]*uarr[1];
+    for (i=1; i<=n; ++i) {
+      double d = dprev[i], u = uarr[i+1];
+      dnow[i+1] += (1.0+r[i])*d - r[i]*u;
+      unext[i] = r[i]*d + (1.0-r[i])*u;
+    }
+    x[t] = dnow[kk] + uarr[kk];
+    if (t==0 && avg) x[t] -= 0.5*(1.0-pV);	/* just below and just above the source: the direct spikes 1 and -pV average */
+    for (i=0; i<n+2; ++i) { dprev[i] = dnow[i]; uarr[i] = unext[i]; unext[i] = 0.0; }
+  }
+  free1double(dprev); free1double(dnow); free1double(uarr); free1double(unext);
+}
+
+/* The impulse response of a lossless Goupillaud medium (with multiples) for plane waves at normal incidence.
+ *
+ * n: number of subsurface interfaces (at least 1); rin[n+1]: the reflection coefficients, rin[0] that of the surface
+ * l, k: the source and the receiver layers (1 to n+1 for the source; k from 1, and a k of more than n+1 is a receiver in the
+ *	homogeneous half-space below the layers)
+ * tmax: number of output samples (at least 1)
+ * pV: 1 for a vector field (displacement, velocity, acceleration), -1 for pressure
+ * out[tmax]: the seismogram. *odd: set to 1 if the seismogram is shifted by half a sample (k-l is odd), otherwise 0
+ *
+ * Returns 0, or -1 if a reflection coefficient is not from -1 to 1, -3 for parameters that are not allowed.
+ */
+int su_goupillaud(int n, const float *rin, int l, int k, int tmax, int pV, float *out, int *odd)
+{
   double *r; /* reflection coefficient series */
   double *x; /* output seismogram*/
-
   int i; /* loop counter*/
-  int verbose; /* verbose flag*/
-  int kk, delay; /* help accomodate receiver in the lower 
-	 homogeneous half-space (k>n+1)*/
-  double *u1, *d1; /* up- and down-going waves in 
-	 the 1st layer for surface source	 */
-  double *u1b; /* up-going waves in the first layer
-	 for buried source*/
-  double *uk, *dk; /* up- and down-going waves in layer k;
- output seismogram:  x=uk+dk */ 
+  int kk, delay; /* help accomodate receiver in the lower homogeneous half-space (k>n+1)*/
+  double *u1, *d1; /* up- and down-going waves in the 1st layer for surface source	 */
+  double *u1b; /* up-going waves in the first layer for buried source*/
+  double *uk, *dk; /* up- and down-going waves in layer k; output seismogram:  x=uk+dk */
   double *Q, *P; /* recursive polynomials; see Robinson */
   double *qr, *pr;/* reverse recursive polynomials*/
   double *cn; /* r[0]*Qn - Pn; for convenience*/
@@ -142,40 +203,27 @@ main(int argc, char **argv)
   double *d0; /* shaping for a buried source; see Ganley  */
   double *storx; /* temporary storage for x when k=l>1*/
 
-
-  /* Initialize */
-  initargs(argc, argv);
-  requestdoc(1);
-	
-  /* Get subsurface model */
-  if (!gettr(&tr)) err("Can't get reflectivity");
-  n = tr.ns - 1 ;
-
-  /* Get parameters */
-  if (!getparint("k",&k)) k=1;
-  if (!getparint("l",&l))l=1;
-  if (!getparint("tmax",&tmax)){
- if (k<n+1)  tmax=(2*n+2-(l-1)-(k-1))/2;
-	 else tmax=k;
-  }
-  if (!getparint("pV",&pV))pV=1;
-  if (!getparint("verbose",&verbose))verbose=0;
-
   /* Check parameters */
-  if (n<=0) err("The number of subsurface interfaces n must be >=1!");
-  if (k<1)  err("Receiver layer k must be >=1 (k=1 corresponds to surface seismogram).");
-  if (l<1)  err("Source layer l must be >= 1 (l=1 corresponds to a surface source).");
-  if (l>(n+1)) err("The current version of the program requires l<=n+1.");
-  if (tmax<0)  err("The number of the output time samples tmax cannot be negative.");
-  if(!( pV==1 || pV==-1 )) err("The field-type flag pV should be either 1 or -1.");
+  if (n<1 || k<1 || l<1 || l>(n+1) || tmax<1 || !(pV==1 || pV==-1)) return -3;
+  for (i=0; i<=n; ++i)
+    if (rin[i]>1. || rin[i]<-1.) return -1;
 
-  /* Verbose */
-  if (verbose) {
-	 warn("Number of layers n=%d", n);
-	 warn("Source layer l=%d", l);
-	 warn("Receiver layer k=%d", k);
-	 warn("Output time samples tmax=%d", tmax);
-	 warn("Field type flag pV=%d", pV);
+  /* A receiver at or below a buried source: the waves are stepped through the layers */
+  if (l>1 && k>=l) {
+    int ns = 2*tmax+1, t;
+    double *xs = ealloc1double(ns);
+    kk = (k>n+1) ? n+1 : k;
+    delay = k-kk;
+    *odd = (k-l)%2 != 0 ? 1 : 0;
+    r = ealloc1double(n+1);
+    for (i=0; i<=n; ++i) r[i] = pV*(double)rin[i];
+    buried_below(n, r, l, kk, k==l, pV, ns, xs);
+    for (t=0; t<tmax; ++t) {
+      int idx = 2*t+*odd-delay;	/* a receiver in the half-space: the response of its top, delayed */
+      out[t] = (float)(idx>=0 ? xs[idx] : 0.0);
+    }
+    free1double(xs); free1double(r);
+    return 0;
   }
 
   /* Allocate Memory */
@@ -187,13 +235,13 @@ main(int argc, char **argv)
   uk = ealloc1double(2*tmax);
   dk = ealloc1double(2*tmax);
   storx = ealloc1double(2*tmax);
-  Q = ealloc1double(n+1); 
+  Q = ealloc1double(n+1);
   P = ealloc1double(n+1);
-  qr = ealloc1double(n+1); 
-  pr = ealloc1double(n+1); 
-  cn = ealloc1double(n+1); 
+  qr = ealloc1double(n+1);
+  pr = ealloc1double(n+1);
+  cn = ealloc1double(n+1);
   t1 = ealloc1double(n+1);
-  t2 = ealloc1double(n+1); 
+  t2 = ealloc1double(n+1);
   d0 = ealloc1double(n+1);
   td1 = ealloc1double(2*(n+1));
   mix1 = ealloc1double(2*tmax+n);
@@ -201,18 +249,11 @@ main(int argc, char **argv)
   mix3 = ealloc1double(2*(tmax+n));
   mix4 = ealloc1double(2*(tmax+n));
   mix = ealloc1double(2*(tmax+n));
-  
-  /* Read and check reflectivity values */
-  for (i=0; i<=n; ++i) 
-	 {
-	r[i] = tr.data[i];
-	if(r[i]>1. || r[i]<-1.)
-	err("Invalid reflection coefficient encountered.");
-	 }
-  
-  /* Account for field type (pressure/displacement) */
+
+  /* Read the reflectivity, and account for the field type (pressure/displacement) */
+  for (i=0; i<=n; ++i)  r[i] = rin[i];
   for (i=0; i<=n; ++i)  r[i]*=pV;
-  
+
   /********************* Begin computation **************************/
   if(n==0)
 	 /* Trivial case - implies source in l==1, receiver in k>=1 */
@@ -512,20 +553,14 @@ for (i=0; i<2*tmax; ++i)  x[i] = u1b[i]*(1-r[0]);
   
   /* output synthetic seismogram (resampled to Z) */
   i=(k-l)/2;
-  if ( 2*i == k-l ){  
- for (i=0; i<tmax; ++i)  tr.data[i]=x[2*i];
-	 tr.delrt=0;
+  if ( 2*i == k-l ){
+    for (i=0; i<tmax; ++i)  out[i]=x[2*i];
+    *odd = 0;
   }
   else{
- for (i=0; i<tmax; ++i)  tr.data[i]=x[2*i+1];
-	 tr.delrt=tr.dt/2000;
+    for (i=0; i<tmax; ++i)  out[i]=x[2*i+1];
+    *odd = 1;
   }
-
-  tr.ns=tmax;
-  tr.trid=1;
-
-  puttr(&tr);
-  
 
   /* Free space */
   free1double(r);
@@ -533,9 +568,9 @@ for (i=0; i<2*tmax; ++i)  x[i] = u1b[i]*(1-r[0]);
   free1double(u1);
   free1double(d1);
   free1double(u1b);
-  free1double(uk); 
-  free1double(dk); 
-  free1double(storx); 
+  free1double(uk);
+  free1double(dk);
+  free1double(storx);
   free1double(Q);
   free1double(P);
   free1double(qr);
@@ -550,10 +585,8 @@ for (i=0; i<2*tmax; ++i)  x[i] = u1b[i]*(1-r[0]);
   free1double(mix3);
   free1double(mix4);
   free1double(mix);
-
-  return(CWP_Exit());
+  return 0;
 }
-
 
 /*--------------------------- functions used ---------------------------*/
 
@@ -562,7 +595,7 @@ imin, imax - return the smaller/larger integer of two integers
 --------------------------------------------------------------------------
 Notes:  Not used in main(), only in the functions below. 
 *************************************************************************/
-int imin( int c1, int c2 )
+static int imin( int c1, int c2 )
 {
   if(c1<=c2)
 	 return(c1);
@@ -570,7 +603,7 @@ int imin( int c1, int c2 )
 	 return(c2);
 }
 
-int imax( int c1, int c2 )
+static int imax( int c1, int c2 )
 {
   if(c1>=c2)
 	 return(c1);
@@ -594,13 +627,13 @@ Notes: If the array p[] contains coefficients of negative powers,
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva2000
 -------------------------------------------------------------------------*/
-int porder( double p[], int l )
+static int porder( double p[], int l )
 {
   int i=0,k=0,j;
   
   do{
 	 j=k;
- if(p[l-1-i]==0)  k=k+1;
+ if(i<l && p[l-1-i]==0)  k=k+1;
 	 ++i;
   } while(k>j);
   
@@ -627,7 +660,7 @@ Note: calling statements of the kind  pcomb(a,b, P ,Q,l1,l2, P ,l) allowed
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void pcomb( double alfa, double beta, double p1[], double p2[], 
+static void pcomb( double alfa, double beta, double p1[], double p2[], 
 	 int l1, int l2, double c[] , int l)
 {
   int i,ii;
@@ -673,7 +706,7 @@ Note: calling statements of the kind  rev( P ,l, P )  allowed
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void rev(double p[],int l,double pr[])
+static void rev(double p[],int l,double pr[])
 {
   int i;
   double *tmp;
@@ -716,7 +749,7 @@ Notes: k should be such that the resulting polynomial has only (+) powers;
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void pshift( double p[], int l, int k, double psh[], int ll )
+static void pshift( double p[], int l, int k, double psh[], int ll )
 {
   int ii,i;
   double *tmp;
@@ -761,7 +794,7 @@ Note: calling statements of the kind  prod( P ,Q,l1,l2, P ,ll)  allowed
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void prod( double p1[], double p2[], int l1, int l2, double pp[], int ll )
+static void prod( double p1[], double p2[], int l1, int l2, double pp[], int ll )
 {
   int i,j,k;
   double *tmp;
@@ -806,7 +839,7 @@ Note:	 see E. Robinson, Chap.1 for the algorithm (a Fortran subroutine)
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void pratio( double p1[], double p2[], int l1, int l2, int L, 
+static void pratio( double p1[], double p2[], int l1, int l2, int L, 
   double q[], int lq )
 {
   int i=0,k=0,j,ii,jj;
@@ -826,7 +859,7 @@ void pratio( double p1[], double p2[], int l1, int l2, int L,
   
   do{
 	 jj=k;
-	 if(p2[i]==0) k=k+1;
+	 if(i<l2 && p2[i]==0) k=k+1;
 	 ++i;
   } while(k>jj);
   
@@ -883,7 +916,7 @@ Note:	 see E. Robinson, p.124-125
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void recurs( int k, double q[], double p[], int n, double r[])
+static void recurs( int k, double q[], double p[], int n, double r[])
 { 
   int i,j;
   double *tq, *qr, *qsh;
@@ -958,7 +991,7 @@ Output:
 --------------------------------------------------------------------------
 Author:  CWP: Albena Mateeva  2000
 ------------------------------------------------------------------------*/
-void upsample( double p4[], int l, double p2[], int ll )
+static void upsample( double p4[], int l, double p2[], int ll )
 {
   int i=0, ii;
   double *tmp;

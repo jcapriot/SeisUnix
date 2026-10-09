@@ -83,7 +83,7 @@ main(int argc, char **argv)
 	int nt;			/* length of input traces		*/
 	int ntsize;		/* ... in bytes				*/
 	int ntr;		/* traces in input data			*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	void subplot(		/* cplot commands			*/
 		float *data,
 		int nt,

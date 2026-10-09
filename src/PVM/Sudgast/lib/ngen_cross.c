@@ -38,15 +38,15 @@ extern int Randint();
 
 Crossover()
 {
-	register int mom, dad;	/* participants in the crossover */
-	register int xpoint1;	/* first crossover point w.r.t. structure */
-	register int xpoint2;	/* second crossover point w.r.t. structure */
-	register int xbyte1;	/* first crossed byte */
-	register int xbit1;	/* first crossed bit in xbyte1 */
-	register int xbyte2;	/* last crossed byte */
-	register int xbit2;	/* last crossed bit in xbyte2 */
-	register int i;		/* loop control variable */
-	register char temp;	/* used for swapping alleles */
+	int mom, dad;	/* participants in the crossover */
+	int xpoint1;	/* first crossover point w.r.t. structure */
+	int xpoint2;	/* second crossover point w.r.t. structure */
+	int xbyte1;	/* first crossed byte */
+	int xbit1;	/* first crossed bit in xbyte1 */
+	int xbyte2;	/* last crossed byte */
+	int xbit2;	/* last crossed bit in xbyte2 */
+	int i;		/* loop control variable */
+	char temp;	/* used for swapping alleles */
 	static int last;	/* last element to undergo Crossover */
 	int diff;		/* set if parents differ from offspring */
 	char *kid1;		/* pointers to the offspring */

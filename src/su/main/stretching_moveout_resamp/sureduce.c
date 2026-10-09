@@ -65,10 +65,10 @@ main(int argc, char **argv)
 		float off  = (float) ABS(tr.offset);
 		float bt   = ((fabs) (off))/(rv*1000.0);
 		int rnt    = NINT(bt/dt);
-		register int i;
+		int i;
 
 		for (i = 0; i < nt; ++i) {
-			register int j = i + rnt;
+			int j = i + rnt;
 			tr.data[i] = (i < (nt - rnt)) ?  tr.data[j] : 0.0;
 		}
 		puttr(&tr);

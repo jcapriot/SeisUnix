@@ -106,10 +106,10 @@ main(int argc, char **argv)
 	int resamp;		/* resampling rate */
 	int ntr;		/* number of trace on input */
 	int iter, niter;	/* iteration vars */
-	register int ishot, ichan, irec, icmp;	/* gather counters */
-	register int itrace;    /* gather counters */
+	int ishot, ichan, irec, icmp;	/* gather counters */
+	int itrace;    /* gather counters */
 	int icmpshift;			/* shift applied to icmp */
-	register int it, itr, i, j=0, k, l;	/* counters */
+	int it, itr, i, j=0, k, l;	/* counters */
 	int *cmpntr, cmp_max, cmp_min;		/* cmp selector */
 	int *recntr;				/* receiver gather fold */
 	int *shotntr;				/* shot gather fold */

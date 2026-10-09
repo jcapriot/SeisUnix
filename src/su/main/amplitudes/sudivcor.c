@@ -76,7 +76,7 @@ main(int argc, char **argv)
 		int ntrms = countparval("trms");
 		int nvrms = countparval("vrms");
 		int npar;
-		register int it, itrms;
+		int it, itrms;
 
 		if (nvrms != ntrms)
 			err("number of trms and vrms must be equal");
@@ -119,7 +119,7 @@ main(int argc, char **argv)
         checkpars();
 
 	/* Form divergence correction vector */
-	{ register int it;
+	{ int it;
 	  
 	  divcor = ealloc1float(nt);
 	  for (it = 0; it < nt; ++it) {
@@ -131,7 +131,7 @@ main(int argc, char **argv)
 	  
 	/* Main loop over traces */
 	do {
-		register int it;
+		int it;
 
 	  	for (it = 0; it < nt; ++it)  tr.data[it] *=  divcor[it];
 		puttr(&tr);

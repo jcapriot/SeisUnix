@@ -91,8 +91,8 @@ int argc; char **argv;
 
 	float *hcos;		/* hold cosines for fft		*/
 	float *hsin;		/* hold sines for fft		*/
-	register float *xr;	/* real part of trace		*/
-	register float *xi;	/* imaginary part of trace	*/
+	float *xr;	/* real part of trace		*/
+	float *xi;	/* imaginary part of trace	*/
 	float *wr;		/* work area for fft		*/
 	float *wi;		/* work area for fft		*/
 	int nfft;		/* size of fft 			*/
@@ -104,9 +104,9 @@ int argc; char **argv;
 	float spread;		/* 3-D spreading factor		*/
 	float isq;		/* temp for omega squared	*/
 
-	register int i;		/* counter			*/
-	register int s;		/* shot counter			*/
-	register int g;		/* receiver counter		*/
+	int i;		/* counter			*/
+	int s;		/* shot counter			*/
+	int g;		/* receiver counter		*/
 
 
 

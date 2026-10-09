@@ -63,7 +63,7 @@ main(int argc, char **argv)
 	float *data=NULL;	/* data values from each trace		*/
 	float *hdata=NULL;	/* Hilbert transformed data values	*/
 	float phaserot=0.0;	/* phase rotation angle in degrees	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	cwp_Bool seismic;	/* is this seismic data?		*/
 	cwp_Bool is_phaserot=cwp_true;	/* is phaserot set?		*/
 	

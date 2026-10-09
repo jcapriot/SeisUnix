@@ -93,19 +93,19 @@ main(int argc, char **argv)
 	float k;			/* constant part of response	*/
 	float rd;			/* direct arrival travel path length */
 
-	register float *rt;		/* real trace			*/
-	register float *temp;	/* temporary vector of length nt */
-	register complex *ct;		/* complex transformed trace	*/
+	float *rt;		/* real trace			*/
+	float *temp;	/* temporary vector of length nt */
+	complex *ct;		/* complex transformed trace	*/
 	int nfft;			/* size of fft 			*/
 	int nfby2;			/* nfft/2			*/
 	int nfby2p1;			/* nfft/2 + 1			*/
 	size_t nzeros;			/* padded zeroes in bytes	*/
 	float spread;			/* 3-D spreading factor		*/
 
-	register int i;			/* counter			*/
-	register int s;			/* shot counter			*/
-	register int g;			/* receiver counter		*/
-	register int tracl;		/* trace counter		*/
+	int i;			/* counter			*/
+	int s;			/* shot counter			*/
+	int g;			/* receiver counter		*/
+	int tracl;		/* trace counter		*/
 
 	float amplitude[1];	/* amplitude 			*/
 	float *tout;		/* times[nt] for interpolation	*/

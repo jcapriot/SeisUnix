@@ -105,10 +105,10 @@ float *data;
 
 dogpow(p,n,gpow)
 float gpow;
-register float *p;
+float *p;
 int n;
 {
-	register float *pp,*pe;
+	float *pp,*pe;
 
 	if(gpow==1.0) {
 		return;
@@ -187,10 +187,10 @@ int nx,nt;
 
 balclip(data,n,c)
 float c;
-register float *data;
+float *data;
 int n;
 {
-	register float oc;
+	float oc;
 	oc = 1.0/c;
 	while(n--) {
 		*data *= oc;
@@ -201,8 +201,8 @@ int n;
 } 
 
 copyabs(p,q,n)
-register n;
-register float *p,*q;
+n;
+float *p,*q;
 {
 	while(n--)
 		*q++ = fabs(*p++);

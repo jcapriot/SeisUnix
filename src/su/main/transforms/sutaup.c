@@ -192,7 +192,7 @@ main(int argc, char **argv)
 		
         /* write output traces */
         erewind(headerfp);
-	{       register int itr;
+	{       int itr;
 		for (itr=0; itr<np; itr++) {
 			efread(&tr, 1, HDRBYTES, headerfp);
                         tr.tracl = 1+itr;

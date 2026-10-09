@@ -1,7 +1,7 @@
 synthetics_srcs = files(
-    'suvibro.c',
+    'suvibro.cpp',
     #'sukdsyn2d.c',
-    'susynlv.c',
+    'susynlv.cpp',
 )
 
 su_main_srcs += synthetics_srcs

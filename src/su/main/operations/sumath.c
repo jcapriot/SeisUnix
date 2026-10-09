@@ -87,7 +87,7 @@ main(int argc, char **argv) {
 	/* Main loop over traces */
 	do {
 
-		switch(iop) { register int i;
+		switch(iop) { int i;
 		case ADD:
 			for (i = 0; i < nt; ++i)
 				tr.data[i] += a;

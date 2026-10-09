@@ -108,7 +108,7 @@ main(int argc, char **argv)
 			if (norm) {
 				ffold = (float) fold;
 				if (fold != 1) {
-				    register int i;
+				    int i;
 				    for (i = 0; i < nt; ++i)
 					outtrace.data[i] /= ffold;
 				}
@@ -137,7 +137,7 @@ main(int argc, char **argv)
 				if (norm) {
 					ffold = (float) fold;
 					if (fold != 1) {
-					    register int i;
+					    int i;
 					    for (i = 0; i < nt; ++i)
 						outtrace.data[i] /= ffold;
 					}
@@ -152,7 +152,7 @@ main(int argc, char **argv)
 
 			} else { /* same offset within this cdp */
 
-				register int i;
+				int i;
 				for (i = 0; i < nt; ++i)
 					outtrace.data[i] += intrace.data[i];
 

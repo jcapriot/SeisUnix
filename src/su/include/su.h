@@ -74,19 +74,16 @@ typedef union { /* storage for arbitrary type */
 			   STREQ(str,"gy")	   )?cwp_true:cwp_false)
 
 /* FUNCTION PROTOTYPES */
-#ifdef __cplusplus /* if C++, specify external linkage to C functions */
-extern "C" {
-#endif
 
 /* valpkge */
-int vtoi(register cwp_String type, Value val);
-long vtol(register cwp_String type, Value val);
-float vtof(register cwp_String type, Value val);
-double vtod(register cwp_String type, Value val);
-int valcmp(register cwp_String type, Value val1, Value val2);
-void printfval(register cwp_String type, Value val);
-void fprintfval(FILE *stream, register cwp_String type, Value val);
-void scanfval(register cwp_String type, Value *valp);
+int vtoi(cwp_String type, Value val);
+long vtol(cwp_String type, Value val);
+float vtof(cwp_String type, Value val);
+double vtod(cwp_String type, Value val);
+int valcmp(cwp_String type, Value val1, Value val2);
+void printfval(cwp_String type, Value val);
+void fprintfval(FILE *stream, cwp_String type, Value val);
+void scanfval(cwp_String type, Value *valp);
 void atoval(cwp_String type, cwp_String keyval, Value *valp);
 void getparval(cwp_String name, cwp_String type, int n, Value *valp);
 Value valtoabs(cwp_String type, Value val);
@@ -241,8 +238,5 @@ void su_synlv(float *data,
 	int ls, int er, int ob, Wavelet *w, int nr, Reflector *r, int lhd, int nhd, float *hd
 );
 
-#ifdef __cplusplus /* if C++, end external linkage specification */
-}
-#endif
 
 #endif

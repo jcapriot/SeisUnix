@@ -220,7 +220,7 @@ main(int argc, char **argv)
 		
         /* write output traces */
         erewind(headerfp);
-	{       register int itr;
+	{       int itr;
 		for (itr=0; itr<ntr; itr++) {
 			efread(&tr, 1, HDRBYTES, headerfp);
 			for (it=0; it<nt; it++){ 

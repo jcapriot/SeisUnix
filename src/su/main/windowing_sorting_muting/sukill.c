@@ -44,7 +44,7 @@ main(int argc, char **argv)
 	int index;		/* index of trace header	*/
 	Value val;		/* trace header value		*/
 	double dval,a;		/* trace header value		*/
-	register int itr;	/* trace counter		*/
+	int itr;	/* trace counter		*/
 	int min;		/* first trace to zero out	*/
 	int count;		/* number of traces to zero out	*/
 	int nt = 0;		/* number of time samples	*/

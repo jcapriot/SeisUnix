@@ -235,7 +235,7 @@ main(int argc, char **argv)
 	if (!have_ntr) {
 		rewind(headerfp);
 		rewind(tracefp);
-		{ register int itr;
+		{ int itr;
 		for (itr = 0; itr < ntr; ++itr) {
 			efread(&tr, 1, HDRBYTES, headerfp);
 			efread(tr.data, FSIZE, nt, tracefp);

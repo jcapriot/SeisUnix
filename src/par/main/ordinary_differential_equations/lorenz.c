@@ -145,8 +145,8 @@ main(int argc, char **argv)
 	p->error_bias=tol;
 
 	for (i=0; i<stepmax; ++i) {
-		register int j;
-		register int number=3;
+		int j;
+		int number=3;
 		float yout[3]={0,0,0};
 		double aimed_t;
 		t=i*h;

@@ -85,7 +85,7 @@ segy tr;
 main(argc, argv)
 int argc; char **argv;
 {
-	register int i;		/* counter 				*/
+	int i;		/* counter 				*/
 	int nt;			/* number of points on trace		*/
 	int ntsize;		/* number of data bytes on a trace	*/
 	int ntr;		/* number of traces			*/
@@ -102,10 +102,10 @@ int argc; char **argv;
 	float sigpow;		/* signal power				*/
 	float normrand;		/* scale random numbers to [0,2]	*/
 	FILE *fphdr;		/* fp for header storage file		*/
-      	register float r1, r2;	/* random numbers in [-1, 1] (gauss)	*/
-	register float magsq;	/* r1*r1 + r2*r2 			*/
-	register float factor;	/* multiplier in Gauss algorithm	*/
-        register float r;	/* random number in [-1, 1]  (white)	*/
+      	float r1, r2;	/* random numbers in [-1, 1] (gauss)	*/
+	float magsq;	/* r1*r1 + r2*r2 			*/
+	float factor;	/* multiplier in Gauss algorithm	*/
+        float r;	/* random number in [-1, 1]  (white)	*/
 	long time();		/* system subroutine			*/
 	long random();		/* system subroutine			*/
 	int srandom();		/* system subroutine			*/

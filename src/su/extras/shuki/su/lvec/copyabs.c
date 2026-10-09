@@ -1,7 +1,7 @@
 #include <math.h>
 copyabs(p,q,n)
-register n;
-register float *p,*q;
+n;
+float *p,*q;
 {
 	while(n--)
 		*q++ = fabs(*p++);

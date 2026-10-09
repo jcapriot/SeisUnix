@@ -79,11 +79,11 @@ main(int argc, char **argv)
 		 *	tr.data[i] = ... ;
 		 * }
 		 * but, as in supack2, this isn't portable */
-		register int i, j;
-		register signed int si;
-		register unsigned int ui;
-		register float val;
-		register unsigned char *itr = (unsigned char *) tr.data;
+		int i, j;
+		signed int si;
+		unsigned int ui;
+		float val;
+		unsigned char *itr = (unsigned char *) tr.data;
 
 		if (istwo) {
 			for (i = nt-1, j=2*nt-1; i >= 0; --i) { 

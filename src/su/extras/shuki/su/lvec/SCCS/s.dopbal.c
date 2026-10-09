@@ -18,8 +18,8 @@
 dopbal(pbal,n,p)
 float pbal,*p;
 {
-	register nn;
-	register float *pp,*pa,oclip;
+	nn;
+	float *pp,*pa,oclip;
 	static first=1,k;
 	static float *a;
 	float clip;

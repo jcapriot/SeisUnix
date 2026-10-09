@@ -120,8 +120,8 @@ int main(int argc, char **argv)
 
         int quad;		/* flag for diagonal filter		*/
 
-	register complex **ct;	/* complex FFT workspace		*/
-	register float **rt;	/* float FFT workspace			*/
+	complex **ct;	/* complex FFT workspace		*/
+	float **rt;	/* float FFT workspace			*/
 	int verbose;		/* flag for echoing info		*/
 	char *tmpdir;		/* directory path for tmp files		*/
 	cwp_Bool istmpdir=cwp_false;/* true for user-given path		*/

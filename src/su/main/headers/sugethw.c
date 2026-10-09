@@ -111,7 +111,7 @@ main(int argc, char **argv)
 
 	/* Loop over traces writing selected header field values */
 	while (gettr(&tr)) {
-		register int ikey;
+		int ikey;
 
 		for (ikey = 0; ikey < nkeys; ++ikey) {
 			Value val;

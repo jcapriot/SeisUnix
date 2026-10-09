@@ -29,66 +29,10 @@ typedef char *cwp_String;
 typedef enum {BADFILETYPE = -1,
         TTY, DISK, DIRECTORY, TAPE, PIPE, FIFO, SOCKET, SYMLINK} FileType;
 
-#if defined(CRAY) || defined(OVERRIDE_CWP_COMPLEX) || defined(_WIN32)
-typedef struct _complexStruct { /* complex number */
-	float r,i;
-}  cwp_complex;
-typedef struct _dcomplexStruct { /* double-precision complex number */
-	double r,i;
-}  cwp_dcomplex;
-#define complex cwp_complex
-#define dcomplex cwp_dcomplex
-#define cadd cwp_cadd
-#define csub cwp_csub
-#define cmul cwp_cmul
-#define cdiv cwp_cdiv
-#define rcabs cwp_rcabs
-#define cmplx cwp_cmplx
-#define conjg cwp_conjg
-#define cneg cwp_cneg
-#define cinv cwp_cinv
-#define cwp_csqrt cwp_csqrt
-#define cwp_cexp cwp_cexp
-#define crmul cwp_crmul
-#define cipow cwp_cipow
-#define crpow cwp_crpow
-#define rcpow cwp_rcpow
-#define ccpow cwp_ccpow
-#define cwp_ccos cwp_ccos
-#define cwp_csin cwp_csin
-#define cwp_ccosh cwp_ccosh
-#define cwp_csinh cwp_csinh
-#define cwp_cexp1 cwp_cexp1
-#define cwp_clog cwp_clog
-
-#else
- 
-#ifndef __cplusplus /* if not C++, define the C struct complex */
-#ifndef complex
-typedef struct _complexStruct { /* complex number */
-	float r,i;
-} complex;
-#endif/* complex */
-
-#ifndef dcomplex
-typedef struct _dcomplexStruct { /* double-precision complex number */
-	double r,i;
-} dcomplex;
-#endif/* dcomplex */
-
-#else /* if C++, define the C++ class complex */
-#include "Complex.h"
-
-/**********Lines added  *******Daniel Tradd *******/ 
-#ifndef dcomplex
-typedef struct _dcomplexStruct { /* double-precision complex number */
-        double r,i;
-}  dcomplex;
-#endif
-/*******************************/
-#endif /* C++ */
-
-#endif
+/* complex numbers are the ones of the standard library (they used to be a struct with the members r and i, and functions) */
+#include <complex>
+typedef std::complex<float> complex;
+typedef std::complex<double> dcomplex;
 
 /* DEFINES */
 /* uncomment the next block if you are installing */
@@ -176,9 +120,6 @@ typedef struct _dcomplexStruct { /* double-precision complex number */
 
 /* FUNCTION PROTOTYPES */
 
-#ifdef __cplusplus /* if C++, specify external linkage to C functions */
-extern "C" {
-#endif
 
 /* allocate and free multi-dimensional arrays */
 void *alloc1 (size_t n1, size_t size);
@@ -262,62 +203,8 @@ void free1dcomplex (dcomplex *p);
 void free2dcomplex (dcomplex **p);
 void free3dcomplex (dcomplex ***p);
 
-#ifndef __cplusplus /* if not C++, declare C complex functions */
-/* complex number manipulation */
-complex cadd (complex a, complex b);
-complex csub (complex a, complex b);
-complex cmul (complex a, complex b);
-complex cdiv (complex a, complex b);
-float rcabs (complex z);
-complex cmplx (float re, float im);
-complex conjg (complex z);
-complex cneg (complex z);
-complex cinv (complex z);
-complex cwp_csqrt (complex z);
-complex cwp_cexp (complex z);
-complex crmul (complex a, float x);
-
-/* complex functions */
-complex cipow(complex a, int p);
-complex crpow(complex a, float p);
-complex rcpow(float a, complex p);
-complex ccpow (complex a, complex p);
-complex cwp_ccos(complex a);
-complex cwp_csin(complex a);
-complex cwp_ccosh(complex a);
-complex cwp_csinh(complex a);
-complex cwp_cexp1(complex a);
-complex cwp_clog(complex a);
-
-/* double complex */
-dcomplex dcadd (dcomplex a, dcomplex b);
-dcomplex dcsub (dcomplex a, dcomplex b);
-dcomplex dcmul (dcomplex a, dcomplex b);
-dcomplex dcdiv (dcomplex a, dcomplex b);
-double drcabs (dcomplex z);
-dcomplex dcmplx (double re, double im);
-dcomplex dconjg (dcomplex z);
-dcomplex dcneg (dcomplex z);
-dcomplex dcinv (dcomplex z);
-dcomplex dcsqrt (dcomplex z);
-dcomplex dcexp (dcomplex z);
-dcomplex dcrmul (dcomplex a, double x);
-
-/* double complex functions */
-dcomplex dcipow(dcomplex a, int p);
-dcomplex dcrpow(dcomplex a, float p);
-dcomplex rdcpow(float a, dcomplex p);
-dcomplex dcdcpow(dcomplex a, dcomplex p);
-dcomplex dccos(dcomplex a);
-dcomplex dcsin(dcomplex a);
-dcomplex dccosh(dcomplex a);
-dcomplex dcsinh(dcomplex a);
-dcomplex dcexp1(dcomplex a);
-dcomplex dclog(dcomplex a);
-
 void chermite (int n, float x[], float y[], float yd[][4]);
 
-#endif /* endif C++ */
 
 /* big matrix handler */
 void *bmalloc (int nbpe, int n1, int n2);
@@ -735,10 +622,6 @@ void strchop(char *s, char *t);
 /* exit function */
 int CWP_Exit();
 
-#ifdef __cplusplus /* if C++, end external linkage specification */
-
-}
-#endif
 
 
 #endif /* CWP_H */

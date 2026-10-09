@@ -64,7 +64,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do { 
-		register int i;
+		int i;
 		for (i = itmin; i <= itmax; ++i)  tr.data[i] = value;
 		
 		puttr(&tr);

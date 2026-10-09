@@ -78,8 +78,8 @@ int argc; char **argv;
 	bool lastzero=false;	/* is this trace a phoney one?		*/
 	float *hcos;		/* hold cosines for fft			*/
 	float *hsin;		/* hold sines for fft			*/
-	register float *xr;	/* real part of trace			*/
-	register float *xi;	/* imaginary part of trace		*/
+	float *xr;	/* real part of trace			*/
+	float *xi;	/* imaginary part of trace		*/
 	float *wr;		/* work area for fft			*/
 	float *wi;		/* work area for fft			*/
 	float *filt;		/* filter array				*/
@@ -106,7 +106,7 @@ int argc; char **argv;
 	int nfac;		/* number of factors of nfft		*/
 	int facs[FACMAX];	/* contains factors of nfft		*/
 	int nzeros;		/* number of padded zeroes in bytes	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 
 	
 	/* Initialize SU */

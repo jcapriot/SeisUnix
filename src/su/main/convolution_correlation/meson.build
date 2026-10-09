@@ -1,5 +1,5 @@
 su_convolution_srcs = files(
-    'suacorfrac.c',
+    'suacorfrac.cpp',
 )
 
 su_main_srcs += su_convolution_srcs

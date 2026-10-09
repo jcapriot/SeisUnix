@@ -33,7 +33,7 @@ Initialize(master)
 int master;
 {
 	FILE *fp, *fopen();
-	register int i, j;	/* loop control				*/
+	int i, j;	/* loop control				*/
 	int idebug;		/* DEBUG 				*/
 	int status;		/* indicates end of file in initfile	*/
 

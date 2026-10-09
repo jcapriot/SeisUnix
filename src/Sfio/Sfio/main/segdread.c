@@ -221,8 +221,8 @@ main(int argc, char **argv)
  short scan_type;        /* scan type number */
  short chan_set;         /* channel set number */
 
- register int i, j;
- register int i_scan, i_cs, i_tr;
+ int i, j;
+ int i_scan, i_cs, i_tr;
  int i_ss;
 /* segdread.c:222: warning: `nread' might be used uninitialized in this function */
  int nread = 0;               /* bytes read */
@@ -745,7 +745,7 @@ main(int argc, char **argv)
 
 static int bcd (unsigned char * ptr , int begin , int n)
 {
- register int i;
+ int i;
  unsigned int val;
 
  val = 0;
@@ -825,8 +825,8 @@ static int bcd (unsigned char * ptr , int begin , int n)
 
 static void F0015_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register short ex1_4;
+ int i;
+ short ex1_4;
  int expo;
  short fraction;
 
@@ -915,8 +915,8 @@ static void F0015_to_float (Sfio_t *from, float to[], int len)
 
 static void F8015_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register short ex1_4;
+ int i;
+ short ex1_4;
  int expo;
  short fraction;
 
@@ -986,8 +986,8 @@ static void F8015_to_float (Sfio_t *from, float to[], int len)
 
 static void F8022_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register int ex1_4;
+ int i;
+ int ex1_4;
  int expo;
  short fraction;
 
@@ -1043,8 +1043,8 @@ static void F8022_to_float (Sfio_t *from, float to[], int len)
 
 static void F8024_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register int ex1_4;
+ int i;
+ int ex1_4;
  int expo;
  short fraction;
 
@@ -1091,8 +1091,8 @@ static void F8024_to_float (Sfio_t *from, float to[], int len)
 
 static void F8036_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register long int ival;
+ int i;
+ long int ival;
 
  for (i = 0; i < len; i ++) {
       ival = GET_UC(from);
@@ -1194,8 +1194,8 @@ static void F8038_to_float (Sfio_t *from, float to[], int len)
 
 static void F8042_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register int ex1_4;
+ int i;
+ int ex1_4;
  int expo;
  short fraction;
 
@@ -1250,8 +1250,8 @@ static void F8042_to_float (Sfio_t *from, float to[], int len)
 
 static void F8044_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register int ex1_4;
+ int i;
+ int ex1_4;
  int expo;
  short fraction;
 
@@ -1312,8 +1312,8 @@ static void F8044_to_float (Sfio_t *from, float to[], int len)
 
 static void F8048_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register int ex1_4;
+ int i;
+ int ex1_4;
  int expo;
  long int fraction;
 
@@ -1388,8 +1388,8 @@ static void F8048_to_float (Sfio_t *from, float to[], int len)
 
 static void F8058_to_float (Sfio_t *from, float to[], int len)
 {
- register int i;
- register int ex1_4, ex2_4;
+ int i;
+ int ex1_4, ex2_4;
  int expo;
  long int fraction;
 
@@ -1974,7 +1974,7 @@ void info_ssh(sample_skew *ssh)
 
 void info_ech(extended_header * ech)
 {
- register int i;
+ int i;
  warn("\n**********************************\n"
  	"segd_extended_header (%2d bytes)\n"
  	"**********************************\n", sizeof(*ech));
@@ -1985,7 +1985,7 @@ void info_ech(extended_header * ech)
 
 void info_exh(external_header * exh)
 {
-	register int i;
+	int i;
 	/*  unsigned char *ptr; */
 	/*  ptr= (unsigned char *) &(exh->dummy[0]); */
 	unsigned char *p;

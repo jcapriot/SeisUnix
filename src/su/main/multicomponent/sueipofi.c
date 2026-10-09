@@ -102,10 +102,10 @@ main(int argc, char **argv)
     /* flags (see selfdoc) */
     int verbose, rl1, rl2, pln;
     
-    register int i,icomp; /* indices for components (in loops) */
-    register int j;       /* loop index */
-    register int it, jt;  /* indices for time sample in main loop */
-    register int iw;      /* time window counter */
+    int i,icomp; /* indices for components (in loops) */
+    int j;       /* loop index */
+    int it, jt;  /* indices for time sample in main loop */
+    int iw;      /* time window counter */
     int nw;               /* number of windows per trace */
     int nstat;            /* number of 3-component datasets */
     int nt;               /* number of time samples in one trace */
@@ -345,7 +345,7 @@ float calc_planarity(float *w, float pwr)
 
 void do_intcub(float *iny, float *outy, int nin, int din, int inx0, int nout)
 {
-    register int ix;
+    int ix;
     float *inx, *outx;
     float (*yd)[4];
     
@@ -380,7 +380,7 @@ void do_intcub(float *iny, float *outy, int nin, int din, int inx0, int nout)
 
 void do_intlin(float *iny, float *outy, int nin, int din, int inx0, int nout)
 {
-    register int ix;
+    int ix;
     float *inx, *outx;
     
     /* allocate space */

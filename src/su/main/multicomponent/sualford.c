@@ -1468,8 +1468,8 @@ NOTES: this is code draws on the SURESAMP
 
 			
 	/* Compute output times */
-	{ register int itime;
-	  register float tvalue;
+	{ int itime;
+	  float tvalue;
 	  for (itime=0,tvalue=0; itime<nt; itime++,tvalue+=0.25)
 		t[itime] = tvalue;
 

@@ -54,7 +54,7 @@
  */
 
 refft (x,n,sign,mode)
-register struct complex {float re, im;} *x;
+struct complex {float re, im;} *x;
 int n, sign, mode;
 /*
  *	radix 2 real <=> complex fast Fourier transform
@@ -67,7 +67,7 @@ int n, sign, mode;
  *	scaling for postive modes
  */
 {
-	register struct complex *xp, *yp;
+	struct complex *xp, *yp;
 	int n2;
 	double cn, sn, cd, sd, arg;
 	double aa, bb, ab, ba, real, imag;

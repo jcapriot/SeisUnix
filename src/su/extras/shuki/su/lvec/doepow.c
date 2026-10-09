@@ -4,7 +4,7 @@ float epow,*p;
 	int j;
 	static int first=1;
 	static float *e;
-	register float *q1,*q2,*q3;
+	float *q1,*q2,*q3;
 
 	if(epow==0.0) return;
 	if(first) {

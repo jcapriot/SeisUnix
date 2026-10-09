@@ -157,7 +157,7 @@ main(int argc, char **argv)
 /* GET_RANKS - fprint some sample ranks */
 static void get_ranks(int *rank, int nt, int fsize)
 {
-	register int i;
+	int i;
 	
 	for (i = 0; i < nt; ++i)  rank[i] = i;
 	qsort(rank, nt, fsize, (int (*)()) cmp_indirect);
@@ -183,7 +183,7 @@ static void get_ranks(int *rank, int nt, int fsize)
 /* GET_QUANTILES - fprint some sample quantiles */
 static void get_quantiles(int *rank, int nt, int fsize)
 {
-	register int i, iq;
+	int i, iq;
 	for (i = 0; i < nt; ++i)  rank[i] = i;
 	qsort(rank, nt, fsize, (int (*)()) cmp_indirect);
 

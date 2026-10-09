@@ -34,7 +34,7 @@ main(int argc, char **argv)
 	int nt;			/* number of points on input trace	*/
 	float *data;		/* data values from each trace		*/
 	float *hdata;		/* Hilbert transformed data values	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	cwp_Bool seismic;	/* is this seismic data?		*/
 	
 	/* Initialize */

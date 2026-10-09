@@ -53,9 +53,9 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-	register complex *ct=NULL;	/* complex input trace		*/
-	register float *rt=NULL;	/* real output trace		*/
-	register float *newrt=NULL;	/* real output trace		*/
+	complex *ct=NULL;	/* complex input trace		*/
+	float *rt=NULL;	/* real output trace		*/
+	float *newrt=NULL;	/* real output trace		*/
 	int ns;			/* number of samples per trace		*/
 	int newns;		/* number of samples per trace		*/
 	int nfft;		/* fft size 				*/
@@ -128,7 +128,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 
 		/* zero out arrays */
 		memset( (void *) ct, 0, nf*sizeof(complex));
@@ -145,7 +145,7 @@ main(int argc, char **argv)
 		/* Load traces into ct (pfa fills in negative freqs) */
 		/* exponentiate prior to inverse transform */
 		for (i = 0; i < nf; ++i) {
-			register float temp=0.0;
+			float temp=0.0;
 
 			temp=ct[i].r;
 

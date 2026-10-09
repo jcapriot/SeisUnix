@@ -196,13 +196,13 @@ int argc; char **argv;
 /* Multiply by t^tpow = exp(tpow * log t) */
 void dotpow(tpow, tmin, dt, nt)
 float tpow;		/* multiply data by t^tpow	*/
-register float tmin;	/* first time on record		*/
-register float dt;	/* sampling rate in seconds	*/
+float tmin;	/* first time on record		*/
+float dt;	/* sampling rate in seconds	*/
 int nt;			/* number of samples		*/
 {
 	static bool first = true;	/* first entry flag	*/
 	static float *tpowfac;		/* tpow values		*/
-	register int i;			/* counter		*/
+	int i;			/* counter		*/
 
 	if (first) { /* first entry, set up array of tpow factors */
 		tpowfac = vector(nt);
@@ -223,11 +223,11 @@ int nt;			/* number of samples		*/
 /* Exponential deattenuation  with deattenuation factor epow */
 void doepow(epow, tmin, dt, nt)
 float epow;		/* coefficient of t in exponent	*/
-register float tmin;	/* first time on record		*/
-register float dt;	/* sampling rate in seconds	*/
+float tmin;	/* first time on record		*/
+float dt;	/* sampling rate in seconds	*/
 int nt;			/* number of samples		*/
 {
-	register int i;			/* counter		*/
+	int i;			/* counter		*/
 	static bool first = true;	/* first entry flag	*/
 	static float *epowfac;		/* exponent stretchs	*/
 
@@ -244,10 +244,10 @@ int nt;			/* number of samples		*/
 
 /* Zero out outliers */
 void dotrap(trap, nt)
-register float trap;	/* zero if magnitude > trap	*/
-register int nt;	/* number of samples		*/
+float trap;	/* zero if magnitude > trap	*/
+int nt;	/* number of samples		*/
 {
-	register float *dataptr = tr.data;
+	float *dataptr = tr.data;
 
 	while (nt--) {
 		if (ABS(*dataptr) > trap) *dataptr = 0.0;
@@ -258,11 +258,11 @@ register int nt;	/* number of samples		*/
 
 /* Hard clip outliers */
 void doclip(clip, nt)
-register float clip;	/* hard clip if magnitude > clip	*/
-register int nt;	/* number of samples			*/
+float clip;	/* hard clip if magnitude > clip	*/
+int nt;	/* number of samples			*/
 {
-	register float *dataptr = tr.data;
-	register float mclip = -clip;
+	float *dataptr = tr.data;
+	float mclip = -clip;
 
 	while (nt--) {
 		if (*dataptr > clip) {
@@ -280,7 +280,7 @@ void doqclip(qclip, nt)
 float qclip;	/* quantile at which to clip	*/
 int nt;		/* number of sample points	*/
 {
-	register float *dataptr = tr.data;	/* ptr to trace data	*/
+	float *dataptr = tr.data;	/* ptr to trace data	*/
 	static bool first = true;	/* first entry flag		*/
 	static float *absdata;		/* absolute value trace		*/
 	static int iq;			/* index of qclipth quantile	*/
@@ -304,7 +304,7 @@ void doqbal(qclip, nt)
 float qclip;	/* quantile at which to clip	*/
 int nt;		/* number of sample points	*/
 {
-	register float *dataptr = tr.data;	/* ptr to trace data	*/
+	float *dataptr = tr.data;	/* ptr to trace data	*/
 	float maxv[2];			/* maxv[0] holds clip		*/
 	static bool first = true;	/* first entry flag		*/
 	static float *absdata;		/* absolute value trace		*/
@@ -408,9 +408,9 @@ float quant(a, k, n)
 float *a;
 int k, n;
 {
-	register int i,j;
+	int i,j;
 	int low, hi;
-	register float ak, aa;
+	float ak, aa;
 
 	low = 0; hi = n-1;
 

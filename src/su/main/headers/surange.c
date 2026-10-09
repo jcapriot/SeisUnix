@@ -112,7 +112,7 @@ main(int argc, char **argv)
 
 	/* Do first trace outside loop to initialize mins and maxs */
 	if (!gettr(&tr)) err("can't get first trace");
-	{	register int i;
+	{	int i;
 		if (nkeys==0) {
    			for (i = 0; i < SU_NKEYS; ++i) {
  				gethval(&tr, i, &val);
@@ -126,7 +126,7 @@ main(int argc, char **argv)
                                 if(i == 24) gy = eastRec[1] = westRec[1] = northRec[1] = southRec[1] = val.i*dcoscal;
 			}
 		} else	{
-			register int j;
+			int j;
 			for (i=0;i<nkeys;i++) {
 				j = getindex(key[i]);
  				gethval(&tr, j, &val);
@@ -143,7 +143,7 @@ main(int argc, char **argv)
 
 	ntr = 1;
 	while (gettr(&tr)) {
-		register int i;
+		int i;
                 sx = sy = gx = gy = mx = my = 0.0;
 		if (nkeys==0) {
 	       		for (i = 0; i < SU_NKEYS; ++i) {
@@ -163,7 +163,7 @@ main(int argc, char **argv)
                                 if(i == 24)  gy = val.i*dcoscal;
 			}
 		} else	{
-			register int j;
+			int j;
 			for (i=0;i<nkeys;i++) {
 				type = hdtype(key[i]);
 				j = getindex(key[i]);
@@ -280,7 +280,7 @@ main(int argc, char **argv)
 /* printrange - print non-zero header values ranges	*/
 void printrange(segy *tpmin, segy *tpmax, segy *tpfirst, segy *tplast)
 {
-	register int i = 0;
+	int i = 0;
 	Value valmin, valmax, valfirst, vallast;
 	double dvalmin, dvalmax, dvalfirst, dvallast;
 	cwp_String key;

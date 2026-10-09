@@ -368,7 +368,7 @@ main(int argc, char **argv)
 		if ((signal_file=fopen(signalfile,"w"))==NULL)
 			err("cannot open signal file=%s\n",signalfile);
 		erewind(headerfp);
-		{	register int itr;
+		{	int itr;
 			for (itr=0; itr<ntr; itr++) {
 				fread(&tro1, 1, HDRBYTES, headerfp);
 				for (it=0; it<nt; it++)
@@ -384,7 +384,7 @@ main(int argc, char **argv)
 		if ((noise_file=efopen(noisefile,"w"))==NULL)
 			err("cannot open noise file=%s\n",noisefile);
 		erewind(headerfp);
-		{	register int itr;
+		{	int itr;
 			for (itr=0; itr<ntr; itr++) {
 				efread(&tro2, 1, HDRBYTES, headerfp);
 				for (it=0; it<nt; it++)

@@ -76,8 +76,8 @@ int
 main(int argc, char **argv)
 {	
     
-    register int i;       /* indices for components (in loops) */
-    register int j,k;     /* loop index */
+    int i;       /* indices for components (in loops) */
+    int j,k;     /* loop index */
     int nsp;	      /* number of samples in input trace	*/
 /*    int nspws; */		  /* number of samples in window (wo taper)*/
 /*    int nspwf; */		  /* number of samples in first window    */

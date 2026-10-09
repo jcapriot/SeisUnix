@@ -31,7 +31,7 @@ char x[MAXSIZE];
 int
 main(int ac, char **av)
 {
-	register int fd, ic, n;
+	int fd, ic, n;
 	struct stat buf;
 
 	if (ac < 2) {

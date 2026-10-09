@@ -125,8 +125,8 @@ main(int argc, char **argv)
 	float **lowpass=NULL;   /* low-pass filtered version of the trace */
 	float **mig=NULL;	/* output migrated data array */
 
-	register float *rtin=NULL,*rtout=NULL;/* real traces */
-	register complex *ct=NULL;   /* complex trace */
+	float *rtin=NULL,*rtout=NULL;/* real traces */
+	complex *ct=NULL;   /* complex trace */
 
 	/* file names */
 	char *vfile="";		/* name of velocity file */

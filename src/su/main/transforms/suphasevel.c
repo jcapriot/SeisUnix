@@ -105,8 +105,8 @@ main(int argc, char **argv)
 	int nF;			/* transform (output) dimensions	*/
 	int iF;			/* transform sample indices		*/
 
-	register complex **ct=NULL;	/* complex FFT workspace	*/
-	register float **rt=NULL;	/* float FFT workspace		*/
+	complex **ct=NULL;	/* complex FFT workspace	*/
+	float **rt=NULL;	/* float FFT workspace		*/
 
 	int verbose;		/* flag for echoing information		*/
 

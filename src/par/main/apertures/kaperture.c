@@ -125,18 +125,18 @@ main(int argc, char **argv)
 	float kscale;		/* scale factor per frequency	*/
 	float knyqscale;	/* ... for Nyquist frequency	*/
 	float phi;		/* angle for Nyquist circle	*/
-	register int iphi;	/* ... and counter 		*/
+	int iphi;	/* ... and counter 		*/
 	int nstep;		/* ... and bound		*/
 	int npoints;		/* number of kx-kz pairs	*/
 	int npairs=0;		/* number of kx-kz pairs output	*/
-	register int ipoint;	/* index for kx-kz pairs	*/
+	int ipoint;	/* index for kx-kz pairs	*/
 	float xmin, xmax;	/* x range for plotting		*/
 	float ymin, ymax;	/* ... and z range		*/
 	char *outpar=NULL;	/* file holding output parfile	*/
 	FILE *outparfp=NULL;	/* ... its file pointer		*/
 	int s;			/* shot index			*/
 	int g;			/* receiver index		*/
-	register int f;		/* frequency counter		*/
+	int f;		/* frequency counter		*/
 
 
 

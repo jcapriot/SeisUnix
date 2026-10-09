@@ -88,14 +88,14 @@ main(int argc, char **argv)
 		   char array which is actually there.
 		*/
 
-		register signed char *otr = (signed char *) tr.data;
-		register int i;
-		register float absmax;
-		register float scale;
+		signed char *otr = (signed char *) tr.data;
+		int i;
+		float absmax;
+		float scale;
 
 		/* Power transform to decrease dynamic range */
 		if (!isone) {
-			register float val;
+			float val;
 
 			if (ishalf) {
 				for (i = 0; i < nt; ++i) {

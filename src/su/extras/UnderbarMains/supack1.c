@@ -157,13 +157,13 @@ int argc; char **argv;
 #define ROLLMSK	(NROLL - 1)
 
 void cpack(a, i, scale, c, k, n)
-register float *a;
-register float scale;
-register string c;
+float *a;
+float scale;
+string c;
 int i, k;
-register int n;
+int n;
 {
-	register int r;
+	int r;
 
 	if (i == 1 && k == 1) {
 		switch (n & ROLLMSK) {

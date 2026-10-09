@@ -551,9 +551,9 @@ main(int argc, char **argv)
 
 		/* Convolve pefilter with trace - don't do zero multiplies */
 		for (i = 0; i < nt; ++i) {
-			register int j;
-			register int n = MIN(i, imaxlag[jcdp]); 
-			register float sum = intrace.data[i];
+			int j;
+			int n = MIN(i, imaxlag[jcdp]); 
+			float sum = intrace.data[i];
 
 			for (j = iminlag[jcdp]; j <= n; ++j)
 				sum -= wiener[j-iminlag[jcdp]] * intrace.data[i-j];
@@ -564,7 +564,7 @@ main(int argc, char **argv)
 
 		/* Show pefilter on request */
 		if (wienerout && autocorr[0] != 0.0) {
-			register int i;
+			int i;
 			warn("Wiener filter, trace: %d", itr);
 
 

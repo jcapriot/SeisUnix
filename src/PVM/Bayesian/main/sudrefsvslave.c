@@ -63,7 +63,7 @@ void main ()
    complex **uRw;                /* displacements in the radial direction */
    complex **uZw;                /* displacements in the z direction */
                                  /* frequency domain */
-   register complex aux1, aux2, aux3;
+   complex aux1, aux2, aux3;
    complex *aux11, *aux12, *aux21, *aux22;
    complex *aux11Old, *aux12Old, *aux21Old, *aux22Old;
                                  /* auxiliar quantities */
@@ -1649,7 +1649,7 @@ void RTu(int i1, int i2)
 
 void Bessels(float x)
 {
-   register float xd3, x2, x4, x6, x8, x10, x12, sqrx;
+   float xd3, x2, x4, x6, x8, x10, x12, sqrx;
    if (x <= 2.75) 
    {
       xd3 = x / 3;

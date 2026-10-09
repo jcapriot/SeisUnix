@@ -325,7 +325,7 @@ int ffile;
 	int ticsz;		/* tic labeling print size		*/
 	int titlsz;		/* title print size			*/
 	int tlines;		/* 1=timing lines (0=no timing lines)	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	void vertwig();		/* draw vertical wiggle traces		*/
 
 	gap = .7;		fgetpar("gap",&gap);

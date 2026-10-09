@@ -42,7 +42,7 @@ main(int argc, char **argv)
 	int itmax;		/* largest sample (zero-based) to plot	*/
 	int nt;			/* number of samples			*/
 	int count;		/* number of traces to plot		*/
-	register int itr;	/* trace counter			*/
+	int itr;	/* trace counter			*/
 	cwp_Bool plotall;	/* plot all the traces			*/
 
 

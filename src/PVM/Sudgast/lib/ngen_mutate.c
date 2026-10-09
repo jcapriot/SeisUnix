@@ -30,10 +30,10 @@ extern int Randint();
 Mutate()
 {
 	static int bits;	/* number of bits per pop */
-	register int i;		/* index of the Mutated structure */
-	register int j;		/* position within the structure */
-	register char k;	/* a random allele */
-	register int open;	/* currently Unpacked Gene */
+	int i;		/* index of the Mutated structure */
+	int j;		/* position within the structure */
+	char k;	/* a random allele */
+	int open;	/* currently Unpacked Gene */
 	static int firstflag = 1;
 
 	Trace("Mutate entered");

@@ -59,7 +59,7 @@ int argc; char **argv;
 	static value *val_list;	/* a list of the key values for each
 				   trace with each group headed by the
 				   trace number of that trace		*/
-	register value *vptr;	/* location pointer for val_list	*/
+	value *vptr;	/* location pointer for val_list	*/
 	int ngroup;		/* size of unit in val_list (nkey + 1)	*/
 	int nv;		/* bytes allocated for val_list		*/
 	int nvstep;		/* incremental allocation for val_list	*/
@@ -73,7 +73,7 @@ int argc; char **argv;
 	bool disk_in;		/* is stdin a diskfile?			*/
 	int nsegy;		/* number of bytes on the trace		*/
 	int nwrite;		/* number of bytes written		*/
-	register int i;		/* for loop counter			*/
+	int i;		/* for loop counter			*/
 	int cmp_list();		/* comparison function for qsort	*/
 	value negval();
 
@@ -225,9 +225,9 @@ int argc; char **argv;
 
 /* Comparison routine for qsort */
 int cmp_list(a, b)
-register value *a, *b;
+value *a, *b;
 {
-	register int i;
+	int i;
 	value va, vb;
 	int compare;
 

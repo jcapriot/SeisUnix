@@ -40,7 +40,7 @@ void check(int *ptrok, float *ptrout, float *ptrdesire,
 	Loop i;
 	float *ptrtmp1, *ptrend;
 	float eps;
-	register float ee;
+	float ee;
 
 
 	eps = .1;					/* error tolerance */
@@ -104,10 +104,10 @@ void delta(float *ptrwt, int nlay, float *ptrdelwt,
 	static int firstnode[NLAYMAX];			   /* number of first node in each layer */
 	static int firstwt[NLAYMAX];			   /* number of first wt in each layer. */
 	static int ientry=0;				   /* entry flag */
-	register float *ptrtmp, *ptrtmp2, *ptrtmp3; 	   /* temporary pointers */
+	float *ptrtmp, *ptrtmp2, *ptrtmp3; 	   /* temporary pointers */
 	float *ptrend, *ptrend2;			   /* "                " */
 	double ee;					   /* error */
-	register float tmp;				   /* temporary variable */
+	float tmp;				   /* temporary variable */
 
 	if(ientry==0)					   /* on first entry compute */
 	{						   /* layer info arrays */
@@ -249,11 +249,11 @@ void response(float *ptrwt, float *ptrinput, float *ptrout,
 {
 	typedef int Loop;
 
-	register float *ptrfinal;			
-	register float *ptrtmp1, *ptrtmp2;
+	float *ptrfinal;			
+	float *ptrtmp1, *ptrtmp2;
 	int numnod,kfinal,ibias,ibias2;
 	Loop i,j;
-	register float temp;
+	float temp;
 
 	double exp(double);
 

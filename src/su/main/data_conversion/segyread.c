@@ -828,7 +828,7 @@ Author: CWP: Jack  K. Cohen, August 1994
 ****************************************************************************/
 
 {
-	register int i;
+	int i;
 	Value val;
 
 	/* convert binary header, field by field */
@@ -861,7 +861,7 @@ four byte fields and is later converted to internal floats by ibm_to_float
 Author: CWP:Jack K. Cohen,  August 1994
 ****************************************************************************/
 {
-	register int i;
+	int i;
 	Value val;
 
 	/* convert header trace header fields */
@@ -882,7 +882,7 @@ static void int_to_float(int from[], float to[], int n, int endian)
 Author:	J.W. de Bruijn, May 1995
 ****************************************************************************/
 {
-	register int i;
+	int i;
 
 	if (endian == 0) {
 		for (i = 0; i < n; ++i) {
@@ -904,7 +904,7 @@ Author: Delft: J.W. de Bruijn, May 1995
 Modified by: Baltic Sea Reasearch Institute: Toralf Foerster, March 1997
 ****************************************************************************/
 {
-	register int i;
+	int i;
 
 	if (endian == 0) {
 		for (i = n - 1; i >= 0 ; --i) {

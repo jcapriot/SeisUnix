@@ -595,7 +595,7 @@ int main(int argc, char **argv) {
                 int topmute;
                 int botmute;
                 int ntair=0;
-                register int i;
+                int i;
 
                 if (!seismic) {
                         tmin = 0.0;

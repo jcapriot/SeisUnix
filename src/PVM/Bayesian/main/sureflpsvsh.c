@@ -765,7 +765,7 @@ int main(int argc, char **argv)
 		if(*wfp!='\0'){
 			if ((wfp_file=efopen(wfp,"w"))==NULL)
 				err("cannot open pressure file=%s\n",wfp);
-			{	register int ix;
+			{	int ix;
 				for (ix=0; ix<nx; ix++) {
 					for (it=0; it<nt; it++)
 						tr1.data[it]=wavefield1[ix][it];
@@ -784,7 +784,7 @@ int main(int argc, char **argv)
 		if (*wfr !='\0') {
 			if ((wfr_file=efopen(wfr,"w"))==NULL)
 					err("cannot open radial wfield file=%s\n",wfr);
-			{	register int ix;
+			{	int ix;
 				for (ix=0; ix<nx; ix++) {
 					for (it=0; it<nt; it++)
 						tr2.data[it]=wavefield2[ix][it];
@@ -799,7 +799,7 @@ int main(int argc, char **argv)
 		if (*wfz !='\0') {
 			if ((wfz_file=efopen(wfz,"w"))==NULL)
 				err("canno open vertical field file=%s\n",wfz);
-			{	register int ix;
+			{	int ix;
 				for (ix=0; ix<nx; ix++) {
 					for (it=0; it<nt; it++)
 							tr3.data[it]=wavefield3[ix][it];
@@ -826,7 +826,7 @@ int main(int argc, char **argv)
 		if (*wft !='\0') {
 			if ((wft_file=efopen(wft,"w"))==NULL)
 				err("cannot open tangential file=%s\n",wft);
-			{	register int ix;
+			{	int ix;
 				for (ix=0; ix<nx; ix++) {
 					for (it=0; it<nt; it++)
 							tr1.data[it]=wavefield1[ix][it];

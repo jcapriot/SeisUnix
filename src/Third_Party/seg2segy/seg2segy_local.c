@@ -155,7 +155,7 @@ swaplong (long *li)
 void
 float_to_ibm(long from[], long to[], long n)
 {
-	register long fconv, fmant, ii, t;
+	long fconv, fmant, ii, t;
 
 	for (ii=0;ii<n;++ii) {
 	fconv = from[ii];

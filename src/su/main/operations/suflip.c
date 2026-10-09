@@ -59,8 +59,8 @@ NULL};
 /**************** end self doc ***********************************/
 
 /* prototype */
-void flipper(register float **indata, register float **flipdata,
-		register int ncol, register int nrow, register int flip);
+void flipper(float **indata, float **flipdata,
+		int ncol, int nrow, int flip);
 static void closefiles(void);
 
 /* Globals (so can trap signal) defining temporary disk files */
@@ -79,9 +79,9 @@ main(int argc, char **argv)
 	int trdt;		/* time sample rate as integer		*/
 	int nt;			/* samples per trace on input		*/
 	int ntr;		/* traces in input data			*/
-	register int i;		/* counter			 	*/
-	register float **data;	/* matrix for input data		*/
-	register
+	int i;		/* counter			 	*/
+	float **data;	/* matrix for input data		*/
+	
 	    float **flipdata;	/* matrix for flipped data		*/
 
 	char *tmpdir;		/* directory path for tmp files		*/
@@ -203,10 +203,10 @@ main(int argc, char **argv)
 }
 
 
-void flipper(register float **indata, register float **flipdata,
-		register int ncol, register int nrow, int flip)
+void flipper(float **indata, float **flipdata,
+		int ncol, int nrow, int flip)
 {
-	register int icol, irow;
+	int icol, irow;
 
 	switch (flip) {
 

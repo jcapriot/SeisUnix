@@ -243,7 +243,7 @@ Sfdisc_t*	sfdisc;
 	reg char_type	*stackp;
 	reg code_int	code;
 	char		*ioend = (char*)iobuf + iocnt;
-	register char	*ioptr = iobuf;
+	char	*ioptr = iobuf;
 #define END_REGS	{disc->code=code;disc->stackp=stackp;}
 #define BEGIN_REGS	{code=disc->code;stackp=disc->stackp;}
 

@@ -1021,7 +1021,7 @@ void horSlowness()
 /*                                              September 1995  */
 void Bessels(float x)
 {
-   register float xd3, x2, x4, x6, x8, x10, x12, sqrx;
+   float xd3, x2, x4, x6, x8, x10, x12, sqrx;
    if (x <= 2.75) 
    {
       xd3 = x / 3;

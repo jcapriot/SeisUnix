@@ -107,7 +107,7 @@ static void ibm_to_float(int from[], int to[], int n, int endian)
 {
 	/* HP version of ibm_to_float */
 
-    register int fconv, fmant, i, t, dummy;
+    int fconv, fmant, i, t, dummy;
 
 	dummy = endian;
 
@@ -160,7 +160,7 @@ Only integer shifting and masking are used.
 Credits: CWP: Brian Sumner,  c.1985
 *************************************************************************/
 {
-    register int fconv, fmant, i, t;
+    int fconv, fmant, i, t;
 
     for (i = 0;i < n; ++i) {
 

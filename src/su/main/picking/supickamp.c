@@ -365,7 +365,7 @@ main(int argc, char **argv)
 	/* Loop over traces */
 	do {
 	
-		register int itime;
+		int itime;
 
 		pick1->iabs=trnum;
 		
@@ -414,7 +414,7 @@ main(int argc, char **argv)
 
 		/* Compute output times */
 		{ 
-		   register float tvalue;
+		   float tvalue;
 		   for (itime=0,tvalue=tmin; tvalue<=tmax; itime++,
 			tvalue+=dt_resamp)
 			t_resamp[itime] = tvalue;
@@ -505,7 +505,7 @@ main(int argc, char **argv)
 
 int tracepick(Pick *pick1, float *t, float *val, int nt)
 {
-   register  int it;
+   int it;
    float min,max,abs,tmax,tmin,tabs,energy;
 
    min = FLT_MAX;

@@ -132,7 +132,7 @@ void wigplot(float *dataptr, int nt, int ntr)
 	int fill;	       /* fill flag			    */
 	float overlap;	  /* maximum trace overlap		*/
 	int plotfat;	    /* line thickness of traces	     */
-	register int i;	 /* counter			      */
+	int i;	 /* counter			      */
 
 
 	/* Get parameters */
@@ -208,7 +208,7 @@ void vertvwig(float *data, int n, int fill)
 {
 	int lpoly = 0;          /* Number of points in fill arrays */
 	static float *xp, *yp;  /* Fill corner arrays              */
-	register int i;         /* Counter for data points         */
+	int i;         /* Counter for data points         */
 
 
 	/* Allocate fill corner arrays if first entry.                */

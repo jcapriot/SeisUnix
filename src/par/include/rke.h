@@ -33,7 +33,7 @@ typedef struct struct_rke_variables {
 
     /* The following are saved from rke_init call arguments. */
     int n_equations;		/* Number of simultaneous equations */
-    int (*eval_routine) ();	/* Routine to compute derivatives */
+    int (*eval_routine) (double, double *, double *);	/* Routine to compute derivatives */
 
     /* These may be changed by the user between two solve calls. */
     double minimum_step;	/* Minimum allowable step size */
@@ -53,7 +53,7 @@ typedef struct struct_rke_variables {
 
 
 
-rke_variables rke_init (int number, int (*routine)());
+rke_variables rke_init (int number, int (*routine)(double, double *, double *));
 void rke_term (rke_variables var);
 int rke_solve (rke_variables var, double *time, double *variables,
 			double aimed_time);

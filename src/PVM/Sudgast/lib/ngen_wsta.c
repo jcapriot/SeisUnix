@@ -35,7 +35,7 @@ int genes;      /* number of elements in vect                   */
 	int *SOURCE, *RECEIVER;		/* POINTERS		*/
 	static int firstflag = 1;
 	double static_j, static_i; 	/* definig total statics*/
-	register int i, j, k;
+	int i, j, k;
 	int NTRACES;			/* # of traces read	*/
 	int shift;
 	int ipoint;
@@ -304,7 +304,7 @@ int genes;		/* # of elements in vect			*/
 	double *BETA;				/* steps		*/
 	double change;				/* relat change in fitness */
 	double aux1, aux2;			/* auxiliary quantities */
-	register int i, j, jj;			/* counters		*/
+	int i, j, jj;			/* counters		*/
 	int how_many, i_to_calc;		/* for tape management	*/
 	int *DONE;				/* stopping flag per member */
 	int *ITERATIONS;			/* iterations / member */
@@ -587,7 +587,7 @@ int *DONE;		/* defines whether the computation is necessary */
         double xc0, xc1, xc2;                   /* Xcor derivatives     */
         double xcor_deriv_0; 		        /* Xcor derivatives     */
 	double aux;				/* auxiliar quantity	*/
-        register int i, ict;  	                /* counters             */
+        int i, ict;  	                /* counters             */
 	int i_to_calc;				/* define the model to  */
 						/* compute gradient	*/
         int ipoint_cross, iparam;

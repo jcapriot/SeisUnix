@@ -108,7 +108,7 @@ main(int argc, char **argv)
 	if (nslopes != namps)
 		err("number of slopes (%d) must equal number of amps(%d)",
 			nslopes, namps);
-	{ register int i;
+	{ int i;
 	  for (i=1; i<nslopes; ++i)
 		if (slopes[i] <= slopes[i-1])
 			err("slopes must be monotonically increasing");
@@ -133,7 +133,7 @@ main(int argc, char **argv)
 	/* Output filtered traces */
 	rewind(hdrfp);
 	rewind(datafp);
-	{ register int itr;
+	{ int itr;
 	  for (itr = 0; itr < ntr; ++itr) {
 		efread(&tr, 1, HDRBYTES, hdrfp);
 		efread(tr.data, FSIZE, nt, datafp);

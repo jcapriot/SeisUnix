@@ -23,13 +23,13 @@ static int worst;		/* pointer to element with worst_value	*/
 
 
 Savebest(i)
-register int i;		/* index of structure to consider for Bestset	*/
+int i;		/* index of structure to consider for Bestset	*/
 {
 	/*  Save the ith structure in current population  */
 	/*  if it is one of the Savesize best seen so far */
 
-	register int j;		/* loop control var */
-	register int k;
+	int j;		/* loop control var */
+	int k;
 	int found;
 
 	if (Bestsize < Savesize)
@@ -106,9 +106,9 @@ Printbest()
 {
 	/*	Write the Best structures out to the Bestfile.	*/
 
-	register int i;
-	register int j;
-	register int k;
+	int i;
+	int j;
+	int k;
 	FILE *fp, *fopen();
 
 	Trace("Printbest entered");

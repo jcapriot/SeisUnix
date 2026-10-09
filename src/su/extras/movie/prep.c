@@ -54,8 +54,8 @@ static char *filnm[4] = {
 
 static void spread3()
 {
-	register int p;
-	register char *ib, *ob, *nb, c;
+	int p;
+	char *ib, *ob, *nb, c;
 	int q, i, k;
 
 	lseek(ifd,0,0);
@@ -186,8 +186,8 @@ static void spread3()
 
 static void spread2()
 {
-	register char *nb, *ib, *ob, c;
-	register int p;
+	char *nb, *ib, *ob, c;
+	int p;
 
 	int q, fbase, t, f, inc1, inc2;
 	char *inc3;
@@ -314,7 +314,7 @@ printf("(Processing frames %d thru %d)\n",fbase+1,t+1);
 static void spread1()
 {
 
-	register char *ib, *ob, *nb, c;
+	char *ib, *ob, *nb, c;
 
 	int fbase, f, t, p, q, l;
 	int inc1, inc2;
@@ -567,7 +567,7 @@ int dir;
 {
 
 	int p, q, msk;
-	register int i;
+	int i;
 
 	/* Set size */
 

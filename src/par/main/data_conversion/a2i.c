@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	/* Loop over data, converting to integer */
 	while (fgets(buf, sizeof(buf), stdin)) {
 		char *p = buf;
-		register int i1;
+		int i1;
 
 		for (i1 = 0; i1 < n1; ++i1) {
 			while (*p == ' ' || *p == '\t')  ++p;

@@ -161,7 +161,7 @@ float h;
 {
 	int ntpad,iw,nw,it,ik,nk,ntpad8,nt8,tmin,tmax,wmin,wmax;
 	float dw,dk,camp,k,hhkk,wt,arg,pha,amp,iop,rop,*w;
-	register float rdata,idata;
+	float rdata,idata;
 	complex *cbuf;
 
 /* 	if(h==0.0) {if(verbose) fprintf(stderr,"sudmo: h=%f ... returning\n",h); return;} */

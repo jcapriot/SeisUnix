@@ -350,7 +350,7 @@ main(int argc, char **argv) {
  */
 int bcd (unsigned char * ptr , int begin , int n)
 {
- register int i;
+ int i;
  unsigned int val;
 
  val = 0;
@@ -497,8 +497,8 @@ This is according to SEG specification
  */
  
 {
- register int i;
- register short ex1_4;
+ int i;
+ short ex1_4;
  int expo;
  short fraction;
 

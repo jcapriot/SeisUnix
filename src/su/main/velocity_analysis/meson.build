@@ -1,6 +1,6 @@
 su_velocity_analysis_srcs = files(
-    'suvelan.c',
-    'surelan.c',
+    'suvelan.cpp',
+    'surelan.cpp',
 )
 
 su_main_srcs += su_velocity_analysis_srcs

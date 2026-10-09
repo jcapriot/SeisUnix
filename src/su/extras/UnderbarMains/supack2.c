@@ -159,13 +159,13 @@ char **argv;
 #define ROLLMSK	(NROLL - 1)
 
 void spack(a, i, scale, c, k, n)
-register float *a;
-register float scale;
-register short *c;
-register int n;
+float *a;
+float scale;
+short *c;
+int n;
 int i, k;
 {
-	register int r;
+	int r;
 
 	if (i ==1 && k==1) {
 		switch (n & ROLLMSK) {

@@ -124,15 +124,9 @@ typedef struct {        /* bhedtape - binary header */
 } tapebhed;
 
 /* FUNCTION PROTOTYPES */
-#ifdef __cplusplus /* if C++, specify external linkage to C functions */
-extern "C" {
-#endif
 
 void gettapebhval(const tapebhed *tapetr, int index, Value *valp);
 void puttapebhval(tapebhed *tapetr, int index, Value *valp);
 
-#ifdef __cplusplus /* if C++, end external linkage specification */
-}
-#endif
 
 #endif	/* end  TAPEBHDR_H */

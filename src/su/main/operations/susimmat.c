@@ -94,11 +94,11 @@ main(int argc, char **argv)
 	float alpha;		/* var for exponential taper		*/
 	float *x=NULL,*y=NULL;	/* arrays for linear fit		*/
 
-	register int irow;	/* row counter			 	*/
-	register int icol;	/* column counter		 	*/
-	register float *trace=NULL;	/* input data vector 		*/
-	register float *data=NULL;	/* input data vector 		*/
-	register float **mat=NULL;	/* similarity matrix 		*/
+	int irow;	/* row counter			 	*/
+	int icol;	/* column counter		 	*/
+	float *trace=NULL;	/* input data vector 		*/
+	float *data=NULL;	/* input data vector 		*/
+	float **mat=NULL;	/* similarity matrix 		*/
 
 	int verbose=0;		/* verbose =0 silent, !=0 chatty */
 

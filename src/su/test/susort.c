@@ -79,7 +79,7 @@ main(int argc, char **argv)
 				/* trace number of that trace		*/
 	static int *index;	/* header key indices			*/
   	static Bool *up;	/* sort direction (+ = up = ascending)	*/
-	register Value *vptr;	/* location pointer for val_list	*/
+	Value *vptr;	/* location pointer for val_list	*/
 	int ngroup;		/* size of unit in val_list (nkey + 1)	*/
 	int nv;			/* number of groups in val_list		*/
 	int nvsize;		/* size of group in val_list		*/
@@ -130,7 +130,7 @@ main(int argc, char **argv)
 		up[0] = true;
 		type[0] = 'l';
 	} else {
-		register int i;
+		int i;
 		for (i = 0; i < nkey; ++i) {
 			switch (**++argv) { /* sign char of next arg */
 			case '+':
@@ -174,7 +174,7 @@ main(int argc, char **argv)
 
 		/* enter trace index in list and then key values */
 		vptr++->l = itr;	/* insert number and advance */
-		{ register int i;
+		{ int i;
 		  for (i = 0; i < nkey; ++i) {
 			gethval(&tr, index[i], &val);
 			*vptr++ = up[i] ? val : negval(type + i, val);
@@ -192,7 +192,7 @@ main(int argc, char **argv)
 
 	if (isdisk) {
 		/* run through sorted list and write output sequentially */
-		register int i;
+		int i;
 		for (i = 0; i < ntr; ++i) {
 			itr = val_list[i*ngroup].l;
 			gettra(&tr, itr);
@@ -201,7 +201,7 @@ main(int argc, char **argv)
 		}
 	} else /* pipe */ {
 		/* invert permutation and read input sequentially */
-		register int i;
+		int i;
 		for (i = 0; i < ntr; ++i) {
 			itr = val_list[i*ngroup].l;
 			val_list[itr*ngroup + 1].l = i;
@@ -220,9 +220,9 @@ main(int argc, char **argv)
 
 
 /* Comparison routine for qsort */
-int cmp_list(register Value *a, register Value *b)
+int cmp_list(Value *a, Value *b)
 {
-	register int i;
+	int i;
 	Value va, vb;
 	int compare;
 

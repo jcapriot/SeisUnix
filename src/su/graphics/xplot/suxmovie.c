@@ -272,7 +272,7 @@ main(int argc, char **argv)
   
   /* set n3 if not getparred */
   if (!got_n3) { 
-    register int ix,iy;
+    int ix,iy;
     float *rbuf;
 
     if (!got_n2) {
@@ -365,7 +365,7 @@ main(int argc, char **argv)
   /* send out stored traces one by one */
   
   { /*register int itr;*/
-    register int ix,iy,iz;
+    int ix,iy,iz;
     float *wrbuf;
 
     switch ( mode ) {    

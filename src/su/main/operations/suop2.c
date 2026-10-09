@@ -187,7 +187,7 @@ main(int argc, char **argv)
 	 		}
 					
 			/* Do the desired binary operation */
-			switch(iop) { register int i;
+			switch(iop) { int i;
 			case SUB:
 				for (i = 0; i < nt; ++i)
 					intrace1.data[i] -= intrace2.data[i];
@@ -316,7 +316,7 @@ main(int argc, char **argv)
 			}
 
 			/* Do the desired binary operation */
-			switch(iop) { register int i;
+			switch(iop) { int i;
 			case PTSUB:
 				for (i = 0; i < nt; ++i)
 					intrace1.data[i] -= intrace2.data[i];

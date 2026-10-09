@@ -481,7 +481,7 @@
 
 /* short-hands */
 #define NIL(t)		((t)0)
-#define reg		register
+#define reg		
 #ifndef uchar
 #define uchar		unsigned char
 #endif

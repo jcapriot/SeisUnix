@@ -156,7 +156,7 @@ int *f; int nt;
 iswap(p,q)
 int *p,*q;
 {
-	register int temp;
+	int temp;
 	temp = *p;
 	*p = *q;
 	*q = temp;

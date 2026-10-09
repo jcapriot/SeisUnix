@@ -69,8 +69,8 @@ int argc; char **argv;
 	int imode;		/* integer abbrev. for mode in switch	*/
 	float *hcos;		/* hold cosines for fft			*/
 	float *hsin;		/* hold sines for fft			*/
-	register float *xr;	/* real part of trace			*/
-	register float *xi;	/* imaginary part of trace		*/
+	float *xr;	/* real part of trace			*/
+	float *xi;	/* imaginary part of trace		*/
 	float xri;		/* temporary for xr[i]			*/
 	float xii;		/* temporary for xi[i]			*/
 	float xrtmp;		/* temporary for xr[nfby2]		*/
@@ -86,7 +86,7 @@ int argc; char **argv;
 	int nfac;		/* number of factors of nfft		*/
 	int facs[FACMAX];	/* contains factors of nfft		*/
 	int nzeros;		/* number of padded zeroes in bytes	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 
 	
 	/* Initialize SU */

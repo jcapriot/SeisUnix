@@ -112,8 +112,8 @@ int main(int argc, char **argv)
         int ik1;		/* k1 counter				*/
         int ik2;		/* k2 counter				*/
 
-	register complex **ct;	/* complex FFT workspace		*/
-	register float **rt;	/* float FFT workspace			*/
+	complex **ct;	/* complex FFT workspace		*/
+	float **rt;	/* float FFT workspace			*/
 	FILE *tracefp;		/* temp file to hold traces		*/
 	FILE *hfp;		/* temp file to hold trace headers	*/
 

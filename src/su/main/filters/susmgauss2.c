@@ -61,8 +61,8 @@ main(int argc, char **argv)
 	int nK1,nK2;	  /* transform dimension			*/
 	int ik1,ik2;	  /* wavenumber indices				*/
 
-	register complex **ct=NULL;	/* complex FFT workspace	*/
-	register float **rt=NULL;	/* float FFT workspace		*/
+	complex **ct=NULL;	/* complex FFT workspace	*/
+	float **rt=NULL;	/* float FFT workspace		*/
 	FILE *tracefp=NULL;	/* temp file to hold traces		*/
 	FILE *hfp=NULL;		/* temp file to hold trace headers	*/
 	

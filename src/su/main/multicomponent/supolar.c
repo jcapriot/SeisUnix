@@ -496,7 +496,7 @@ void calc_window(float *w, int iwl, int iwin)
 
 float covar(float *data1, float *data2, int istart, int iwl, float *w)
 {
-    register int i, j;
+    int i, j;
     float cov=0.0;
     float mean1=0.0;
     float mean2=0.0;

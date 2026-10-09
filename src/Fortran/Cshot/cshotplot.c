@@ -72,7 +72,7 @@ main(int argc, char **argv)
 		int n1cur;	/* current value of n1		*/
 		int colorcur;   /* current color		*/
 		float x[2];	/* z,x pairs defining rays	*/
-		register int i1;
+		int i1;
 		
 		if (2 != sscanf(buf, "%d %d", &n1cur, &colorcur))
 			err("scan failed on header line #%d:\n%s",
@@ -96,13 +96,13 @@ main(int argc, char **argv)
 	/* Make par file */
 	fprintf(outparfp, "n2=%d\n", n2);
 	fprintf(outparfp, "n1=%d", n1[0]);
-	{ register int i2;
+	{ int i2;
 	  for (i2 = 1; i2 < n2; ++i2)  fprintf(outparfp, ",%d", n1[i2]);
 	}
 	fprintf(outparfp, "\n");
 	
 	fprintf(outparfp, "linecolor=%d", color[0]);
-	{ register int i2;
+	{ int i2;
 	  for (i2 = 1; i2 < n2; ++i2)  fprintf(outparfp, ",%d", color[i2]);
 	}
 	fprintf(outparfp, "\n");

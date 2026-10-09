@@ -196,16 +196,16 @@ int agc, qbal, pbal, wagc, nt, ntr;
 
 /* Multiply by t^tpow = exp(tpow * log t) */
 void dotpow(dataptr, tpow, tmin, dt, nt, ntr)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 float tpow;			/* multiply data by t^tpow	*/
-register float tmin;		/* first time on record		*/
-register float dt;		/* sampling rate in seconds	*/
+float tmin;		/* first time on record		*/
+float dt;		/* sampling rate in seconds	*/
 int nt;				/* number of samples		*/
 int ntr;			/* number of traces		*/
 {
-	register float *timeptr;	/* ptr to time on trace	*/
+	float *timeptr;	/* ptr to time on trace	*/
 	static float *tpowfac;		/* tpow values		*/
-	register int i;			/* counter		*/
+	int i;			/* counter		*/
 
 	tpowfac = vec(nt);
 
@@ -228,16 +228,16 @@ int ntr;			/* number of traces		*/
 
 /* Exponential deattenuation  with deattenuation factor epow */
 void doepow(dataptr, epow, tmin, dt, nt, ntr)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 float epow;			/* coefficient of t in exponent	*/
-register float tmin;		/* first time on record		*/
-register float dt;		/* sampling rate in seconds	*/
+float tmin;		/* first time on record		*/
+float dt;		/* sampling rate in seconds	*/
 int nt;				/* number of samples		*/
 int ntr;			/* number of traces		*/
 {
-	register float *timeptr;	/* ptr to time on trace	*/
+	float *timeptr;	/* ptr to time on trace	*/
 	static float *epowfac;		/* exponent stretches	*/
-	register int i;			/* counter		*/
+	int i;			/* counter		*/
 
 	epowfac = vec(nt);
 
@@ -257,7 +257,7 @@ int ntr;			/* number of traces		*/
 
 /* Dynamic data compression */
 void dogpow(dataptr, gpow, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 float gpow;			/* compression power 		*/
 int nfloat;			/* total data count		*/
 {
@@ -274,8 +274,8 @@ int nfloat;			/* total data count		*/
 
 /* Zero out outliers */
 void dotrap(dataptr,trap, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
-register float trap;		/* zero if magnitude > trap	*/
+float *dataptr;	/* pointer to data vector	*/
+float trap;		/* zero if magnitude > trap	*/
 int nfloat;			/* total data count		*/
 {
 
@@ -288,11 +288,11 @@ int nfloat;			/* total data count		*/
 
 /* Hard clip outliers */
 void doclip(dataptr, clip, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
-register float clip;		/* hard clip if magnitude > clip	*/
+float *dataptr;	/* pointer to data vector	*/
+float clip;		/* hard clip if magnitude > clip	*/
 int nfloat;			/* total data count		*/
 {
-	register float mclip = -clip;
+	float mclip = -clip;
 
 	while (nfloat--) {
 		if (*dataptr > clip) {
@@ -307,7 +307,7 @@ int nfloat;			/* total data count		*/
 
 /* Quantile clip on magnitudes of trace values */
 void doqclip(dataptr, qclip, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 float qclip;			/* quantile at which to clip	*/
 int nfloat;			/* total data count		*/
 {
@@ -332,7 +332,7 @@ int nfloat;			/* total data count		*/
 
 /* Quantile balance */
 void doqbal(dataptr, qclip, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 float qclip;			/* quantile at which to clip	*/
 int nfloat;			/* total data count		*/
 {
@@ -372,7 +372,7 @@ int nfloat;			/* total data count		*/
 
 /* Power balance */
 void dopbal(dataptr, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 int nfloat;			/* total data count		*/
 {
 	float rmsq;
@@ -386,7 +386,7 @@ int nfloat;			/* total data count		*/
 
 /* Multiply by overall scale */
 void doscale(dataptr, scale, nfloat)
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 float scale;			/* scale factor			*/
 int nfloat;			/* total data count		*/
 {
@@ -399,23 +399,23 @@ int nfloat;			/* total data count		*/
 #define EPS	3.8090232	/* exp(-EPS*EPS) = 5e-7, "noise" level	*/
 
 void doagc(dataptr, wagc, nt, ntr)	
-register float *dataptr;	/* pointer to data vector	*/
+float *dataptr;	/* pointer to data vector	*/
 int wagc;			/* agc window in samples	*/
 int nt;				/* number of samples		*/
 int ntr;			/* number of traces		*/
 {
 	float u;		/* related to reciprocal of std dev	*/
 	float usq;		/* u*u					*/
-	register float wtmp;	/* storage for w[i]			*/
+	float wtmp;	/* storage for w[i]			*/
 	float *w;		/* Gaussian window weights		*/
-	register float *outdataptr;	/* agc'd data			*/
-	register float *d2;	/* square of input data			*/
-	register float stmp;	/* storage for s[i]			*/
-	register float *s;	/* weighted sum of squares of the data	*/
-	register int i;		/* counter 				*/
+	float *outdataptr;	/* agc'd data			*/
+	float *d2;	/* square of input data			*/
+	float stmp;	/* storage for s[i]			*/
+	float *s;	/* weighted sum of squares of the data	*/
+	int i;		/* counter 				*/
 	float floati;		/* float(i)				*/
-	register int j;		/* counter				*/
-	register int k;		/* counter				*/
+	int j;		/* counter				*/
+	int k;		/* counter				*/
 	float *timeptr;		/* pointer to time on trace		*/
 	int itr;		/* trace counter			*/
 
@@ -488,9 +488,9 @@ float quant(a, k, n)
 float *a;
 int k, n;
 {
-	register int i, j;
+	int i, j;
 	int low, hi;
-	register float ak, aa;
+	float ak, aa;
 
 	low = 0; hi = n-1;
 

@@ -1,10 +1,10 @@
 su_transforms_srcs = files(
-    'sucwt.c',
-    'sugabor.c',
-    'sust.c',
-    'suwfft.c',
-    'suclogfft.c',
-    'suiclogfft.c',
+    'sucwt.cpp',
+    'sugabor.cpp',
+    'sust.cpp',
+    'suwfft.cpp',
+    'suclogfft.cpp',
+    'suiclogfft.cpp',
 )
 
 su_main_srcs += su_transforms_srcs

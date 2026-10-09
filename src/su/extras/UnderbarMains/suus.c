@@ -95,13 +95,13 @@ int argc; char **argv;
 			vmov_(intrace.data + s, &j, outtrace.data, ONE, &nt);
 		} else {
 			/* local variable */
-			register int it; /* counter on outtrace	*/
+			int it; /* counter on outtrace	*/
 
 			for (it = 0; it < nt; ++it) {
 				/* local variables */
-				register int jt; /* counter on intrace	*/
-				register int jj; /* counter up to j	*/
-				register float sum = 0.0;
+				int jt; /* counter on intrace	*/
+				int jj; /* counter up to j	*/
+				float sum = 0.0;
 
 				/* compute first location on intrace to use */
 				jt = s + j*it;

@@ -97,7 +97,7 @@ main(int argc, char **argv)
 	int ntsize;		/* ... in bytes				*/
 	int ntr;		/* traces in input data			*/
 	int tracl2;		/* traces in input data			*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	void subplotg();	/* isolate cplot commands		*/
 	void subplotw();	/* isolate cplot commands		*/
 
@@ -401,7 +401,7 @@ float tmin, dt, xmin, dx, sizex, sizet, zerox, zerot;
 	int ticsz;		/* tic labeling print size		*/
 	int titlsz;		/* title print size			*/
 	int tlines;		/* 1=timing lines (0=no timing lines)	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	string tval[8];		/* local string for tic label		*/
 
 
@@ -531,7 +531,7 @@ int n, fill, overlap;
 	static bool first = true;
 	static float *xp, *yp;
 	float s;
-	register int i;
+	int i;
 
 	if (first) {
 		xp = ealloc1float(n + 2);

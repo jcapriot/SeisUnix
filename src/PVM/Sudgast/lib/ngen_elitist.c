@@ -20,9 +20,9 @@
 
 Elitist()
 {
-	register int i;		/* loop control variables */
-	register int k;
-	register int found;	/* set if elite one is present */
+	int i;		/* loop control variables */
+	int k;
+	int found;	/* set if elite one is present */
 
 
 	Trace("Elitist entered");

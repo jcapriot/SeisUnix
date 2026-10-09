@@ -187,7 +187,7 @@ else /* CONVEX to IBM */
 {
  union { long int i; float f;} signedtemp,unsignedtemp;
  float *top;
- register float c;
+ float c;
  long int ic = 0x02000000;
  long int *toint; 
 

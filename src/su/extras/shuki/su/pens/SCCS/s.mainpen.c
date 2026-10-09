@@ -74,7 +74,7 @@ char *argv[];
 I 5
 	int code;
 E 5
-	register int i;
+	int i;
 D 4
 	float ua[MAXPOLY],va[MAXPOLY];
 E 4

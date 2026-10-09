@@ -193,8 +193,8 @@ sir_epidemic_equations(double t, double y[3] , double yprime[3]);
 int
 main(int argc, char **argv)
 {
-	register int i=0, j=0;		/* counters */
-	register int number=3; 		/* the three dependent variables */
+	int i=0, j=0;		/* counters */
+	int number=3; 		/* the three dependent variables */
 	int verbose=0;		/* verbose flag =1 chatty, =0 silent */
 	int stepmax=0;		/* maximum number of steps */
 

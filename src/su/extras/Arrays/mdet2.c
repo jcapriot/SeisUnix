@@ -55,7 +55,7 @@ double det(arg, n)
 double *arg;
 int n;
 {
-	register int i, j, k;
+	int i, j, k;
 	double **a;		/* this is the array name */
 	double d;		/* determinant		  */
 	double x;		/* temp			  */

@@ -70,15 +70,15 @@ int argc; char **argv;
 	int nt;			/* number of points on trace		*/
 	float u;		/* related to reciprocal of std dev	*/
 	float usq;		/* u*u					*/
-	register float wtmp;	/* storage for w[i]			*/
+	float wtmp;	/* storage for w[i]			*/
 	float *w;		/* Gaussian window weights		*/
-	register float *d2;	/* square of input data			*/
-	register float stmp;	/* storage for s[i]			*/
-	register float *s;	/* weighted sum of squares of the data	*/
-	register int i;		/* counter 				*/
+	float *d2;	/* square of input data			*/
+	float stmp;	/* storage for s[i]			*/
+	float *s;	/* weighted sum of squares of the data	*/
+	int i;		/* counter 				*/
 	float floati;		/* float(i)				*/
-	register int j;		/* counter				*/
-	register int k;		/* counter				*/
+	int j;		/* counter				*/
+	int k;		/* counter				*/
 
 
 	/* Initialize SU */

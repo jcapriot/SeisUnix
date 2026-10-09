@@ -255,7 +255,7 @@ main (int argc, char **argv)
 		/* read data for this plot */
 		if (d1[iplot] && d2[iplot]) { /* straight line */
 			float x,y;
-			register int i;
+			int i;
 			float *pdata=data[iplot];
 
 			for (i=0; i<npoint; ++i) {
@@ -270,7 +270,7 @@ main (int argc, char **argv)
 			}
 		} else if (d1[iplot]) { /* equally spaced x's */
 			float x,y;
-			register int i;
+			int i;
 			float *pdata=data[iplot];
 
 			for (i=0; i<npoint; ++i) {
@@ -285,7 +285,7 @@ main (int argc, char **argv)
 			}
 		} else if (d2[iplot]) { /* equally spaced y's */
 			float x,y;
-			register int i;
+			int i;
 			float *pdata=data[iplot];
 
 			for (i=0; i<npoint; ++i) {
@@ -300,7 +300,7 @@ main (int argc, char **argv)
 			}
 		} else { /* pairs */
 			float x,y;
-			register int i;
+			int i;
 			float *pdata=data[iplot];
 
 			if (pairs[iplot]) { /* x1,y1,x2,y2,...,xn,yn */

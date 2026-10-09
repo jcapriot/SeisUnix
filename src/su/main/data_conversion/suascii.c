@@ -279,7 +279,7 @@ Author: Nils Maercklin, March 2006
     float d1,f1;         /* time sampling and time of first sample */
     static float d2,f2;  /* trace sampling and coordinate of first trace */
     static int itr=0;    /* internal trace counter */
-    register int i;      /* loop index */
+    int i;      /* loop index */
 
 
     /* Use value of key */

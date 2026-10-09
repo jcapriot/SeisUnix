@@ -44,8 +44,8 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-	register float *rt=NULL;	/* real trace			*/
-	register complex *ct;   /* complex transformed trace		*/
+	float *rt=NULL;	/* real trace			*/
+	complex *ct;   /* complex transformed trace		*/
 
 	float t0;		/* t0 in ms				*/	
 	float dom;		/* 2pi/nfft/dt			    	*/
@@ -105,7 +105,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 
 		/* Load trace into rt (zero-padded) */
 		memcpy((void *) rt, (const void *) tr.data, nt*FSIZE);

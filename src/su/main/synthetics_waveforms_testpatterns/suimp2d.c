@@ -84,8 +84,8 @@ main(int argc, char **argv)
 	float t;		/* total travel time		*/
 	float k;		/* constant part of response	*/
 
-	register float *rt;	/* real trace			*/
-	register complex *ct;	/* complex transformed trace	*/
+	float *rt;	/* real trace			*/
+	complex *ct;	/* complex transformed trace	*/
 	int nfft;		/* size of fft 			*/
 	int nfby2;		/* nfft/2			*/
 	int nfby2p1;		/* nfft/2 + 1			*/
@@ -93,10 +93,10 @@ main(int argc, char **argv)
 	float spread;		/* geometric spreading factor	*/
 	float i32;		/* temp for omega to the 3/2	*/
 
-	register int i;		/* counter			*/
-	register int s;		/* shot counter			*/
-	register int g;		/* receiver counter		*/
-	register int tracl;	/* trace counter		*/
+	int i;		/* counter			*/
+	int s;		/* shot counter			*/
+	int g;		/* receiver counter		*/
+	int tracl;	/* trace counter		*/
 
 	float amplitude[1];	/* amplitude 			*/
 	float *tout;		/* times[nt] for interpolation	*/

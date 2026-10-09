@@ -56,7 +56,7 @@ main(int argc, char **argv)
         short unit;                                                           
 	int degree;
 	cwp_String outpar;
-	register int npairs;
+	int npairs;
 
 
 	/* Initialize */

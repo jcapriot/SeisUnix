@@ -78,11 +78,11 @@ NULL};
 int
 main(int argc, char **argv)
 {
-	register float *v=NULL;		/* interval velocities		*/
-	register float *h=NULL;		/* layer thicknesses at the cmp	*/
-	register float *vs=NULL;	/* stacking velocities		*/
-	register float *t0=NULL;	/* zero incidence times		*/
-	register int i;		/* counter				*/
+	float *v=NULL;		/* interval velocities		*/
+	float *h=NULL;		/* layer thicknesses at the cmp	*/
+	float *vs=NULL;	/* stacking velocities		*/
+	float *t0=NULL;	/* zero incidence times		*/
+	int i;		/* counter				*/
 	int n;			/* number of layers			*/
 	float t0by2;		/* temporary for t0/2 sum		*/
 	float vh;		/* temporary for vh sum			*/

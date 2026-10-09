@@ -8,7 +8,7 @@
 
 main()
 {
-	register int	i;
+	int	i;
 #if _ast_fltmax_double
 	char*		fs = "";
 	char*		ds = "";

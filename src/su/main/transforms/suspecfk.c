@@ -72,8 +72,8 @@ main(int argc, char **argv)
 	int ntfft,nxfft;	/* dimensions after padding for FFT	*/
 	int nF,nK;		/* transform (output) dimensions	*/
 	int iF,iK;		/* transform sample indices		*/
-	register complex **ct;	/* complex FFT workspace		*/
-	register float **rt;	/* float FFT workspace			*/
+	complex **ct;	/* complex FFT workspace		*/
+	float **rt;	/* float FFT workspace			*/
 	int verbose;		/* flag for echoing information		*/
 	char *tmpdir;		/* directory path for tmp files		*/
 	cwp_Bool istmpdir=cwp_false;/* true for user-given path		*/

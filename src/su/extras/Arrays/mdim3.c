@@ -28,7 +28,7 @@ int argc; char *argv[];
 	int ***a;			/* 3D array of ints	  */
 	double ***b;			/* 3D array of doubles	  */
 	int grids, rows, cols;
-	register int i, j, k;
+	int i, j, k;
 	int inum = 1;
 	double dnum = 1.1;
 

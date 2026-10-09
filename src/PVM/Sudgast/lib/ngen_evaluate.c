@@ -23,9 +23,9 @@ extern void eval();
 
 Evaluate()
 {
-	register double performance;
-	register int i;
-	register how_many;	/* # of models to evaluate	*/
+	double performance;
+	int i;
+	how_many;	/* # of models to evaluate	*/
 
 	int idebug;		/* DEBUG */
 

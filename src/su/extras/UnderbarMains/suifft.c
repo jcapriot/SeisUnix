@@ -103,7 +103,7 @@ int argc; char **argv;
 	int nfac;		/* number of factors of nfft		*/
 	int facs[FACMAX];	/* contains factors of nfft		*/
 	int sign;		/* sign in exponent of transform	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 
 
 	/* Initialize SU */

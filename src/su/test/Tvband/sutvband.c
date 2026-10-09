@@ -96,7 +96,7 @@ main(int argc, char **argv)
 	tf = ealloc1float(nfilter+4);  /* never use ist2 or last 2 */
 	itf = ealloc1int(nfilter+4);
         getparfloat("tf", tf+2); jmin = 2; jmax = nfilter + 1;
-	{ register int j;
+	{ int j;
           for (j = jmin; j <= jmax; ++j)  itf[j] = NINT((tf[j] - tmin)/dt);
         }
 	
@@ -107,7 +107,7 @@ main(int argc, char **argv)
 		err("Padded nt=%d -- too big", nfft);
 	nfreq = nfft/2 + 1;
 	filter = ealloc2float(nfreq, nfilter+4); /* never use 1st & last */
-        { register int j;
+        { int j;
           for (j = jmin; j <= jmax; ++j) {
                 float *f = ealloc1float(4);
 
@@ -145,7 +145,7 @@ main(int argc, char **argv)
         ftrace = ealloc2float(nt, nfilter+4); /* never use 1st & last */
         do {
 		float *data = ealloc1float(nt);
-                register int i, j;
+                int i, j;
 		
 		/* Construct filtered sub-traces */
 		for (j = jmin; j <= jmax; ++j) {			
@@ -176,7 +176,7 @@ void bandpass(float *data, int nt, int nfft, int nfreq,
 {
 	float *rt = ealloc1float(nt);
 	complex *ct = ealloc1complex(nfreq);
-	register int i;
+	int i;
 
         /* Load trace into rt (zero-padded) */
         memcpy(rt, data, nt*FSIZE);
@@ -203,23 +203,23 @@ void makefilter(float *f, int nfft, int nfreq, float dt, float *filter)
         int if4 = MIN(NINT(f[3]/df), nfreqm1);
 
 
-        { register int i;
-	  register float c = PIBY2 / (if2 - if1 + 2);
+        { int i;
+	  float c = PIBY2 / (if2 - if1 + 2);
 	  for (i = if1; i <= if2; ++i) {
-		register float s = sin(c*(i - if1 + 1));
+		float s = sin(c*(i - if1 + 1));
 		filter[i] = s * s * onfft;
           }
 	 }
 
-        { register int i;
-	  register float c = PIBY2 / (if4 - if3 + 2);
+        { int i;
+	  float c = PIBY2 / (if4 - if3 + 2);
 	  for (i = if3; i <= if4; ++i) {
-		register float s = sin(c*(if4 - i + 1));
+		float s = sin(c*(if4 - i + 1));
 		filter[i] = s * s * onfft;
 	  }
         }
 
-        { register int i;
+        { int i;
           for (i = if2 + 1; i < if3;   ++i)  filter[i] = onfft; 
           for (i = 0;       i < if1;   ++i)  filter[i] = 0.0; 
           for (i = if4 + 1; i < nfreq; ++i)  filter[i] = 0.0; 

@@ -43,7 +43,7 @@ void vertvwig(float *data, int n, int fill)
 {
 	int lpoly = 0;          /* Number of points in fill arrays */
 	static float *xp, *yp;  /* Fill corner arrays              */
-	register int i;         /* Counter for data points         */
+	int i;         /* Counter for data points         */
 
 
 	/* Allocate fill corner arrays if first entry.                */

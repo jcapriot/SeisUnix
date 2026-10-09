@@ -158,7 +158,7 @@ main(int argc, char **argv)
 
 	/* Show shaper on request */
 	if (showshaper) {
-		register int i;
+		int i;
 		if (verbose) warn("Shaping filter:");
 		for (i = 0; i < nshape; ++i)
 			fprintf(stderr, "%10g%c", shaper[i],

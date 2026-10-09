@@ -32,9 +32,9 @@ int current_evolution;
 {
 	double New_worst();
 	FILE *fp, *fopen();
-	register int i;
-	register int w;
-	register double performance;
+	int i;
+	int w;
+	double performance;
 	int j;
 
 	Trace("Measure entered");
@@ -226,8 +226,8 @@ static char BIT[CHARSIZE] ={ '\200', '\100', '\040', '\020',
 
 Converge()			/* measure population convergence	*/
 {
-	register int i,j;	/* loop control				*/
-	register int ones;	/* number of ones in a given position	*/
+	int i,j;	/* loop control				*/
+	int ones;	/* number of ones in a given position	*/
 	int focus;		/* index of current byte		*/
 	int bit;		/* index of current bit			*/
 	FILE *fp, *fopen();

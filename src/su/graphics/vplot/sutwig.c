@@ -251,7 +251,7 @@ void wigplot(
 	int ticsz;              /* tic labeling print size              */
 	int titlsz;             /* title print size                     */
 	int tlines;             /* 1=timing lines (0=no timing lines)   */
-	register int i;         /* counter                              */
+	int i;         /* counter                              */
 
 
 	if (!igetpar("fill", &fill))            fill = FILL;

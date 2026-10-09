@@ -1,5 +1,5 @@
 su_noise_srcs = files(
-    'suaddnoise.c',
+    'suaddnoise.cpp',
 )
 
 su_main_srcs += su_noise_srcs

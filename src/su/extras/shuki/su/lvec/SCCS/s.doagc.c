@@ -19,7 +19,7 @@ float wagc,*p;
 {
  	static int first=1;
 	static float *s1,*s2,*s1e,ro,eps;
-	register float *q1,*q2,*q3;
+	float *q1,*q2,*q3;
 	int np;
 
 	if(wagc==0.0) return;

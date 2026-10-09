@@ -255,7 +255,7 @@ char *s;
 int ilog2(n)
 	unsigned long n;
 {
-	register int i;
+	int i;
 
 	if (n <= 0)
 	{

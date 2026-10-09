@@ -82,22 +82,22 @@ segy tr;
 main(argc, argv)
 int argc; char **argv;
 {
-	register int i;		/* counter 				*/
+	int i;		/* counter 				*/
 	int nt;			/* number of points on trace		*/
 	float dt;		/* sampling rate on trace		*/
 	string stype;		/* noise type (gauss, white) as string	*/
 	int itype;		/* ... as integer (for use in switch)	*/
 	float sn;		/* signal to noise ratio		*/
 	int seed;		/* random number seed			*/
-	register float *noise;	/* noise vector				*/
+	float *noise;	/* noise vector				*/
 	float noiscale;		/* scale for noise			*/
 	float noipow;		/* noise power				*/
 	float sigpow;		/* signal power				*/
 	float normrand;		/* scale random numbers to [0,2]	*/
-      	register float r1, r2;	/* random numbers in [-1, 1] (gauss)	*/
-	register float magsq;	/* r1*r1 + r2*r2 			*/
-	register float factor;	/* multiplier in Gauss algorithm	*/
-        register float r;	/* random number in [-1, 1]  (white)	*/
+      	float r1, r2;	/* random numbers in [-1, 1] (gauss)	*/
+	float magsq;	/* r1*r1 + r2*r2 			*/
+	float factor;	/* multiplier in Gauss algorithm	*/
+        float r;	/* random number in [-1, 1]  (white)	*/
 	float n1, n2;
 	long time();		/* system subroutine			*/
 	long random();		/* system subroutine			*/

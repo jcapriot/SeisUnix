@@ -61,7 +61,7 @@ main(int argc, char **argv)
 	int index1, index2;	/* ... their indices in hdr.h	*/
 	float x, y;		/* temps to hold current x & y 	*/
 	cwp_String outpar;	/* name of par file		*/
-	register int npairs;	/* number of pairs found	*/
+	int npairs;	/* number of pairs found	*/
 
 
 	/* Hook up getpars */

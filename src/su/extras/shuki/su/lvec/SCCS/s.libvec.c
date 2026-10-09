@@ -77,8 +77,8 @@ typedef struct {float re, im;} complex;
 
 
 void vsadd(x, a, n)
-register float *x, a;
-register int n;
+float *x, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ += a;
@@ -86,8 +86,8 @@ register int n;
 
 
 void vsmul(x, a, n)
-register float *x, a;
-register int n;
+float *x, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ *= a;
@@ -95,8 +95,8 @@ register int n;
 
 
 void vsadd2(x, y, a, n)
-register float *x, *y, a;
-register int n;
+float *x, *y, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ = *y++ + a;
@@ -104,8 +104,8 @@ register int n;
 
 
 void vsmul2(x, y, a, n)
-register float *x, *y, a;
-register int n;
+float *x, *y, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ = *y++ * a;
@@ -113,8 +113,8 @@ register int n;
 
 
 void vadd(x, y, n)
-register float *x, *y;
-register int n;
+float *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ += *y++;
@@ -122,8 +122,8 @@ register int n;
 
 
 void vsub(x, y, n)
-register float *x, *y;
-register int n;
+float *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ -= *y++;
@@ -131,8 +131,8 @@ register int n;
 
 
 void vmul(x, y, n)
-register float *x, *y;
-register int n;
+float *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ *= *y++;
@@ -140,8 +140,8 @@ register int n;
 
 
 void vdiv(x, y, n)
-register float *x, *y;
-register int n;
+float *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		if (*y != 0)
@@ -152,8 +152,8 @@ register int n;
 
 
 void vadd2(x, y, z, n)
-register float *x, *y, *z;
-register int n;
+float *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y + *z;
@@ -163,8 +163,8 @@ register int n;
 
 
 void vsub2(x, y, z, n)
-register float *x, *y, *z;
-register int n;
+float *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y - *z;
@@ -174,8 +174,8 @@ register int n;
 
 
 void vmul2(x, y, z, n)
-register float *x, *y, *z;
-register int n;
+float *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y * *z;
@@ -185,8 +185,8 @@ register int n;
 
 
 void vdiv2(x, y, z, n)
-register float *x, *y, *z;
-register int n;
+float *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--)
 		if (*z != 0)
@@ -199,8 +199,8 @@ register int n;
 
 
 void vsqrt(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
 	for ( ; n > 0; n--,x++) {
 		*x = sqrt(*x);
@@ -209,8 +209,8 @@ register int n;
 
 
 void vabs(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
 	for ( ; n > 0; n--,x++)
 		*x = ABS(*x);
@@ -218,11 +218,11 @@ register int n;
 
 
 void cvabs(x, z, n)
-register float *x;
-register complex *z;
-register int n;
+float *x;
+complex *z;
+int n;
 {
-	register i;
+	i;
 
 	for (i = 0; i < n; i++) {
 		x[i] = z[i].re*z[i].re + z[i].im*z[i].im;
@@ -232,10 +232,10 @@ register int n;
 
 
 float vmax(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float m = -FHUGE;
+	float m = -FHUGE;
 
 	for ( ; n > 0; n--) {
 		m = MAX(*x, m);
@@ -246,10 +246,10 @@ register int n;
 
 
 float vmin(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float m = FHUGE;
+	float m = FHUGE;
 
 	for ( ; n > 0; n--) {
 		m = MIN(*x, m);
@@ -261,11 +261,11 @@ register int n;
 
 
 float vabsmax(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float m = 0.0;
-	register float absp;
+	float m = 0.0;
+	float absp;
 
 	for ( ; n > 0; n--) {
 		absp = ABS(*x);
@@ -277,10 +277,10 @@ register int n;
 
 
 float vsum(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float sum;
+	float sum;
 
 	sum = 0.0;
 	for ( ; n> 0; n--)
@@ -290,10 +290,10 @@ register int n;
 
 
 float vprod(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float prod;
+	float prod;
 
 	prod = 1.0;
 	for ( ; n> 0; n--)
@@ -303,10 +303,10 @@ register int n;
 
 
 float vl1(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float l1;
+	float l1;
 
 	l1 = 0.0;
 	for ( ; n> 0; n--) {
@@ -318,10 +318,10 @@ register int n;
 
 
 float vl2(x, n)
-register float *x;
-register int n;
+float *x;
+int n;
 {
-	register float l2;
+	float l2;
 
 	l2 = 0.0;
 	for ( ; n> 0; n--) {
@@ -333,8 +333,8 @@ register int n;
 
 
 void dvsadd(x, a, n)
-register double *x, a;
-register int n;
+double *x, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ += a;
@@ -342,8 +342,8 @@ register int n;
 
 
 void dvsmul(x, a, n)
-register double *x, a;
-register int n;
+double *x, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ *= a;
@@ -351,8 +351,8 @@ register int n;
 
 
 void dvsadd2(x, y, a, n)
-register double *x, *y, a;
-register int n;
+double *x, *y, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ = *y++ + a;
@@ -360,8 +360,8 @@ register int n;
 
 
 void dvsmul2(x, y, a, n)
-register double *x, *y, a;
-register int n;
+double *x, *y, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ = *y++ * a;
@@ -369,8 +369,8 @@ register int n;
 
 
 void dvadd(x, y, n)
-register double *x, *y;
-register int n;
+double *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ += *y++;
@@ -378,8 +378,8 @@ register int n;
 
 
 void dvsub(x, y, n)
-register double *x, *y;
-register int n;
+double *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ -= *y++;
@@ -387,8 +387,8 @@ register int n;
 
 
 void dvmul(x, y, n)
-register double *x, *y;
-register int n;
+double *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ *= *y++;
@@ -396,8 +396,8 @@ register int n;
 
 
 void dvdiv(x, y, n)
-register double *x, *y;
-register int n;
+double *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		if (*y != 0)
@@ -408,8 +408,8 @@ register int n;
 
 
 void dvsqrt(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
 	for ( ; n > 0; n--,x++) {
 		*x = sqrt(*x);
@@ -418,8 +418,8 @@ register int n;
 
 
 void dvabs(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
 	for ( ; n > 0; n--,x++)
 		*x = ABS(*x);
@@ -427,10 +427,10 @@ register int n;
 
 
 double dvmax(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double m = -DHUGE;
+	double m = -DHUGE;
 
 	for ( ; n > 0; n--) {
 		m = MAX(*x, m);
@@ -441,10 +441,10 @@ register int n;
 
 
 double dvmin(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double m = DHUGE;
+	double m = DHUGE;
 
 	for ( ; n > 0; n--) {
 		m = MIN(*x, m);
@@ -455,11 +455,11 @@ register int n;
 
 
 double dvabsmax(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double m = 0.0;
-	register double absp;
+	double m = 0.0;
+	double absp;
 
 	for ( ; n > 0; n--) {
 		absp = ABS(*x);
@@ -471,10 +471,10 @@ register int n;
 
 
 double dvsum(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double sum;
+	double sum;
 
 	sum = 0.0;
 	for ( ; n> 0; n--)
@@ -484,10 +484,10 @@ register int n;
 
 
 double dvprod(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double prod;
+	double prod;
 
 	prod = 1.0;
 	for ( ; n> 0; n--)
@@ -497,10 +497,10 @@ register int n;
 
 
 double dvl1(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double l1;
+	double l1;
 
 	l1 = 0.0;
 	for ( ; n> 0; n--) {
@@ -512,10 +512,10 @@ register int n;
 
 
 double dvl2(x, n)
-register double *x;
-register int n;
+double *x;
+int n;
 {
-	register double l2;
+	double l2;
 
 	l2 = 0.0;
 	for ( ; n> 0; n--) {
@@ -527,8 +527,8 @@ register int n;
 
 
 void dvadd2(x, y, z, n)
-register double *x, *y, *z;
-register int n;
+double *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y + *z;
@@ -538,8 +538,8 @@ register int n;
 
 
 void dvsub2(x, y, z, n)
-register double *x, *y, *z;
-register int n;
+double *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y - *z;
@@ -549,8 +549,8 @@ register int n;
 
 
 void dvmul2(x, y, z, n)
-register double *x, *y, *z;
-register int n;
+double *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y * *z;
@@ -560,8 +560,8 @@ register int n;
 
 
 void dvdiv2(x, y, z, n)
-register double *x, *y, *z;
-register int n;
+double *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--)
 		if (*z != 0)
@@ -574,8 +574,8 @@ register int n;
 
 
 void ivsadd(x, a, n)
-register int *x, a;
-register int n;
+int *x, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ += a;
@@ -583,8 +583,8 @@ register int n;
 
 
 void ivsmul(x, a, n)
-register int *x, a;
-register int n;
+int *x, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ *= a;
@@ -592,8 +592,8 @@ register int n;
 
 
 void ivsadd2(x, y, a, n)
-register int *x, *y, a;
-register int n;
+int *x, *y, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ = *y++ + a;
@@ -601,8 +601,8 @@ register int n;
 
 
 void ivsmul2(x, y, a, n)
-register int *x, *y, a;
-register int n;
+int *x, *y, a;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ = *y++ * a;
@@ -610,8 +610,8 @@ register int n;
 
 
 void ivadd(x, y, n)
-register int *x, *y;
-register int n;
+int *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ += *y++;
@@ -619,8 +619,8 @@ register int n;
 
 
 void ivsub(x, y, n)
-register int *x, *y;
-register int n;
+int *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ -= *y++;
@@ -628,8 +628,8 @@ register int n;
 
 
 void ivmul(x, y, n)
-register int *x, *y;
-register int n;
+int *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		*x++ *= *y++;
@@ -637,8 +637,8 @@ register int n;
 
 
 void ivdiv(x, y, n)
-register int *x, *y;
-register int n;
+int *x, *y;
+int n;
 {
 	for ( ; n > 0; n--)
 		if (*y != 0)
@@ -649,8 +649,8 @@ register int n;
 
 
 void ivsqrt(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
 	for ( ; n > 0; n--,x++) {
 		*x = (int) sqrt((double)*x);
@@ -659,8 +659,8 @@ register int n;
 
 
 void ivabs(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
 	for ( ; n > 0; n--,x++)
 		*x = ABS(*x);
@@ -668,10 +668,10 @@ register int n;
 
 
 int ivmax(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int m = -IHUGE;
+	int m = -IHUGE;
 
 	for ( ; n > 0; n--) {
 		m = MAX(*x, m);
@@ -682,10 +682,10 @@ register int n;
 
 
 int ivmin(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int m = IHUGE;
+	int m = IHUGE;
 
 	for ( ; n > 0; n--) {
 		m = MIN(*x, m);
@@ -696,11 +696,11 @@ register int n;
 
 
 int ivabsmax(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int m = 0.0;
-	register int absp;
+	int m = 0.0;
+	int absp;
 
 	for ( ; n > 0; n--) {
 		absp = ABS(*x);
@@ -712,10 +712,10 @@ register int n;
 
 
 int ivsum(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int sum;
+	int sum;
 
 	sum = 0.0;
 	for ( ; n> 0; n--)
@@ -725,10 +725,10 @@ register int n;
 
 
 int ivprod(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int prod;
+	int prod;
 
 	prod = 1.0;
 	for ( ; n> 0; n--)
@@ -738,10 +738,10 @@ register int n;
 
 
 int ivl1(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int l1;
+	int l1;
 
 	l1 = 0.0;
 	for ( ; n> 0; n--) {
@@ -753,10 +753,10 @@ register int n;
 
 
 int ivl2(x, n)
-register int *x;
-register int n;
+int *x;
+int n;
 {
-	register int l2;
+	int l2;
 
 	l2 = 0.0;
 	for ( ; n> 0; n--) {
@@ -768,8 +768,8 @@ register int n;
 
 
 void ivadd2(x, y, z, n)
-register int *x, *y, *z;
-register int n;
+int *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y + *z;
@@ -779,8 +779,8 @@ register int n;
 
 
 void ivsub2(x, y, z, n)
-register int *x, *y, *z;
-register int n;
+int *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y - *z;
@@ -790,8 +790,8 @@ register int n;
 
 
 void ivmul2(x, y, z, n)
-register int *x, *y, *z;
-register int n;
+int *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--) {
 		*x++ = *y * *z;
@@ -801,8 +801,8 @@ register int n;
 
 
 void ivdiv2(x, y, z, n)
-register int *x, *y, *z;
-register int n;
+int *x, *y, *z;
+int n;
 {
 	for ( ; n > 0; n--)
 		if (*z != 0)

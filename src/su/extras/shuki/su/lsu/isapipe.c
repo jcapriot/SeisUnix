@@ -29,7 +29,7 @@ isapipe(fd)
 int fd;
 {
 	extern long lseek();
-	register long rc;
+	long rc;
 
 	rc = lseek(fd,0L,1);
 	if(-1 == rc)

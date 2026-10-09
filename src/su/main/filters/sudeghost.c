@@ -97,8 +97,8 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-        register float *rt=NULL;     /* real trace                           */
-        register complex *ct=NULL;   /* complex transformed trace            */
+        float *rt=NULL;     /* real trace                           */
+        complex *ct=NULL;   /* complex transformed trace            */
         complex *filter=NULL;    /* filter array                         */
 
         float dt;               /* sample spacing                       */
@@ -184,7 +184,7 @@ main(int argc, char **argv)
 
         /* Main loop over traces */
         do {
-                register int i;
+                int i;
 
 		++ntr;
 

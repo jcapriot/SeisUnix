@@ -39,7 +39,7 @@ Dtrace(s)
 Interactive() {
 	char cmd[40];
 	char opt[40];
-	register int i;
+	int i;
 	int ncycles;
 	int ok;
 		

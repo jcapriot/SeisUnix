@@ -149,8 +149,8 @@ main(int argc, char **argv)
         if (!tmin_is_set)    tmin = tmin_in;
             
         /* Compute output times */
-        { register int itime;
-          register float tvalue;
+        { int itime;
+          float tvalue;
           for (itime=0,tvalue=tmin; itime<nt; itime++,tvalue+=dt)
               t[itime] = tvalue;
         }

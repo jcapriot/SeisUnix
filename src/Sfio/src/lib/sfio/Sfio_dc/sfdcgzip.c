@@ -138,8 +138,8 @@ int		flags;
 
 	if (sfset(sp, 0, 0) & SF_READ)
 	{
-		register unsigned char*	s;
-		register int		n;
+		unsigned char*	s;
+		int		n;
 
 		/*
 		 * peek the first 2 bytes to verify the magic

@@ -23,7 +23,7 @@ char *argv[];
 	unsigned short xy[2];
 	short int j,size,orient,lp;
 	int code;
-	register int i;
+	int i;
 	unsigned short ua[MAXPOLY],va[MAXPOLY];
 	char *sbuf;
 	bool first=true;

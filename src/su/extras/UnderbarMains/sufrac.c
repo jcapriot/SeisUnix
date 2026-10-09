@@ -89,13 +89,13 @@ int argc; char **argv;
 	int nfac;		/* number of factors of nfft		*/
 	int facs[FACMAX];	/* contains factors of nfft		*/
 	int nzeros;		/* number of padded zeroes in bytes	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	float *hcos;		/* hold cosines for fft			*/
 	float *hsin;		/* hold sines for fft			*/
-	register float *xr;	/* real part of trace			*/
-	register float *xi;	/* imaginary part of trace		*/
-	register float xrold;	/* temp for real part			*/
-	register float xiold;	/* temp for imaginary part 		*/
+	float *xr;	/* real part of trace			*/
+	float *xi;	/* imaginary part of trace		*/
+	float xrold;	/* temp for real part			*/
+	float xiold;	/* temp for imaginary part 		*/
 	float *wr;		/* work area for fft			*/
 	float *wi;		/* work area for fft			*/
 

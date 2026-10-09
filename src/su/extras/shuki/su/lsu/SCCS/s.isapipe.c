@@ -107,7 +107,7 @@ int fd;
 E 2
 I 2
 	extern long lseek();
-	register long rc;
+	long rc;
 E 2
 
 D 2

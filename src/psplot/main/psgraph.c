@@ -146,7 +146,7 @@ int main (int argc, char **argv)
 {
 	int nplot,n[NPMAX],nn,iplot,n1tic,n2tic,nd1,nf1,nd2,nf2,npairs,
 		mark[NPMAX],pairs[NPMAX],grid1,grid2,style,npar,bbox[4];
-	register int i;
+	int i;
 	float labelsize,titlesize,
 		linewidth[NPMAX],linegray[NPMAX],lineon[NPMAX],lineoff[NPMAX],
 		marksize[NPMAX],d1[NPMAX],f1[NPMAX],d2[NPMAX],f2[NPMAX],
@@ -214,16 +214,16 @@ int main (int argc, char **argv)
 	x2max = x1max = -FLT_MAX;
 	x2min = x1min =  FLT_MAX;
 	for (iplot=0; iplot<nplot; ++iplot) {
-		register int npoint = n[iplot];
+		int npoint = n[iplot];
 
 		x1data[iplot] = ealloc1float(npoint);
 		x2data[iplot] = ealloc1float(npoint);
 
 		/* read data for this plot */
 		if (d1[iplot] && d2[iplot]) { /* straight line */
-			register int i;
-			register float *px1data=x1data[iplot];
-			register float *px2data=x2data[iplot];
+			int i;
+			float *px1data=x1data[iplot];
+			float *px2data=x2data[iplot];
 			float x1,x2;
 
 			for (i=0; i<npoint; ++i) {
@@ -237,9 +237,9 @@ int main (int argc, char **argv)
 				*px2data++ = x2;
 			}
 		} else if (d1[iplot]) { /* equally spaced x1's */
-			register int i;
-			register float *px1data=x1data[iplot];
-			register float *px2data=x2data[iplot];
+			int i;
+			float *px1data=x1data[iplot];
+			float *px2data=x2data[iplot];
 			float x1,x2;
 
 			for (i=0; i<npoint; ++i) {
@@ -254,9 +254,9 @@ int main (int argc, char **argv)
 				*px2data++ = x2;
 			}
 		} else if (d2[iplot]) { /* equally spaced x2's */
-			register int i;
-			register float *px1data=x1data[iplot];
-			register float *px2data=x2data[iplot];
+			int i;
+			float *px1data=x1data[iplot];
+			float *px2data=x2data[iplot];
 			float x1,x2;
 
 			for (i=0; i<npoint; ++i) {
@@ -271,9 +271,9 @@ int main (int argc, char **argv)
 				*px2data++ = x2;
 			}
 		} else { /* pairs */
-			register int i;
-			register float *px1data=x1data[iplot];
-			register float *px2data=x2data[iplot];
+			int i;
+			float *px1data=x1data[iplot];
+			float *px2data=x2data[iplot];
 			float x1,x2;
 
 			if (pairs[iplot]) { /* x1,y1,x2,y2,...,xn,yn */
@@ -460,10 +460,10 @@ int main (int argc, char **argv)
 	for (iplot=nplot_start; (plot_direction==1) ? (iplot<=nplot_end) : (iplot>=nplot_end); 
 			   iplot+=plot_direction) {
 	        /* ......to here */
-	        register int j;
-		register int ni = n[iplot];
-		register float *px1data = x1data[iplot];
-		register float *px2data = x2data[iplot];
+	        int j;
+		int ni = n[iplot];
+		float *px1data = x1data[iplot];
+		float *px2data = x2data[iplot];
 		float *x1 = ealloc1float(ni);
 		float *x2 = ealloc1float(ni);
 

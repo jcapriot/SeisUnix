@@ -97,7 +97,7 @@ main(int argc, char **argv)
 	else         warn("%f, seconds, %f-%f Hz Down-Sweep\n", tv, f1, f2);
 
 	/* Tapering function (cosine bells) */
-	{ register int it;
+	{ int it;
 	  
 	  for (it = 0; it < nt; ++it) {
 	  	float am1, am2;

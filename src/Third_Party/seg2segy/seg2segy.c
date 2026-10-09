@@ -164,7 +164,7 @@ swapint (int *li)
 void
 float_to_ibm(int from[], int to[], int n)
 {
-	register int fconv, fmant, ii, t;
+	int fconv, fmant, ii, t;
 
 	for (ii=0;ii<n;++ii) {
 	fconv = from[ii];

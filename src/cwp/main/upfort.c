@@ -24,7 +24,7 @@ int
 main()
 {
 
-	register int c;
+	int c;
 	while ((c = getchar()) != EOF) {
 		if (c=='\n') putchar(c);
 		else if (c=='*' || c=='C' || c=='c' || c=='D') {

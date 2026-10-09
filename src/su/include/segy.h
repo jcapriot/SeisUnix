@@ -921,9 +921,6 @@ typedef struct {	/* bhed - binary header */
 #define HDRBYTES (sizeof(segy) - sizeof(float *)) /* Bytes in the trace header */
 
 /* FUNCTION PROTOTYPES */
-#ifdef __cplusplus /* if C++, specify external linkage to C functions */
-extern "C" {
-#endif
 
 /* get trace and put trace */
 int fgettr(FILE *fp, segy *tp);
@@ -956,7 +953,4 @@ void printheader(const segy *tp);
 
 void tabplot(segy *tp, int itmin, int itmax);
 
-#ifdef __cplusplus /* if C++, end external linkage specification */
-}
-#endif
 #endif

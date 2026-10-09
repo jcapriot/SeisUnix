@@ -244,7 +244,7 @@ main(int argc, char **argv)
 
   if (debug) fprintf(stderr,"returned from weights \n");
   
-  if (verbose>1) { register int i;
+  if (verbose>1) { int i;
      fprintf(stderr,"print taper weights: \n");
        for (i=0;i<ntap;i++) 
            fprintf(stderr,"Taper %i = %g (x=%g) \n",i,taperv[i],x2[i]);
@@ -277,7 +277,7 @@ main(int argc, char **argv)
           (tr1+tr2) && 
 	  (fac < 1.) ) fprintf(stderr,"trace %i factor %g \n",itr,fac);
        
-       { register int i;       
+       { int i;       
            for (i=0;i<nt;i++)
 	        tr.data[i]=fac*trbuf[i];
        }
@@ -397,7 +397,7 @@ Rewriten: Gerald Klein				  Date:31 Mar 2004
 *********************************************************************/
 { 
    if ( tr2 && (tr1-tr2) ) { /* end taper differs from begin taper */
-                register int i;
+                int i;
 		float env=0.0, f, x;
 		/* set taper weights for last traces; fill array from end */
                 for (i = 0; i <= tr2; ++i) {
@@ -421,7 +421,7 @@ Rewriten: Gerald Klein				  Date:31 Mar 2004
 	        } 		
    } 	
    if (tr1) { 	/* set taper weights for first traces */
-                register int i;
+                int i;
 		float env=0.0, f, x;
 	           for (i = 0; i <= tr1; i++) {
 			f = (float) (i)/tr1;
@@ -463,7 +463,7 @@ This subroutine computes the taper weights
 Author: Gerald Klein				  Date:31 Mar 2004
 *********************************************************************/
 {
-  register int i;
+  int i;
   float env=0.0, f=0., x;
   
   for (i=0;i<ntap;i++) {

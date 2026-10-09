@@ -98,8 +98,8 @@ main(int argc, char **argv)
 	cwp_String mode;	/* display: real, imag, amp, arg	*/
 	int imode=AMP;		/* integer abbrev. for mode in switch	*/
 	int nfby2;		/* nf/2					*/
-	register float *xr;	/* real part of trace			*/
-	register float *xi;	/* imaginary part of trace		*/
+	float *xr;	/* real part of trace			*/
+	float *xi;	/* imaginary part of trace		*/
 	int jack=0;		/* flag for special treatment of zero omega */
 	float unwrap;		/* PI/unwrap = min dphase assumed to wrap */
 
@@ -177,7 +177,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 
 		/* Separate complex trace into real and imag parts */
 		for (i = 0; i < nfby2; ++i) {
@@ -201,7 +201,7 @@ main(int argc, char **argv)
 		break;
 		case AMP:
 		{
-	 		register float re, im;
+	 		float re, im;
 	
 			re = xr[0];
 			im = xi[0];
@@ -220,7 +220,7 @@ main(int argc, char **argv)
 		break;
 		case LOGAMP:
 		{
-	 		register float re, im, tmpamp;
+	 		float re, im, tmpamp;
 	
 			re = xr[0];
 			im = xi[0];

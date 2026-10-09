@@ -322,7 +322,7 @@ main(int argc, char **argv)
 /* Assumes sizeof(int) == 4 */
 void ibm_to_float(int from[], int to[], int n)
 {
-    register int fconv, fmant, i, t;
+    int fconv, fmant, i, t;
 
     for (i=0;i<n;++i) {
 	fconv = from[i];

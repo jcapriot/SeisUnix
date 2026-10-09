@@ -3,8 +3,8 @@
 doqbal(qbal,n,p)
 float qbal,*p;
 {
-	register nn;
-	register float *pp,*pa,oclip;
+	nn;
+	float *pp,*pa,oclip;
 	static first=1,k;
 	static float *a;
 	float clip;

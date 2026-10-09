@@ -52,8 +52,8 @@ main(int argc, char **argv)
 {
 	float phase;		/* phase shift = phasefac*PI		*/
 	float power;		/* phase shift = phasefac*PI		*/
-	register float *rt;	/* real trace				*/
-	register complex *ct;	/* complex transformed trace		*/
+	float *rt;	/* real trace				*/
+	complex *ct;	/* complex transformed trace		*/
 	complex *filt;		/* complex power	 		*/
 	int nt;			/* number of points on input trace	*/
 	size_t ntsize;		/* nt in bytes				*/
@@ -237,7 +237,7 @@ main(int argc, char **argv)
 
 
 		/* Apply filter */
-		{ register int i;
+		{ int i;
 		for (i = 0; i < nf; ++i){
 			omega = i * domega;
 			if (power < 0 && i == 0) omega = FLT_MAX;
@@ -259,7 +259,7 @@ main(int argc, char **argv)
 
 
 		/* Load traces back in, recall filter had nfft factor */
-		{ register int i;
+		{ int i;
 		for (i = 0; i < nt; ++i)  tr.data[i] = rt[i];
 		}
 

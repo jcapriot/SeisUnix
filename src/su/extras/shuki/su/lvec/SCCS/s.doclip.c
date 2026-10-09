@@ -16,8 +16,8 @@
 doclip(clip,n,p)
 float clip,*p;
 {
-	register nn;
-	register float *pp,c,mc;
+	nn;
+	float *pp,c,mc;
 	pp = p;
 	c = clip;
 	mc = -clip;

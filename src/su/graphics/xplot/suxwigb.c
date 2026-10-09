@@ -347,7 +347,7 @@ main(int argc, char **argv)
 
 	if (!have_ntr || irregular) { /* send out stored traces one by one */
 		rewind(tracefp);
-		{ register int itr;
+		{ int itr;
 			for (itr = 0; itr < ntr; ++itr) {
 				efread (trbuf, FSIZE, nt, tracefp);
 				efwrite(trbuf, FSIZE, nt, plotfp);

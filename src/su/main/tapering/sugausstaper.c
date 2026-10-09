@@ -73,7 +73,7 @@ main(int argc, char **argv)
  
 	/* Loop through traces */
 	do {
-		register int i = 0;	     /* counter */
+		int i = 0;	     /* counter */
 
 		/* Get value of key and convert to float */
 		gethval(&tr, index, &val);

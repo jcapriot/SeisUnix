@@ -54,7 +54,7 @@
  */
 
 cefft (x,n,sign)
-register struct complex {float re, im;} *x;
+struct complex {float re, im;} *x;
 int n,sign;
 /*
  *	radix 2 complex <=> complex Fourier transform
@@ -62,7 +62,7 @@ int n,sign;
  *	scaling on positive sign
  */
 {
-	register struct complex *xp, *yp;
+	struct complex *xp, *yp;
 	struct complex *end;
 	double cn, sn, cd, sd, real, imag, scale, *psintab;
 	float temp;

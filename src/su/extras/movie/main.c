@@ -39,7 +39,7 @@ char *argv[];
 	char *mfilnam;	/* Movie file name */
 	char *cfilnam;
 	int r,g,b;
-	register int i;		/* Counter */
+	int i;		/* Counter */
 
 	xargc = argc;
 	xargv = argv;

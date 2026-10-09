@@ -16,8 +16,8 @@
 float powerof(p,n)
 float *p;
 {
-	register nn;
-	register float *pp,ppower;
+	nn;
+	float *pp,ppower;
 
 	nn = n;
 	pp = p;

@@ -165,7 +165,7 @@ main(int argc, char **argv)
 
 	/* Part I - linear fit of (P,d(ln(P))/dt) */
 	{	
-		register int i=0;
+		int i=0;
 		float *logpprime=NULL;	/* logpprime_e(P) */
 		float coeff[4]={0.0,0.0,0.0,0.0}; /* coefficients from linear_regression */
 
@@ -202,7 +202,7 @@ main(int argc, char **argv)
 	/* Part II - linear fit of (log(p[i]/K-p[i],t) */
 	{	
 		float coeff[4]={0.0,0.0,0.0,0.0}; /* coefficients from linear_regression */
-		register int i=0;
+		int i=0;
 		float *logpp=NULL;
 
 		logpp = ealloc1float(nwindow);

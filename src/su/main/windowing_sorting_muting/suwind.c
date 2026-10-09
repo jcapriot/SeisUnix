@@ -144,7 +144,7 @@ main(int argc, char **argv)
 	 int ngood;     /* number unconditionally accepted	*/
 	short ab;	/* absolute value flag (1=YES, 0=NO)    */
 	short verbose;  /* if 1(yes) echo parameters to stderr  */
-	register int i; /* counter				*/
+	int i; /* counter				*/
 
 	float tmin=0.0;     /* minimum time to pass			*/
 	float tmax;     /* maximum time to pass			*/

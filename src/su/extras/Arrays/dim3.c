@@ -34,8 +34,8 @@ static bool first = true;	/* to check if first entry	*/
 char ***dim3(grid, row, col, size)
 int grid, row, col, size;
 {
-	register char ***pgrid, **prow, *pdata;
-	register int i;
+	char ***pgrid, **prow, *pdata;
+	int i;
 
 
 	/* Allocate room for data, row  and grid pointers */
@@ -85,7 +85,7 @@ int argc; char *argv[];
 	int ***a;			/* 3D array of ints	  */
 	double ***b;			/* 3D array of doubles	  */
 	int grids, rows, cols;
-	register int i, j, k;
+	int i, j, k;
 	int inum = 1;
 	double dnum = 1.1;
 

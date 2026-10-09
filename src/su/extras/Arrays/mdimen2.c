@@ -30,7 +30,7 @@ main()
 {
 	float a1[ROWS1][COLS1];
 	float a2[ROWS2][COLS2];
-	register float *p1, *p2;
+	float *p1, *p2;
 	float fnum1 = 1.1;
 	float fnum2 = 1.2;
 	void display();
@@ -57,7 +57,7 @@ void display(arg, n, m)
 float *arg;
 int n, m;
 {
-	register int i, j;
+	int i, j;
 	float **a;		/* the array name */
 
 	/* Dynamically create 2 dim "array" a from arg */

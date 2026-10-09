@@ -44,7 +44,7 @@ segy tr,tr2;
 int main(int argc, char **argv)
 {
 	int j,ih;
-	register int it;
+	int it;
 	int nt;
 	int ntr;
 	int nh;

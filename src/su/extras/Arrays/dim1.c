@@ -32,7 +32,7 @@ static bool first = true;	/* to check if first entry	*/
 char *dim1(n, size)
 int n, size;
 {
-	register char *pdata;
+	char *pdata;
 
 
 	/* Allocate room for data */
@@ -60,7 +60,7 @@ int argc; char *argv[];
 	int *a;				/* 1D array of ints	  */
 	double *b;			/* 1D array of doubles	  */
 	int n;
-	register int i;
+	int i;
 	int inum = 1;
 	double dnum = 1.1;
 

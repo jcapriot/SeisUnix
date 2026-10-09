@@ -238,15 +238,9 @@ typedef struct {        /* tapesegy - trace identification header */
 } tapesegy;
 
 /* FUNCTION PROTOTYPES */
-#ifdef __cplusplus /* if C++, specify external linkage to C functions */
-extern "C" {
-#endif
 
 void gettapehval(const tapesegy *tapetr, int index, Value *valp);
 void puttapehval(tapesegy *tapetr, int index, Value *valp);
 
-#ifdef __cplusplus /* if C++, end external linkage specification */
-}
-#endif
 
 #endif

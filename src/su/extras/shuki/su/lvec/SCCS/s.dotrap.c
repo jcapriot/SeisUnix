@@ -17,8 +17,8 @@
 dotrap(trap,n,p)
 float trap,*p;
 {
-	register nn;
-	register float *pp,t;
+	nn;
+	float *pp,t;
 	pp = p;
 	t = trap;
 	nn = n;

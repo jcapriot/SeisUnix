@@ -34,10 +34,10 @@ Select()
 	double rank_max;	/* max number of offspring under ranking */
 	double sum;             /* control for selection loop           */
 	int best;		/* index of next best structure		*/
-	register int i;		/* loop control				*/
-	register int j;		/* loop control				*/
-	register int k;		/* loop control				*/
-	register int temp;	/* used for swapping pointers		*/
+	int i;		/* loop control				*/
+	int j;		/* loop control				*/
+	int k;		/* loop control				*/
+	int temp;	/* used for swapping pointers		*/
 
 	Trace("Select entered");
 	Dtrace("select");
@@ -166,7 +166,7 @@ int sample[];
 {
 	static firstflag = 1;
 	static int *survivors;	/* a random permutation of 0 .. Popsize-1 */
-	register int i,j;	/* loop control				*/
+	int i,j;	/* loop control				*/
 	int temp;		/* for swapping				*/
 
 	if (firstflag)

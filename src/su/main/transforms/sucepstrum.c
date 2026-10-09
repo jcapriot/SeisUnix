@@ -79,10 +79,10 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-	register float *rt=NULL;	/* real trace			*/
-	register complex *ct=NULL;	/* complex transformed trace	*/
-	register complex *clogfft=NULL;/* the clogfft domain form of a trace*/
-	register float *cepstrum=NULL;/* the clogfft domain form of a trace*/
+	float *rt=NULL;	/* real trace			*/
+	complex *ct=NULL;	/* complex transformed trace	*/
+	complex *clogfft=NULL;/* the clogfft domain form of a trace*/
+	float *cepstrum=NULL;/* the clogfft domain form of a trace*/
 	int nt;			/* number of points on input trace	*/
 	int nfft;		/* transform length			*/
 	int nifft=0;		/* inverse transform length		*/
@@ -185,7 +185,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 	
 		/* zero out arrays */
 		memset((void *) phase, 0,nf*FSIZE);

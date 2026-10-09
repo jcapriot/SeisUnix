@@ -571,8 +571,8 @@ Only integer shifting and masking are used.
 Credits:     CWP: Brian Sumner
 ***********************************************************************/
 {
-    register fourbyte fconv, fmant, t;
-    register int i;
+    fourbyte fconv, fmant, t;
+    int i;
 
     for (i=0;i<n;++i) {
 	fconv = from[i];
@@ -596,7 +596,7 @@ Credits:     CWP: Brian Sumner
 #ifdef _HPUX_SOURCE
 void float_to_ibm(int from[], int to[], int n, int endian)
 {
-    register int fconv, fmant, i, t, dummy;
+    int fconv, fmant, i, t, dummy;
 
 	dummy = endian;
 
@@ -640,7 +640,7 @@ Only integer shifting and masking are used.
 Credits:     CWP: Brian Sumner
 ***********************************************************************/
 {
-    register int fconv, fmant, i, t;
+    int fconv, fmant, i, t;
 
     for (i=0;i<n;++i) {
 	fconv = from[i];
@@ -681,7 +681,7 @@ the conversions that would be needed on a machine not using this convention.
 Author: CWP: Jack K. Cohen  August 1994
 ***************************************************************************/
 {
-	register int i;
+	int i;
 	Value val;
 	
 	/* convert the binary header field by field */
@@ -716,7 +716,7 @@ by float_to_ibm (which, in turn, makes additonal assumptions)
 Author: CWP: Jack K. Cohen  August 1994
 ***************************************************************************/
 {
-	register int i;
+	int i;
 	Value val;
 	
 	/* convert trace header, field by field */

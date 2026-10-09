@@ -35,8 +35,8 @@ int master;
 	static int rsflag = 1;	/* flag cleared after restart		*/
 
 	STRUCTURE *temp;	/* for swapping population pointers	*/
-	register int i;		/* for marking structures		*/
-	register int j;		/* counter				*/
+	int i;		/* for marking structures		*/
+	int j;		/* counter				*/
 	int imember;		/* member to be uphilled		*/
 	int n_of_iter;		/* # of uphill iterations		*/
 	int how_many;		/* # of members to evaluate		*/

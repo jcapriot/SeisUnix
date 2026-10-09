@@ -162,7 +162,7 @@ main(int argc, char **argv)
 	/* Open pipe; read data to buf; write buf to plot program */
 	plotfp = epopen(plotcmd, "w");
 	rewind(datafp);
-	{ register int itr;
+	{ int itr;
 		for (itr = 0; itr < ntr; ++itr) {
 			efread (trbuf, FSIZE, nt, datafp);
 			efwrite(trbuf, FSIZE, nt, plotfp);

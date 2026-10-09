@@ -488,9 +488,9 @@ string title, ylabel, xlabel;
 contour (z,nx,ny,c)
 int nx,ny; float **z,c;
   {
-	register int ix,iy,non; 
+	int ix,iy,non; 
 	int jx,jy,sset(),wset();
-	register float zxymc,zemc,znmc; 
+	float zxymc,zemc,znmc; 
 	float x,y,delta(),*pzxy;
 
 	/* find all the intersections */
@@ -628,7 +628,7 @@ int nx,ny; float **z,c;
 int connect (z,nx,ny,c,ix,iy)
 int nx,ny,*ix,*iy; float **z,c;
   {
-	register int jx,jy;
+	int jx,jy;
 	float x,y,delta();
 
 	jx = (*ix); jy = (*iy);
@@ -670,32 +670,32 @@ int nx,ny,*ix,*iy; float **z,c;
 #define SOUTH 0x00000001
 #define WEST 0x00000002
 sets(i)
-register int *i;
+int *i;
   {
 	*i |= SOUTH;
   }
 clrs(i)
-register int *i;
+int *i;
   {
 	*i &= ~SOUTH;
   }
 int sset(i)
-register int *i;
+int *i;
   {
 	return ((*i)&SOUTH);
   }
 setw(i)
-register int *i;
+int *i;
   {
 	*i |= WEST;
   }
 clrw(i)
-register int *i;
+int *i;
   {
 	*i &= ~WEST;
   }
 int wset(i)
-register int *i;
+int *i;
   {
 	return ((*i)&WEST);
   }
@@ -800,7 +800,7 @@ float xmin,xmax,*xminp,*xmaxp,*dist;
 minmax (f,n,m,pmin,pmax)
 int n,m; float **f,*pmin,*pmax;
   {
-	register int i,j; register float min,max,fij;
+	int i,j; float min,max,fij;
 	min = 1.e30; max = (-1.e30);
 	for (i=0; i<m; i++)
 	  {

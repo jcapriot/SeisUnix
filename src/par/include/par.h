@@ -64,9 +64,6 @@ typedef struct WaveletStruct {
 
 /* FUNCTION PROTOTYPES */
 
-#ifdef __cplusplus  /* if C++, specify external C linkage */
-extern "C" {
-#endif
 
 /* getpar parameter parsing */
 void initargs (int argc, char **argv);
@@ -255,9 +252,9 @@ float golden_bracket(float ax, float bx, float cx,
 float brent_bracket(float ax, float bx, float cx,
                 float (*f)(float), float tol, float *xmin);
 
-void linmin(float p[],float xi[],int n,float *fret, float (*func)());
+void linmin(float p[],float xi[],int n,float *fret, float (*func)(float *));
 void powell_minimization(float p[], float **xi, int n,
-                float ftol,int *iter,float *fret,float (*func)());
+                float ftol,int *iter,float *fret,float (*func)(float *));
 
 /* fractals */
 float hausdorff_dimension( float *ar, int n,int minl,int maxl,int dl);
@@ -295,8 +292,5 @@ int Phi_rot(float *rs1,float *rs2,int iso_plane,float pb_x,float pb_y,float pb_z
    routines */
 /*** end lincoeff */
 
-#ifdef __cplusplus  /* if C++ (external C linkage is being specified) */
-}
-#endif
 
 #endif /* PAR_H */

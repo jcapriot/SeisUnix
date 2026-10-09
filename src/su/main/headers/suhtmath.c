@@ -128,7 +128,7 @@ int	main(int argc, char **argv)
 		gethval(&tr, indx, &val);
 		f = s * getval(type, &val) + c;
 			
-		switch(iop) { register int i;
+		switch(iop) { int i;
 		case ADD:
 			for (i = 0; i < nt; ++i)
 				tr.data[i] += f;

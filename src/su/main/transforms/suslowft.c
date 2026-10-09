@@ -62,8 +62,8 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-	register float *rt;	/* real trace				*/
-	register complex *ct;	/* complex transformed trace		*/
+	float *rt;	/* real trace				*/
+	complex *ct;	/* complex transformed trace		*/
 	int nt;			/* number of points on input trace	*/
 	int sign;		/* sign in exponent of transform	*/
 	float nfft;		/* fft size				*/
@@ -102,7 +102,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 
 		/* Load trace into rt  */
                 memcpy((void *) rt, (const void *) tr.data, nt*FSIZE);
@@ -156,8 +156,8 @@ void dftcc (int sign, int nsamp, complex *cz)
 
 	/* do the dftcc */
 	for(ni=0; ni<nsamp; ni++) {
-		register float retemp = 0.0;
-		register float imtemp = 0.0;
+		float retemp = 0.0;
+		float imtemp = 0.0;
 
 		for(ki=0; ki<nsamp; ki++) {
 
@@ -210,13 +210,13 @@ void dftrc (int sign, int nsamp, float *re, complex *out)
 
 	/* do the dft assuming that the input are real data only */
 	for(ni=0; ni<nsamp; ++ni) {
-		register float retemp = 0.0;
-		register float imtemp = 0.0;
+		float retemp = 0.0;
+		float imtemp = 0.0;
 		
 		
 		for(ki=0; ki<nsamp; ++ki) {
-			register float tmpcos=0.0;
-			register float tmpsin=0.0;
+			float tmpcos=0.0;
+			float tmpsin=0.0;
 			
 			phase = freq*ki;
 

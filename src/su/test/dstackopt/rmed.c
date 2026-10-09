@@ -66,7 +66,7 @@ float *f; int nt;
 swap(p,q)
 float *p,*q;
 {
-	register float temp;
+	float temp;
 	temp = *p;
 	*p = *q;
 	*q = temp;

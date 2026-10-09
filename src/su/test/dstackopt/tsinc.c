@@ -15,7 +15,7 @@ int n,l; float *p,*q,d,*buf;
 {
 	int k,id,ks,ke;
 	float h,omh,sind,*bufe,*pps;
-	register float *qq,*pp,*qe,*dmk;
+	float *qq,*pp,*qe,*dmk;
 	id = (int)d;
 	qe = q + n;
 	qe = q + n;

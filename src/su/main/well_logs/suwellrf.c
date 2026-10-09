@@ -271,8 +271,8 @@ main(int argc, char **argv)
 	t = ealloc1float(ntout);	
 	memset((void *) t,0,ntout*FSIZE);
 
-	{ register int itime;
- 	  register float tvalue;
+	{ int itime;
+ 	  float tvalue;
           for (itime=0,tvalue=0.0; itime<ntout; itime++,tvalue+=dtout)
                         t[itime] = tvalue;
          }

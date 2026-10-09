@@ -124,14 +124,14 @@ S2F_function(str, end) char* str; char** end;
 #endif
 {
 #if !S2F_scan
-	register unsigned char*	s = (unsigned char*)str;
+	unsigned char*	s = (unsigned char*)str;
 	unsigned char*		t;
 #endif
-	register S2F_batch	n;
-	register int		c;
-	register int		digits;
-	register int		m;
-	register unsigned char*	cv;
+	S2F_batch	n;
+	int		c;
+	int		digits;
+	int		m;
+	unsigned char*	cv;
 	int			negative;
 	int			enegative;
 	int			fraction;

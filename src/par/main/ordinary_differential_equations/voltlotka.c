@@ -86,8 +86,8 @@ modified_volterra_lotka_equations(double t, double y[2] , double yprime[2]);
 int
 main(int argc, char **argv)
 {
-	register int i=0, j=0;		/* counters */
-	register int number=2; 		/* the three dependent variables */
+	int i=0, j=0;		/* counters */
+	int number=2; 		/* the three dependent variables */
 	int verbose=0;		/* verbose flag =1 chatty, =0 silent */
 	int stepmax=0;		/* maximum number of steps */
 

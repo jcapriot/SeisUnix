@@ -53,7 +53,7 @@ segy tr;
 main(argc, argv)
 int argc; char **argv;
 {
-	register int itr;	/* trace counter		*/
+	int itr;	/* trace counter		*/
 	int min;		/* first trace to zero out	*/
 	int count;		/* number of traces to zero out	*/
 	int nt;			/* number of time samples	*/

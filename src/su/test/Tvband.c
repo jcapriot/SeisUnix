@@ -62,8 +62,8 @@ segy tr;
 
 main(int argc, char **argv)
 {
-	register float *rt;	/* real trace				*/
-	register complex *ct;	/* complex transformed trace		*/
+	float *rt;	/* real trace				*/
+	complex *ct;	/* complex transformed trace		*/
 	float *filt;		/* filter array				*/
 	float f1;		/* left lower corner frequency		*/
 	float f2;		/* left upper corner frequency		*/
@@ -131,23 +131,23 @@ main(int argc, char **argv)
 
 
 	/* Make filter with scale for inverse transform */
-	{ register int i;
-	  register float c = PIBY2 / (if2 - if1 + 2);
+	{ int i;
+	  float c = PIBY2 / (if2 - if1 + 2);
 	  for (i = if1; i <= if2; ++i) {
-		register s = sin(c*(i - if1 + 1));
+		s = sin(c*(i - if1 + 1));
 		filt[i] = s * s * onfft;
 	  }
 	 }
 
-	{ register int i;
-	  register float c = PIBY2 / (if4 - if3 + 2);
+	{ int i;
+	  float c = PIBY2 / (if4 - if3 + 2);
 	  for (i = if3; i <= if4; ++i) {
-		register s = sin(c*(if4 - i + 1));
+		s = sin(c*(if4 - i + 1));
 		filt[i] = s * s * onfft;
 	  }
 	}
 
-	{ register int i;
+	{ int i;
 	  for (i = if2 + 1; i < if3; ++i)  filt[i] = onfft; 
 	  for (i = 0;       i < if1; ++i)  filt[i] = 0.0; 
 	  for (i = if4 + 1; i < nf;  ++i)  filt[i] = 0.0; 
@@ -157,7 +157,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 
 		/* Load trace into rt (zero-padded) */
 		memcpy(rt, tr.data, nt*FSIZE);

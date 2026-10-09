@@ -92,7 +92,7 @@ main(int argc, char **argv)
 	int ntsize;		/* ... in bytes				*/
 	int ndata;		/* allocation parameter			*/
 	int ntr;		/* traces in input data			*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	void subplot(		/* wiggle plot subroutine		*/
 	float *data,
 	int nt,

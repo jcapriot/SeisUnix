@@ -150,7 +150,7 @@ int main( int argc, char *argv[] )
 		
 
 		flag=1;
-		{ register int i;
+		{ int i;
 			for(i=0;i<nu;i++)
 				if(ua[i]==utmp) {
 					flag=0;
@@ -164,7 +164,7 @@ int main( int argc, char *argv[] )
 		}
 		
 		flag=1;
-		{ register int i;
+		{ int i;
 			for(i=0;i<nv;i++)
 				if(va[i]==vtmp) {
 					flag=0;
@@ -182,7 +182,7 @@ int main( int argc, char *argv[] )
 /*		fprintf(stderr," %d %d\n",utmp-1,vtmp-1); */
 		
 		if(!bendian) {
-			{ register int i;
+			{ int i;
 				for(i=0;i<tr.ns;i++) swap_float_4(&tr.data[i]);
 			}
 		}

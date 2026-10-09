@@ -166,7 +166,7 @@ int nt, ntr;
 	int fill;		/* fill flag				*/
 	float overlap;		/* maximum trace overlap		*/
 	int plotfat;		/* line thickness of traces		*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 	void vertwig();		/* draw vertical wiggle traces		*/
 
 

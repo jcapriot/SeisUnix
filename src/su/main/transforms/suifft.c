@@ -43,8 +43,8 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-	register complex *ct;	/* complex input trace			*/
-	register float *rt;	/* real output trace			*/
+	complex *ct;	/* complex input trace			*/
+	float *rt;	/* real output trace			*/
 	int nfft;		/* fft size 				*/
 	int nf;			/* number of frequencies		*/
 	int sign;		/* sign in exponent of transform	*/
@@ -88,7 +88,7 @@ main(int argc, char **argv)
 
 	/* Main loop over traces */
 	do {
-		register int i;
+		int i;
 
 		/* Load traces into ct (pfa fills in negative freqs) */
 		for (i = 0; i < nf; ++i) {

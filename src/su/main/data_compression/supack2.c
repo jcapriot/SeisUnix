@@ -87,16 +87,16 @@ main(int argc, char **argv)
 		 * floats, so we need to invent a pointer for the
 		 * short array which is actually there. */
 
-		register unsigned char *otr = (unsigned char *) tr.data;
-		register int i,j;
-		register signed   int si;
-		register unsigned int ui;
-		register float absmax;
-		register float scale;
+		unsigned char *otr = (unsigned char *) tr.data;
+		int i,j;
+		signed   int si;
+		unsigned int ui;
+		float absmax;
+		float scale;
 
 		/* Power transform to decrease dynamic range */
 		if (!isone) {
-			register float val;
+			float val;
 
 			if (ishalf) {
 				for (i = 0; i < nt; ++i) {

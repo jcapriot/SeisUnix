@@ -131,7 +131,7 @@ char **sp;
 int *lenp;
 {
 	char *s = *sp;
-	register int c;
+	int c;
 	int typ;
 	int len = 0;
 
@@ -184,9 +184,9 @@ static int getstr(sp)
 char **sp;
 {
 
-	register char *s = *sp;
-	register char *t = str;
-	register char c;
+	char *s = *sp;
+	char *t = str;
+	char c;
 
 	for (;;) {
 		c = *++s;
@@ -302,7 +302,7 @@ entry *tp;
 {
 	char *s = *sp;
 	char *n = str;
-	register int c;
+	int c;
 	int relocf = 0;
 	float *fp;
 	int *ip;

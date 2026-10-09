@@ -28,7 +28,7 @@ int argc; char *argv[];
 	int *a;				/* 1D array of ints	  */
 	double *b;			/* 1D array of doubles	  */
 	int n;
-	register int i;
+	int i;
 	int inum = 1;
 	double dnum = 1.1;
 

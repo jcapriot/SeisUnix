@@ -41,8 +41,8 @@
 /* Allocate 2D array */
 #define DIM2(prow, row, col, type)					\
 {									\
-	register type *pdata;						\
-	register int i_i;						\
+	type *pdata;						\
+	int i_i;						\
 									\
 									\
 	/* Allocate room for data and row pointers */			\
@@ -73,8 +73,8 @@
 /* Allocate 3D array */
 #define DIM3(pgrid, grid, row, col, type)				\
 {									\
-	register type **prow, *pdata;					\
-	register int i_i;						\
+	type **prow, *pdata;					\
+	int i_i;						\
 									\
 									\
 	/* Allocate room for data, row and grid pointers */		\
@@ -116,7 +116,7 @@
 /* Dynamic creation of 2D array in subroutines */
 #define DIMENSION2(arga usera, row, col, type)				\
 {									\
-	register int i_i;						\
+	int i_i;						\
 									\
 									\
 	/* Allocate room for row pointers */				\

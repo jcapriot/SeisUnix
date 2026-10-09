@@ -56,7 +56,7 @@ main(int argc, char **argv)
 
 	/* Loop over data converting to ascii */
 	while ((n1read = efread(x, sizeof(int), n1, stdin))) {
-		register int i1;
+		int i1;
 
 		if (n1read != n1)
 			err("out of data in forming line #%d", n2+1);

@@ -107,7 +107,7 @@ int argc; char **argv;
 	int facs[FACMAX];	/* contains factors of nfft		*/
 	int nzeros;		/* number of padded zeroes*sizeof(float)*/
 	int sign;		/* sign in exponent of transform	*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 
 
 	/* Initialize SU */

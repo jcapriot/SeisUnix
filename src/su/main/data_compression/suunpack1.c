@@ -72,9 +72,9 @@ main(int argc, char **argv)
 		   char array which is actually there.
 		*/
 
-		register int i;
-		register float val;
-		register signed char *itr = (signed char *) tr.data;
+		int i;
+		float val;
+		signed char *itr = (signed char *) tr.data;
 
 		if (istwo) {
 			for (i = nt-1; i >= 0; --i) { 

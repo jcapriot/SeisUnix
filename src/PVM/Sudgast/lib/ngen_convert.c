@@ -26,7 +26,7 @@ unsigned long int Ctoi(instring, length)
 	char *instring;		/* string representation	*/
 	int length;		/* length of instring		*/
 {
-	register int i;		/* loop control			*/
+	int i;		/* loop control			*/
 	unsigned long n;	/* accumulator for return value	*/
 
 	n = (unsigned long) 0;
@@ -43,7 +43,7 @@ Itoc(n, outstring, length)
 	char *outstring;	/* string representation	*/
 	int length;		/* length of outstring		*/
 {
-	register int i;		/* loop control			*/
+	int i;		/* loop control			*/
 
 	for (i=length-1; i>=0; i--)
 	{
@@ -62,7 +62,7 @@ Pack(instring, outstring, length)
 	static firstflag = 1 ;
 	static full;	/* number of fully used bytes in outstring	*/
 	static slop;	/* number of bits used in outstring's last byte	*/
-	register i,j;	/* loop control					*/
+	i,j;	/* loop control					*/
 
 	if (firstflag)
 	{
@@ -93,7 +93,7 @@ Unpack(instring, outstring, length)
 	static firstflag = 1 ;
 	static full;	/* number of fully used bytes in instring	*/
 	static slop;	/* number of bits used in instring's last byte	*/
-	register i,j;	/* loop control					*/
+	i,j;	/* loop control					*/
 
 	if (firstflag)
 	{
@@ -129,10 +129,10 @@ Unpack(instring, outstring, length)
 Gray(instring, outstring, length)
 char *instring;		/* string representing fixed point int		*/
 char *outstring;	/* string representing Gray coded value		*/
-register int length;	/* length of strings				*/
+int length;	/* length of strings				*/
 {
-	register int i;
-	register char last;
+	int i;
+	char last;
 
 	last = '0';
 	for (i=0; i<length; i++)
@@ -146,10 +146,10 @@ register int length;	/* length of strings				*/
 Degray(instring, outstring, length)
 char *instring;		/* string representing Gray coded int		*/
 char *outstring;	/* string representing fixed point int		*/
-register int length;	/* length of strings				*/
+int length;	/* length of strings				*/
 {
-	register int i;
-	register int last;
+	int i;
+	int last;
 
 	last = 0;
 	for (i=0; i<length; i++)
@@ -171,9 +171,9 @@ FloatRep(instring, vect, length)
 	double vect[];		/* floating point representation	*/
 	int length;		/* length of vect (output array)	*/
 {
-	register int i;		/* loop control				*/
+	int i;		/* loop control				*/
 	unsigned long int n;	/* decoded int value			*/
-	register int pos;	/* position to start decoding		*/
+	int pos;	/* position to start decoding		*/
 	char tmpstring[80];	/* used for gray code interpretation	*/
 
 	pos = 0;
@@ -199,9 +199,9 @@ StringRep(vect, outstring, length)
 	char *outstring;	/* string representation		*/
 	int length;		/* length of vect 			*/
 {
-	register int i;		/* loop control				*/
+	int i;		/* loop control				*/
 	unsigned long int n;	/* index of vext[i] within legal range	*/
-	register int pos;	/* next position for filling outstring	*/
+	int pos;	/* next position for filling outstring	*/
 	char tmpstring[80];	/* used for gray code translation	*/
 	
 	pos = 0;

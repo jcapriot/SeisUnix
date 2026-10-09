@@ -51,9 +51,9 @@ int len, type;
 {
 
 	unsigned fconv, fsign, fexpn;
-	register unsigned fmant;
-	register int t;
-	register char *bp = (char *) &fconv;
+	unsigned fmant;
+	int t;
+	char *bp = (char *) &fconv;
 
 	if (len <= 0) return;
 

@@ -37,15 +37,15 @@ segy tr;
 int
 main(int argc, char **argv)
 {
-	register float *rt;	/* real trace				*/
-	register complex *ct;	/* complex transformed trace		*/
+	float *rt;	/* real trace				*/
+	complex *ct;	/* complex transformed trace		*/
 	int nt;			/* number of points on input trace	*/
 	int nfft;		/* number of points on output trace	*/
 	int nfby2p1;		/* nfft/2 + 1				*/
 	float dt;		/* sample interval in secs		*/
 	float d1;		/* output sample interval in Hz		*/
 	int ntr=0;		/* number of traces			*/
-	register int i;		/* counter				*/
+	int i;		/* counter				*/
 
 
 	/* Initialize */

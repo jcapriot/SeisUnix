@@ -42,7 +42,7 @@ main(int argc, char **argv)
 {
 	int nt;			/* number of time samples		*/
 	int ntr;		/* number of traces			*/
-	register int itr;	/* trace counter			*/
+	int itr;	/* trace counter			*/
 	float dt;		/* time sampling interval (seconds)	*/
 	int idt;		/* 	...		(micro seconds)	*/
 	

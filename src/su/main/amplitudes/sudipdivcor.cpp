@@ -255,8 +255,7 @@ void su_dipdivcor_filter(float k, float dpx, float dt, int np, int nw, int nt, c
 
 	/* initialize qq */
 	for (iw=0; iw<nw; iw++){
-		qq[iw].real(0.0);
-		qq[iw].imag(0.0);
+		qq[iw] = 0.0f;
 	}
 
 	for (ip=np-1; ip>=0; ip--){
@@ -275,19 +274,16 @@ void su_dipdivcor_filter(float k, float dpx, float dt, int np, int nw, int nt, c
 		/* sum over frequency */
 		if (iwh>=iwl){
 			for (it=0; it<nt; it++){
-				kq[it].real(p[it].real()*div[ip*nt+it]);
-				kq[it].imag(p[it].imag()*div[ip*nt+it]);
+				kq[it] = p[it]*div[ip*nt+it];
 			}
 			for (it=nt; it<nw; it++){
-				kq[it].real(0.0);
-				kq[it].imag(0.0);
+				kq[it] = 0.0f;
 			}
 			pfacc(1,nw,kq);
 
 			/* dip filter positive frequencies */
 			for (iw=iwl; iw<=iwh; iw++){
-				qq[iw].real(qq[iw].real() + (kq[iw].real()*pscl));
-				qq[iw].imag(qq[iw].imag() + (kq[iw].imag()*pscl));
+				qq[iw] += kq[iw]*pscl;
 			}
 
 			/* dip filter negative frequencies */
@@ -295,8 +291,7 @@ void su_dipdivcor_filter(float k, float dpx, float dt, int np, int nw, int nt, c
 			iwh=nw-iwh;
 
 			for (iw=iwh; iw<=iwl; iw++){
-				qq[iw].real(qq[iw].real() + (kq[iw].real()*pscl));
-				qq[iw].imag(qq[iw].imag() + (kq[iw].imag()*pscl));
+				qq[iw] += kq[iw]*pscl;
 			}
 		}
 		if (pm<1.01*pmin) break;
@@ -305,7 +300,6 @@ void su_dipdivcor_filter(float k, float dpx, float dt, int np, int nw, int nt, c
 	/* Fourier transform w to t */
 	pfacc(-1,nw,qq);
 	for (it=0; it<nt; it++){
-		q[it].real(qq[it].real()*fftscl);
-		q[it].imag(qq[it].imag()*fftscl);
+		q[it] = qq[it]*fftscl;
 	}
 }

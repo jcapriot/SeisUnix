@@ -366,7 +366,6 @@ traces          2-D array of output traces in tau-p domain
         float pmax;             /* maximum slope */
         int lwrap;              /* samples required to make k periodic */
         float fka;              /* first wavenumber with k periodic */
-	float temp;		/* auxiliary variable */
         int nka;                /* number of wavenumbers with k perioic */
         float *tr_fft;          /* padded trace for FFT */
         complex **ctr;          /* F-K transformed trace */
@@ -432,8 +431,7 @@ traces          2-D array of output traces in tau-p domain
 
 	/* scale tr_x by x sampling interval */
 	for (ix=0; ix<nx; ix++) {
-		tr_x[ix].real(ctr[ix][iw].real()*dx*fftscl);
-		tr_x[ix].imag(ctr[ix][iw].imag()*dx*fftscl);
+		tr_x[ix] = ctr[ix][iw]*dx*fftscl;
 	}
 
 	/* pad tr_x with zeros */
@@ -442,8 +440,7 @@ traces          2-D array of output traces in tau-p domain
 
 		/* negate every other sample for k-axis centered */
 		for (ix=1; ix<nx; ix+=2) {
-			tr_x[ix].real(-tr_x[ix].real());
-			tr_x[ix].imag(-tr_x[ix].imag());
+			tr_x[ix] = -tr_x[ix];
 		}
 
 		/* Fourier transform tr_x to tr_k */
@@ -461,9 +458,7 @@ traces          2-D array of output traces in tau-p domain
 			phase = k*xshift;
 			c = cos(phase);
 			s = sin(phase);
-			temp = tr_ka[ik].real()*c-tr_ka[ik].imag()*s;
-			tr_ka[ik].imag(tr_ka[ik].real()*s+tr_ka[ik].imag()*c);
-			tr_ka[ik].real(temp);
+			tr_ka[ik] *= complex(c, s);
 		}
 
 		/* compute k values at which to interpolate tr_k */
@@ -486,8 +481,7 @@ traces          2-D array of output traces in tau-p domain
 			phase = kp[ip]*xshift;
 			c = cos(phase);
 			s = sin(phase);
-			ctr_p[ip][iw].real(hp[ip].real()*c-hp[ip].imag()*s);
-			ctr_p[ip][iw].imag(hp[ip].real()*s+hp[ip].imag()*c);
+			ctr_p[ip][iw] = hp[ip]*complex(c, s);
 		}
 	}
 
@@ -624,7 +618,6 @@ out_traces      2-D array of output traces in t-x domain
         /* added by Bee Bednar 12/25/2006*/
         float c,s;
         float phase;
-        float temp;
         float xshift;
 
         /* compute slope sampling interval */
@@ -696,9 +689,7 @@ out_traces      2-D array of output traces in t-x domain
                     phase = pk[ik]*w*xshift;
                     c = cos(phase);
                     s = sin(phase);
-                    temp = hk[ik].real()*c - hk[ik].imag()*s;
-                    hk[ik].imag(hk[ik].real()*s + hk[ik].imag()*c);
-                    hk[ik].real(temp);
+                    hk[ik] *= complex(c, s);
                 }
                  
 	

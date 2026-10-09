@@ -157,6 +157,21 @@ void su_velan_semblance(int nt, int ntout, int dtratio, int nsmooth, float pwr, 
 void su_relan_accumulate(int nz, float dz, float fz, float offset, int nr, float dr, float fr, float smute,
 	const float *data, float *num, float *den, float *nnz);
 
+// synthetics
+int su_goupillaudpo_tmax(int n, int l, int k);
+int su_goupillaudpo(int n, const float *r, int l, int k, int tmax, int pV, float *x, float *out, int *odd);
+int su_imp_nfft(int nt);
+void su_imp2d_trace(int nt, float dt, int nfft, float c, float rs, float rg, const float *tout, float *rt, complex *ct,
+	float *data);
+void su_imp3d_trace(int nt, float dt, int nfft, float c, float rs, float rg, int dir, float rd, const float *tout, float *temp,
+	float *rt, complex *ct, float *data);
+int su_syncz_tables(int ninf, int ntr, float dx, const float *zint, const float *dip, const float *v, const float *rho,
+	float *dipr, float *xl, float *xr, float *theta, float *m, float *b, float *d, float *k, float *w, float *meet,
+	float *trcoefs, int *dorow, int *info);
+void su_syncz_trace(int ninf, float x, int nt, float dt, float tdelay, const float *v, const float *m, const float *b,
+	const float *d, const float *k, const float *w, const float *meet, const float *trcoefs, const int *dorow,
+	const float *tout, float *data, float *trace);
+
 // tapering
 float su_taper_envelope(int tap_type, float f, float min, float max);
 void su_taper_time(float t1, float t2, int tap_type, float dt, float *trace, int nt);

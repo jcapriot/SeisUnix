@@ -3,10 +3,9 @@
 
 /* SUSYNVXZCS: $Revision: 1.17 $ ; $Date: 2015/06/02 20:15:23 $	*/
 
-#include "su.h" 
-#include "segy.h" 
-
+#include "su.h"
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 " 									",
 " SUSYNVXZCS - SYNthetic seismograms of common shot in V(X,Z) media via	",
@@ -75,6 +74,8 @@ char *sdoc[] = {
 " Default amplitude is 1.0 if amplitude: part of the string is omitted.	",
 "									",
 NULL};
+#endif
+
 
 /*
  *	Author: Zhenyue Liu, 07/20/92, Center for Wave Phenomena
@@ -91,167 +92,91 @@ NULL};
  */
 /**************** end self doc ***********************************/
 
-/* global varibles for detecting error in solving eikonal equation */
-int ierr=0;
-float x_err, z_err, r_err;
-int ia_err;
-
+/* Library version of SUSYNVXZCS
+ *
+ * The main program (the parameters, the velocities and the slowness perturbations read from files, the headers of the traces) is
+ * left to the caller, with the reflectors (decodeReflectors, breakReflectors, makeref), the Ricker wavelet (makericker) and the
+ * half-derivative filter (mkhdiff) made by it. What is here is the loop over the receivers of one shot, which makes the traces of
+ * the shot, and it holds no static state (the half-derivative filter, which the program made on its first trace, is passed in).
+ *
+ *	su_synvxzcs_shot:	the nxg traces of the common-shot gather of one shot
+ *
+ * Differences from the program:
+ *  - The maximum segment length of the reflectors (dsmax), which the program works out from the velocity at the first sample, is for
+ *    the caller to do.
+ *  - The program has global variables (ierr, x_err, ...) with which it would report that the eikonal equation failed with a turned
+ *    ray, but nothing in the library sets them, so that it never did; they are gone.
+ *  - The velocities in the two upper corners (nxc, nzc) are replaced in the program with the width of the traveltime band
+ *    (1+2*nxb) where the width of the model (nx) is meant, which can go past the last trace of the model; it is nx here. The model
+ *    of the caller is not changed.
+ */
 
 /* parameters for half-derivative filter */
 #define LHD 20
 #define NHD 1+2*LHD
 
-static void makeone (float **ts, float **as, float **sgs, float **tg, 
-	float **ag, float **sgg, float ex, float ez, float dx,  
+static void makeone (float **ts, float **as, float **sgs, float **tg,
+	float **ag, float **sgg, float ex, float ez, float dx,
 	float dz, float fx, float vs0, float vg0, int ls, Wavelet *w,
-	int nr, Reflector *r, int nt, float dt, float ft, float *trace);
+	int nr, Reflector *r, int nt, float dt, float ft, float *trace,
+	int lhd, int nhd, float *hd);
 
-/* additional prototypes for eikonal equation functions */
-void delta_t (int na, float da, float r, float dr, 
+static void delta_t (int na, float da, float r, float dr,
 	float uc[], float wc[], float sc[], float bc[],
 	float un[], float wn[], float sn[], float bn[]);
-void eiktam_pert (float xs, float zs, int nz, float dz, float fz, int nx, 
-	float dx, float fx, float **vel, float **vel_p, int pert, 
+static void eiktam_pert (float xs, float zs, int nz, float dz, float fz, int nx,
+	float dx, float fx, float **vel, float **vel_p, int pert,
 	float **time, float **angle, float **sig, float **bet);
 
-/* segy trace */
-segy tr;
-
-int
-main (int argc, char **argv)
+/* The traces of one shot at xs, for the receivers gx0+ixg*dxg; the velocity is vel[nx][nz] (z the fast axis) on the grid fx+ix*dx,
+ * iz*dz, and pert (or NULL) the slowness perturbation, array[nx][nz]. The traces are out[nxg][nt].
+ *
+ * nxb: half the width, in grid samples, of the band of the traveltimes about the receiver; nxd: the number of receivers between
+ * those at which the traveltimes are calculated (1 for every one); nxc, nzc: the width and height, in grid samples, of the two
+ * upper corners where the velocity is replaced by constant extrapolation.
+ *
+ * Returns 0, -1 if the shot or a receiver is outside the grid, -3 for parameters that are not allowed.
+ */
+int su_synvxzcs_shot(const float *vel, const float *pert, int nx, int nz, float dx, float dz, float fx,
+	int nxb, int nxd, int nxc, int nzc, float xs, int nxg, float dxg, float gx0,
+	int ls, Wavelet *w, int nr, Reflector *r, int nt, float dt, float ft,
+	int lhd, int nhd, float *hd, float *out)
 {
-	int 	nr,ir,ls,smooth,ndpfz,ns,ixs,ixg,nxs,nxg,nt,
-		nx,nz,nxb,nxd,ixd,i,ix,iz,nx1,nx0,nxd1,nxc,nzc,
-		verbose,tracl,pert,cable,
-		*nxz;
-	float   tmin,temp,temp1,
-		dsmax,fpeak,dx,dz,fx,ex,fx1,ex1,
-		dxg,dxs,dt,fxg,fxs,ft,xs,xg,vs0,vg0,ez,
-		*ar,**xr,**zr,
+	int ixg,ixd,i,ix,iz,nx1,nx0,nxd1,doperturb = (pert!=NULL);
+	float temp,temp1,fx1,ex1,ex,ez,xg,vs0,vg0,
 		**vold,**vpold=NULL,**told,**aold,**sgold,
 		**ts,**as,**sgs,**tg,**ag,**sgg,**bas,**bag,
 		**v,**vp=NULL,**tg1=NULL,**ag1=NULL,**sgg1=NULL;
-	FILE *vfp=stdin;
-	char *vpfile="";
-	Reflector *r;
-	Wavelet *w;
 
-	/* hook up getpar to handle the parameters */
-	initargs(argc,argv);
-	requestdoc(0);
+	if (nx<2 || nz<2 || nxb<1 || nxd<1 || nxg<1 || nt<1 || nxc<0 || nzc<0) return -3;
+	if (nxc>nxb) nxc = nxb;
+	if (nzc>nz) nzc = nz;
 
-	/* get required parameters */
-	if (!getparint("nx",&nx)) err("must specify nx!\n");
-	if (!getparint("nz",&nz)) err("must specify nz!\n");
-	
-	/* get optional parameters */
-	if (!getparint("nt",&nt)) nt = 501; CHECK_NT("nt",nt);
-	if (!getparfloat("dt",&dt)) dt = 0.004;
-	if (!getparfloat("ft",&ft)) ft = 0.0;
-	if (!getparfloat("fpeak",&fpeak)) fpeak = 0.2/dt;
-	if (!getparint("nxg",&nxg)) nxg = 101;
-	if (!getparfloat("dxg",&dxg)) dxg = 15;
-	if (!getparfloat("fxg",&fxg)) fxg = 0.0;
-	if (!getparint("nxd",&nxd)) nxd = 5;
-	if (!getparint("nxs",&nxs)) nxs = 1;
-	if (!getparfloat("dxs",&dxs)) dxs = 50;
-	if (!getparfloat("fxs",&fxs)) fxs = 0.0;
-	if (!getparfloat("dx",&dx)) dx = 50;
-	if (!getparfloat("fx",&fx)) fx = 0.0;
-	if (!getparfloat("dz",&dz)) dz = 50;
-	if (!getparint("nxb",&nxb)) nxb = nx/2;
-	if (!getparint("nxc",&nxc)) nxc = 0;
-	nxc = MIN(nxc,nxb);
-	if (!getparint("nzc",&nzc)) nzc = 0;
-	nzc = MIN(nzc,nz);
-	if (!getparint("ls",&ls)) ls = 0;
-	if (!getparint("pert",&pert)) pert = 0;
-	if (!getparfloat("tmin",&tmin)) tmin = 10.0*dt;
-	if (!getparint("ndpfz",&ndpfz)) ndpfz = 5;
-	if (!getparint("smooth",&smooth)) smooth = 0;
-	if (!getparint("cable",&cable)) cable = 1;
-	if (!getparint("verbose",&verbose)) verbose = 0;
-	
-	/* check the ranges of shots and receivers */
+	/* check the ranges of the shot and receivers */
 	ex = fx+(nx-1)*dx;
 	ez = (nz-1)*dz;
-	for (ixs=0; ixs<nxs; ++ixs) {
-		/* compute shot coordinates */
-		xs = fxs+ixs*dxs;
-		if (fx>xs || ex<xs) 
-		err("shot %i lies outside of specified (x,z) grid\n",ixs);
+	if (fx>xs || ex<xs) return -1;
+	for (ixg=0; ixg<nxg; ++ixg) {
+		xg = gx0+ixg*dxg;
+		if (fx>xg || ex<xg) return -1;
 	}
 
-	for (ixs=0; ixs<2; ++ixs) {
-		for (ixg=0; ixg<nxg; ++ixg) {
-			/* compute receiver coordinates */
-			if (cable==1) {
-				xg = fxg+ixg*dxg+ixs*(nxs-1)*dxs;
-			} else {
-				xg = fxg+ixg*dxg;
-			}
-			if (fx>xg || ex<xg)
-			err("receiver %i lies outside of specified (x,z) grid\n",ixs);
-		}
-	}
-
-
-	decodeReflectors(&nr,&ar,&nxz,&xr,&zr);
-	if (!smooth) breakReflectors(&nr,&ar,&nxz,&xr,&zr);
-
-	/* allocate space */
+	/* allocate space, and copy the velocities, which are changed below */
 	vold = ealloc2float(nz,nx);
 	aold = ealloc2float(nz,nx);
 	told = ealloc2float(nz,nx);
 	bas = ealloc2float(nz,nx);
 	sgold = ealloc2float(nz,nx);
-	if(pert) vpold = ealloc2float(nz,nx);
-	/* read velocities and slowness perturbation*/
-	if(fread(vold[0],sizeof(float),nx*nz,vfp)!=nx*nz)
-		err("cannot read %d velocities from file %s",nx*nz,vfp);
-	if(pert) {
-		/* read slowness perturbation*/
-		if (!getparstring("vpfile",&vpfile)) 
-			err("must specify vpfile!\n");
-		if(fread(vpold[0],sizeof(float),nx*nz,fopen(vpfile,"r"))
-			!=nx*nz)
-		err("cannot read %d slowness perturbation from file %s"
-			,nx*nz,vpfile);
+	memcpy(vold[0],vel,sizeof(float)*(size_t)nx*nz);
+	if (doperturb) {
+		vpold = ealloc2float(nz,nx);
+		memcpy(vpold[0],pert,sizeof(float)*(size_t)nx*nz);
 		/* calculate 1/2 perturbation of slowness squares*/
 		for (ix=0; ix<nx; ++ix)
 			for (iz=0; iz<nz; ++iz)
 				vpold[ix][iz] = vpold[ix][iz]/vold[ix][iz];
 	}
-	/* determine maximum reflector segment length */
-	tmin = MAX(tmin,MAX(ft,dt));
-	dsmax = vold[0][0]/(2*ndpfz)*sqrt(tmin/fpeak);
- 	
-	/* make reflectors */
-	makeref(dsmax,nr,ar,nxz,xr,zr,&r);
 
-	/* count reflector segments */
-	for (ir=0,ns=0; ir<nr; ++ir)
-		ns += r[ir].ns;
-
-	/* make wavelet */
-	makericker(fpeak,dt,&w);
-	
-	/* if requested, print information */
-	if (verbose) {
-		warn("\nSUSYNVXZCS:");
-		warn("Total number of small reflecting segments is %d.\n",ns);
-	}
-	
-	/* set constant segy trace header parameters */
-	memset((void *) &tr, 0, sizeof(segy));
-	tr.trid = 1;
-	tr.counit = 1;
-	tr.ns = nt;
-	tr.dt = 1.0e6*dt;
-	tr.delrt = 1.0e3*ft;
-	tr.d2 = dxg;
-	
-	/* allocate space */
 	nx1 = 1+2*nxb;
 	ts = ealloc2float(nz,nx1);
 	as = ealloc2float(nz,nx1);
@@ -261,8 +186,8 @@ main (int argc, char **argv)
 	sgg = ealloc2float(nz,nx1);
 	v = ealloc2float(nz,nx1);
 	bag = ealloc2float(nz,nx1);
-	if(pert) vp = ealloc2float(nz,nx1);
-	if(nxd>1) {
+	if (doperturb) vp = ealloc2float(nz,nx1);
+	if (nxd>1) {
 		/* allocate space for interpolation */
 		tg1 = ealloc2float(nz,nx1);
 		ag1 = ealloc2float(nz,nx1);
@@ -274,49 +199,37 @@ main (int argc, char **argv)
 	for(iz=0; iz<nzc; ++iz)
 		for(ix=iz*nxc/nzc; ix<nxc; ++ix){
 			vold[nxc-ix-1][iz] = vold[nxc-iz*nxc/nzc][iz];
-			vold[nx1-nxc+ix][iz] = vold[nx1-nxc+iz*nxc/nzc-1][iz];
+			vold[nx-nxc+ix][iz] = vold[nx-nxc+iz*nxc/nzc-1][iz];
 		}
 
-		
-	/* loop over shots */
-	for (ixs=0, tracl=0; ixs<nxs; ++ixs){
-	    xs = fxs+ixs*dxs;
-	    /* calculate traveltimes from shot */
-	    eiktam_pert(xs,0,nz,dz,0,nx,dx,fx,vold,vpold,pert,told,aold,sgold,bas);
-	    if(ierr){
-		/* Ekonal equation suffers from turned rays*/
-		err("\tEikonal equation fails to solve at "
-		    "x=%g, z=%g\n\tfrom shot xs=%g .\n",x_err+xs,z_err,xs);
-		}
-	    /* calculate velocity at shot 	*/
-	    temp = (xs-fx)/dx;
-	    ixd = temp;
-	    temp = temp-ixd;
-	    vs0 = (1-temp)*vold[ixd][0]+temp*vold[ixd+1][0];
-	
-	    /* save the skipping number */
-	    nxd1 = nxd;
-	    
-	    /* loop over receivers */
-	    for (ixg=0; ixg<nxg; ixg +=nxd1){
-		if (cable==1) {
-			xg = fxg+ixs*dxs+ixg*dxg;
-		} else {
-			xg = fxg+ixg*dxg;
-		}
+	/* calculate traveltimes from shot */
+	eiktam_pert(xs,0,nz,dz,0,nx,dx,fx,vold,vpold,doperturb,told,aold,sgold,bas);
+
+	/* calculate velocity at shot 	*/
+	temp = (xs-fx)/dx;
+	ixd = temp;
+	temp = temp-ixd;
+	vs0 = (ixd+1<nx) ? (1-temp)*vold[ixd][0]+temp*vold[ixd+1][0] : vold[ixd][0];
+
+	/* save the skipping number */
+	nxd1 = nxd;
+
+	/* loop over receivers */
+	for (ixg=0; ixg<nxg; ixg +=nxd1){
+		xg = gx0+ixg*dxg;
 
 		/* set range for traveltimes' calculation */
 		fx1 = xg-nxb*dx;
 		nx0 = (fx1-fx)/dx;
 		temp = (fx1-fx)/dx-nx0;
 	       	for(ix=0;ix<nx1;++ix){
-		    if(ix<-nx0) 
+		    if(ix<-nx0)
 			for(iz=0;iz<nz;++iz)
 				v[ix][iz] = vold[0][iz];
 		    else if(ix+nx0>nx-2)
 			for(iz=0;iz<nz;++iz)
 				v[ix][iz]=vold[nx-1][iz];
-		    else	
+		    else
 			for(iz=0;iz<nz;++iz){
 				v[ix][iz] = vold[ix+nx0][iz]*(1.0-temp)
 					+temp*vold[ix+nx0+1][iz];
@@ -329,68 +242,47 @@ main (int argc, char **argv)
 				}
 		}
 
-		if(pert){
+		if(doperturb){
 		    for(ix=0;ix<nx1;++ix)
 			for(iz=0;iz<nz;++iz){
-			    if(ix<-nx0) 
+			    if(ix<-nx0)
 				vp[ix][iz] = vpold[0][iz];
-			    else if(ix+nx0>nx-2) 
+			    else if(ix+nx0>nx-2)
 				vp[ix][iz]=vpold[nx-1][iz];
 			    else
 				vp[ix][iz] = vpold[ix+nx0][iz]*(1.0-temp)
 					+temp*vpold[ix+nx0+1][iz];
 			    }
 		}
-			
+
 		if(ixg==0 || nxd1==1){
 		/* No interpolation */
-	
-		/* compute traveltimes, prop angles, sigmas from receiver */
-		eiktam_pert(xg,0.,nz,dz,0.,nx1,dx,fx1,v,vp,pert,tg,ag,sgg,bag);
-		if(ierr){
-			/* Ekonal equation fails to solve */
-			warn("\tEikonal equation fails to solve at "
-			     "x=%g, z=%g\n\tfrom receiver xg=%g .",
-			     x_err+xg,z_err,xg);
-			break;
-		}
+
+			/* compute traveltimes, prop angles, sigmas from receiver */
+			eiktam_pert(xg,0.,nz,dz,0.,nx1,dx,fx1,v,vp,doperturb,tg,ag,sgg,bag);
+
 			/* calculate velocity at receiver 	*/
 			vg0 = (1-temp)*vold[nx0+nxb][0]
-				+temp*vold[nx0+nxb+1][0];
+				+temp*vold[MIN(nx0+nxb+1,nx-1)][0];
 
 			/* make one trace */
 			ex1 = MIN(ex,xg+nxb*dx);
 			makeone(ts,as,sgs,tg,ag,sgg,ex1,ez,dx,dz,fx1,vs0,vg0,
-				ls,w,nr,r,nt,dt,ft,tr.data);
-			/* set segy trace header parameters */
-			tr.tracl = tr.tracr = ++tracl;
-			tr.fldr = ixs+1;
-			tr.tracf = ixg+1;	
-			tr.sx = NINT(xs);
-			tr.gx = NINT(xg);
-			/* write trace */
-			puttr(&tr);
+				ls,w,nr,r,nt,dt,ft,out+(size_t)ixg*nt,lhd,nhd,hd);
 		}
 		else {
 			/* Linear interpolation */
-			
-		eiktam_pert(xg,0,nz,dz,0,nx1,dx,fx1,v,vp,pert,tg1,ag1,sgg1,bag);
-		if(ierr){
-			/* Ekonal equation fails to solve */
-			warn("\tEikonal equation fails to solve at "
-			     "x=%g, z=%g\n\tfrom receiver xg=%g .",
-			     x_err+xg,z_err,xg);
-			break;
-		}
 
-		/* calculate velocity at receiver 	*/
-		vg0 = (1-temp)*vold[nx0+nxb][0]+temp*vold[nx0+nxb+1][0];
-			
+			eiktam_pert(xg,0,nz,dz,0,nx1,dx,fx1,v,vp,doperturb,tg1,ag1,sgg1,bag);
+
+			/* calculate velocity at receiver 	*/
+			vg0 = (1-temp)*vold[nx0+nxb][0]+temp*vold[MIN(nx0+nxb+1,nx-1)][0];
+
 			/* interpolate quantities between two midpoints	*/
 		    	xg -= nxd1*dxg;
 		    for(i=1; i<=nxd1; ++i) {
 		    	xg += dxg;
-			fx1 = xg-nxb*dx;	
+			fx1 = xg-nxb*dx;
 			ex1 = xg+nxb*dx;
 			temp = nxd1-i;
 			temp1 = 1.0/(nxd1-i+1);
@@ -424,26 +316,15 @@ main (int argc, char **argv)
 					+temp*aold[ix+nx0+1][iz];
 		   		 }
 			}
-				
+
 			/* make one trace */
 			ex1 = MIN(ex,xg+nxb*dx);
 			makeone(ts,as,sgs,tg,ag,sgg,ex1,ez,dx,dz,fx1,vs0,vg0,
-				ls,w,nr,r,nt,dt,ft,tr.data);
-			/* set segy trace header parameters */
-			tr.tracl = tr.tracr = ++tracl;
-			tr.fldr = ixs+1;
-			tr.tracf = ixg+1;	
-			tr.sx = NINT(xs);
-			tr.gx = NINT(xg);
-			/* write trace */
-			puttr(&tr);
+				ls,w,nr,r,nt,dt,ft,out+(size_t)(ixg-nxd1+i)*nt,lhd,nhd,hd);
 		    }
 		}
-		/* recount the skipping number for the last midpoint */
-		    if(ixg<nxg-1 && ixg>nxg-1-nxd1) nxd1 = nxg-1-ixg;
-
-	    }
-	    warn("\t finish shot %f",xs);
+		/* recount the skipping number for the last receiver */
+		if(ixg<nxg-1 && ixg>nxg-1-nxd1) nxd1 = nxg-1-ixg;
 	}
 
 	free2float(vold);
@@ -459,7 +340,7 @@ main (int argc, char **argv)
 	free2float(bag);
 	free2float(sgg);
 	free2float(ag);
-	if(pert) {
+	if(doperturb) {
 		free2float(vp);
 		free2float(vpold);
 	}
@@ -468,13 +349,14 @@ main (int argc, char **argv)
 		free2float(tg1);
 		free2float(ag1);
   	}
-	return(CWP_Exit());
+	return 0;
 }
 
 static void makeone (float **ts, float **as, float **sgs, 
 	float **tg, float **ag, float **sgg, float ex, float ez, float dx, 
 	float dz, float fx, float vs0, float vg0, int ls, Wavelet *w,
-	int nr, Reflector *r, int nt, float dt, float ft, float *trace)
+	int nr, Reflector *r, int nt, float dt, float ft, float *trace,
+	int lhd, int nhd, float *hd)
 /*****************************************************************************
 Make one synthetic seismogram 
 ******************************************************************************
@@ -511,16 +393,6 @@ trace		array[nt] containing synthetic seismogram
 		tsd,asd,sgsd,tgd,agd,sggd,
 		*temp;
 	ReflectorSegment *rs;
-	int lhd=LHD,nhd=NHD;
-	static float hd[NHD];
-	static int madehd=0;
-
-	/* if half-derivative filter not yet made, make it */
-	if (!madehd) {
-		mkhdiff(dt,lhd,hd);
-		madehd = 1;
-	}
- 
 	/* zero trace */
 	for (it=0; it<nt; ++it)
 		trace[it] = 0.0;
@@ -611,7 +483,7 @@ trace		array[nt] containing synthetic seismogram
 	free1float(temp);
 }
 
-void delta_t (int na, float da, float r, float dr, 
+static void delta_t (int na, float da, float r, float dr, 
 	float uc[], float wc[], float sc[], float bc[],
 	float un[], float wn[], float sn[], float bn[])
 /*****************************************************************************
@@ -674,7 +546,7 @@ Author:  Zhenyue Liu, Colorado School of Mines, 07/8/92
 }
 
 /* functions defined and used internally */
-void eiktam_pert (float xs, float zs, int nz, float dz, float fz, int nx, 
+static void eiktam_pert (float xs, float zs, int nz, float dz, float fz, int nx, 
 	float dx, float fx, float **vel, float **vel_p, int pert,
 	float **time, float **angle, float **sig, float **bet)
 /*****************************************************************************
@@ -781,11 +653,6 @@ Revisor:  Zhenyue Liu, Colorado School of Mines, 7/8/92
 		eikpex(na,da,r,dr,
 			sp[ir],up[ir],wp[ir],tp[ir],
 			sp[ir+1],up[ir+1],wp[ir+1],tp[ir+1]);
-		if(ierr) {
-			x_err = r_err*sin(ia_err*da+fa);
-			z_err = r_err*cos(ia_err*da+fa);
-			return;
-		}
 	}
 	
 	/* convert times from polar to rectangular coordinates */

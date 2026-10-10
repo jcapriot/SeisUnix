@@ -3,10 +3,10 @@
 
 /* SUSYNVXZ: $Revision: 1.22 $ ; $Date: 2015/06/02 20:15:23 $	*/
 
-#include "su.h" 
-#include "segy.h" 
+#include "su.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 " 									",
 " SUSYNVXZ - SYNthetic seismograms of common offset V(X,Z) media via	",
@@ -56,6 +56,8 @@ char *sdoc[] = {
 " Default amplitude is 1.0 if amplitude: part of the string is omitted.	",
 "									",
 NULL};
+#endif
+
 
 /*
  *   CWP:  Zhenyue Liu, 07/20/92
@@ -67,141 +69,65 @@ NULL};
  */
 /**************** end self doc ***********************************/
 
-/* these structures are defined in par.h -- this is documentation only
+/* Library version of SUSYNVXZ
  *
- * typedef struct ReflectorSegmentStruct {
- *	float x;	( x coordinate of segment midpoint )
- *	float z;	( z coordinate of segment midpoint )
- *	float s;	( x component of unit-normal-vector )
- *	float c;	( z component of unit-normal-vector )
- * } ReflectorSegment;
- * typedef struct ReflectorStruct {
- *	int ns;			( number of reflector segments )
- *	float ds;		( segment length )
- *	float a;		( amplitude of reflector )
- *	ReflectorSegment *rs;	( array[ns] of reflector segments )
- * } Reflector;
- * typedef struct WaveletStruct {
- *	int lw;			( length of wavelet )
- *	int iw;			( index of first wavelet sample )
- *	float *wv;		( wavelet sample values )
- * } Wavelet;
+ * The main program (the parameters, the velocities read from a file, the headers of the traces) is left to the caller, with the
+ * reflectors (decodeReflectors, breakReflectors, makeref), the Ricker wavelet (makericker) and the half-derivative filter (mkhdiff)
+ * made by it. What is here is the loop over the midpoints of one offset, which makes the traces of the offset, and it holds no
+ * static state (the half-derivative filter, which the program made on its first trace, is passed in).
  *
+ *	su_synvxz_offset:	the nxm traces of the common-offset section for one offset
+ *
+ * Differences from the program: the checks of the parameters return a code, and the maximum segment length of the reflectors (dsmax),
+ * which the program works out from the velocity at the first sample, is for the caller to do.
  */
 
 /* parameters for half-derivative filter */
 #define LHD 20
 #define NHD 1+2*LHD
 
-/* prototypes */
-static void makeone (float **ts, float **as, float **sgs, float **tg, 
-	float **ag, float **sgg, float ex, float ez, float dx,  
+static void makeone (float **ts, float **as, float **sgs, float **tg,
+	float **ag, float **sgg, float ex, float ez, float dx,
 	float dz, float fx, float vs0, float vg0, int ls, Wavelet *w,
-	int nr, Reflector *r, int nt, float dt, float ft, float *trace);
+	int nr, Reflector *r, int nt, float dt, float ft, float *trace,
+	int lhd, int nhd, float *hd);
 
-/* segy trace */
-segy tr;
-
-int
-main (int argc, char **argv)
+/* The traces of one offset xo, for the nxm midpoints fxm+ixm*dxm; the velocity is vel[nx][nz] (z the fast axis) on the grid
+ * fx+ix*dx, iz*dz. The traces are out[nxm][nt].
+ *
+ * nxb: half the width, in grid samples, of the band of the traveltimes about the midpoint; nxd: the number of midpoints between
+ * those at which the traveltimes are calculated (1 for every one).
+ *
+ * Returns 0, -1 if a shot or receiver is outside the grid, -2 if nxb is too small for the offset, -3 for parameters that are
+ * not allowed.
+ */
+int su_synvxz_offset(const float *vel, int nx, int nz, float dx, float dz, float fx,
+	int nxb, int nxd, float xo, int nxm, float dxm, float fxm,
+	int ls, Wavelet *w, int nr, Reflector *r, int nt, float dt, float ft,
+	int lhd, int nhd, float *hd, float *out)
 {
-	int 	nr,ir,ls,smooth,ndpfz,ns,ixo,ixm,nxo,nxm,nt,
-		nx,nz,nxb,nxd,ixd,i,ix,iz,nx1,nx0,nxd1,
-		verbose,tracl,
-		*nxz;
-	float   tmin,temp,temp1,
-		dsmax,fpeak,dx,dz,fx,ex,fx1,ex1,
-		dxm,dxo,dt,fxm,fxo,ft,xo,xm,vs0,vg0,
-		xs,xg,ez,
-		*ar,**xr,**zr,
+	int ixm,ixd,i,ix,iz,nx1,nx0,nxd1;
+	float temp,temp1,fx1,ex1,ex,ez,xm,vs0,vg0,xs,xg,
 		**vold,**ts,**as,**sgs,**tg,**ag,**sgg,**bas,**bag,
 		**v,**ts1=NULL,**as1=NULL,**sgs1=NULL,
 		**tg1=NULL,**ag1=NULL,**sgg1=NULL;
-	FILE *vfp=stdin;
-	Reflector *r;
-	Wavelet *w;
 
-	/* hook up getpar to handle the parameters */
-	initargs(argc,argv);
-	requestdoc(0);
+	if (nx<2 || nz<2 || nxb<1 || nxd<1 || nxm<1 || nt<1) return -3;
 
-	/* get required parameters */
-	if (!getparint("nx",&nx)) err("must specify nx!\n");
-	if (!getparint("nz",&nz)) err("must specify nz!\n");
-	
-	/* get optional parameters */
-	if (!getparint("nxb",&nxb)) nxb = nx;
-	if (!getparint("nxd",&nxd)) nxd = 1;
-	if (!getparfloat("dx",&dx)) dx = 100;
-	if (!getparfloat("fx",&fx)) fx = 0.0;
-	if (!getparfloat("dz",&dz)) dz = 100;
-	if (!getparint("nt",&nt)) nt = 101; CHECK_NT("nt",nt);
-	if (!getparfloat("dt",&dt)) dt = 0.04;
-	if (!getparfloat("ft",&ft)) ft = 0.0;
-	if (!getparint("nxo",&nxo)) nxo = 1;
-	if (!getparfloat("dxo",&dxo)) dxo = 50;
-	if (!getparfloat("fxo",&fxo)) fxo = 0.0;
-	if (!getparint("nxm",&nxm)) nxm = 101;
-	if (!getparfloat("dxm",&dxm)) dxm = 50;
-	if (!getparfloat("fxm",&fxm)) fxm = 0.0;
-	if (!getparfloat("fpeak",&fpeak)) fpeak = 0.2/dt;
-	if (!getparint("ls",&ls)) ls = 0;
-	if (!getparfloat("tmin",&tmin)) tmin = 10.0*dt;
-	if (!getparint("ndpfz",&ndpfz)) ndpfz = 5;
-	if (!getparint("smooth",&smooth)) smooth = 0;
-	if (!getparint("verbose",&verbose)) verbose = 0;
-	
 	/* check the ranges of shots and receivers */
 	ex = fx+(nx-1)*dx;
 	ez = (nz-1)*dz;
- 	for (ixm=0; ixm<nxm; ++ixm) 
-		for (ixo=0; ixo<nxo; ++ixo) {
-			/* compute source and receiver coordinates */
-			xs = fxm+ixm*dxm-0.5*(fxo+ixo*dxo);
-			xg = xs+fxo+ixo*dxo;
-			if (fx>xs || ex<xs || fx>xg || ex<xg) 
-		err("shot or receiver lie outside of specified (x,z) grid\n");
-	} 
-		
-	
-	decodeReflectors(&nr,&ar,&nxz,&xr,&zr);
-        checkpars();
-
-	if (!smooth) breakReflectors(&nr,&ar,&nxz,&xr,&zr);
-
-	/* allocate space */
-	vold = ealloc2float(nz,nx);
-	/* read velocities */
-	if(fread(vold[0],sizeof(float),nx*nz,vfp)!=nx*nz)
-		err("cannot read %d velocities from file %s",nx*nz,vfp);
-	/* determine maximum reflector segment length */
-	tmin = MAX(tmin,MAX(ft,dt));
-	dsmax = vold[0][0]/(2*ndpfz)*sqrt(tmin/fpeak);
- 	
-	/* make reflectors */
-	makeref(dsmax,nr,ar,nxz,xr,zr,&r);
-
-	/* count reflector segments */
-	for (ir=0,ns=0; ir<nr; ++ir)
-		ns += r[ir].ns;
-
-	/* make wavelet */
-	makericker(fpeak,dt,&w);
-	
-	/* if requested, print information */
-	if (verbose) {
-		warn("\nSUSYNVXZ:");
-		warn("Total number of small reflecting segments is %d.\n",ns);
+	for (ixm=0; ixm<nxm; ++ixm) {
+		xs = fxm+ixm*dxm-0.5*xo;
+		xg = xs+xo;
+		if (fx>xs || ex<xs || fx>xg || ex<xg) return -1;
 	}
-	
-	/* set constant segy trace header parameters */
-	memset( (void *) &tr, 0, sizeof(segy));
-	tr.trid = 1;
-	tr.counit = 1;
-	tr.ns = nt;
-	tr.dt = 1.0e6*dt;
-	tr.delrt = 1.0e3*ft;
-	
+	if (ABS(xo)>nxb*dx) return -2;
+
+	/* the velocities, with the pointers to the rows */
+	vold = (float**)ealloc1(nx,sizeof(float*));
+	for (ix=0; ix<nx; ++ix) vold[ix] = (float*)vel+(size_t)ix*nz;
+
 	/* allocate space */
 	nx1 = 1+2*nxb;
 	ts = ealloc2float(nz,nx1);
@@ -222,39 +148,34 @@ main (int argc, char **argv)
 		ag1 = ealloc2float(nz,nx1);
 		sgg1 = ealloc2float(nz,nx1);
   	}
-		
 
-	/* loop over offsets and midpoints */
-	for (ixo=0, tracl=0; ixo<nxo; ++ixo){
-	    xo = fxo+ixo*dxo;
-	    if(ABS(xo)>nxb*dx) err("\t band NXB is too small!\n");
-	    nxd1 = nxd;
-	    for (ixm=0; ixm<nxm; ixm +=nxd1){
+	nxd1 = nxd;
+	for (ixm=0; ixm<nxm; ixm +=nxd1){
 		xm = fxm+ixm*dxm;
    		xs = xm-0.5*xo;
 		xg = xs+xo;
 		/* set range for traveltimes' calculation */
 		fx1 = xm-nxb*dx;
 		ex1 = MIN(ex+(nxd1-1)*dxm,xm+nxb*dx);
-		nx1 = 1+(ex1-fx1)/dx;	
+		nx1 = 1+(ex1-fx1)/dx;
 		nx0 = (fx1-fx)/dx;
 		temp = (fx1-fx)/dx-nx0;
 		/* transpose velocity such that the first row is at fx1 */
 		for(ix=0;ix<nx1;++ix)
 		    for(iz=0;iz<nz;++iz){
-		    	if(ix<-nx0) 
+		    	if(ix<-nx0)
 			   	v[ix][iz] = vold[0][iz];
-		    	else if(ix+nx0>nx-2) 
+		    	else if(ix+nx0>nx-2)
 				v[ix][iz]=vold[nx-1][iz];
 			else
 				v[ix][iz] = vold[ix+nx0][iz]*(1.0-temp)
 					+temp*vold[ix+nx0+1][iz];
 		    }
-			
+
 		if(ixm==0 || nxd1==1){
 		/* No interpolation */
-	
-			/* compute traveltimes, propagation angles, sigmas 
+
+			/* compute traveltimes, propagation angles, sigmas
 	  		 from shot and receiver respectively	*/
 			eiktam(xs,0.,nz,dz,0.,nx1,dx,fx1,v,ts,as,sgs,bas);
 			eiktam(xg,0.,nz,dz,0.,nx1,dx,fx1,v,tg,ag,sgg,bag);
@@ -262,39 +183,30 @@ main (int argc, char **argv)
 			vs0 = vold[ixd][0];
 			ixd = NINT((xg-fx)/dx);
 			vg0 = vold[ixd][0];
-				
+
 			/* make one trace */
 			ex1 = MIN(ex,xm+nxb*dx);
 			makeone(ts,as,sgs,tg,ag,sgg,ex1,ez,dx,dz,fx1,vs0,vg0,
-				ls,w,nr,r,nt,dt,ft,tr.data);
-			/* set segy trace header parameters */
-			tr.tracl = tr.tracr = ++tracl;
-			tr.cdp = 1+ixm;
-			tr.cdpt = 1+ixo;
-			tr.offset = NINT(xo);
-			tr.sx = NINT(xs);
-			tr.gx = NINT(xg);
-			/* write trace */
-			puttr(&tr);
+				ls,w,nr,r,nt,dt,ft,out+(size_t)ixm*nt,lhd,nhd,hd);
 		}
 		else {
 			/* Linear interpolation */
-			
+
 			eiktam(xs,0,nz,dz,0,nx1,dx,fx1,v,ts1,as1,sgs1,bas);
 			eiktam(xg,0,nz,dz,0,nx1,dx,fx1,v,tg1,ag1,sgg1,bag);
 			ixd = NINT((xs-fx)/dx);
 			vs0 = vold[ixd][0];
 			ixd = NINT((xg-fx)/dx);
 			vg0 = vold[ixd][0];
-			
+
 		    	xm -= nxd1*dxm;
 		    for(i=1; i<=nxd1; ++i) {
 		    	xm += dxm;
 			xs = xm-0.5*xo;
 			xg = xs+xo;
-			fx1 = xm-nxb*dx;	
+			fx1 = xm-nxb*dx;
 			ex1 = MIN(ex+(nxd1-1)*dxm,xm+nxb*dx);
-			nx1 = 1+(ex1-fx1)/dx;	
+			nx1 = 1+(ex1-fx1)/dx;
 			temp = nxd1-i;
 			temp1 = 1.0/(nxd1-i+1);
 			for(ix=0;ix<nx1;++ix)
@@ -322,32 +234,18 @@ main (int argc, char **argv)
 					+sgg1[ix][iz])*temp1;
 				}
 			}
-				
+
 			/* make one trace */
 			ex1 = MIN(ex,xm+nxb*dx);
 			makeone(ts,as,sgs,tg,ag,sgg,ex1,ez,dx,dz,fx1,vs0,vg0,
-				ls,w,nr,r,nt,dt,ft,tr.data);
-			/* set segy trace header parameters */
-			tr.tracl = tr.tracr = ++tracl;
-			tr.cdp = 1+ixm-nxd1+i;
-			tr.cdpt = 1+ixo;
-			tr.offset = NINT(xo);
-			tr.d2=dxm;
-			tr.f2=fxm;
-			tr.sx = NINT(xs);
-			tr.gx = NINT(xg);
-			/* write trace */
-			puttr(&tr);
+				ls,w,nr,r,nt,dt,ft,out+(size_t)(ixm-nxd1+i)*nt,lhd,nhd,hd);
 		    }
 		}
-		    /* set skip parameter */
-		    if(ixm<nxm-1 && ixm>nxm-1-nxd1) nxd1 = nxm-1-ixm;
-
-	    }
-	    warn("\t finish offset %f\n",xo);
+		/* set skip parameter */
+		if(ixm<nxm-1 && ixm>nxm-1-nxd1) nxd1 = nxm-1-ixm;
 	}
 
-	free2float(vold);
+	free1(vold);
 	free2float(ts);
 	free2float(bas);
 	free2float(sgs);
@@ -365,13 +263,14 @@ main (int argc, char **argv)
 		free2float(ag1);
 		free2float(sgg1);
   	}
-	return(CWP_Exit());
+	return 0;
 }
 
 static void makeone (float **ts, float **as, float **sgs, 
 	float **tg, float **ag, float **sgg, float ex, float ez, float dx, 
 	float dz, float fx, float vs0, float vg0, int ls, Wavelet *w,
-	int nr, Reflector *r, int nt, float dt, float ft, float *trace)
+	int nr, Reflector *r, int nt, float dt, float ft, float *trace,
+	int lhd, int nhd, float *hd)
 /*****************************************************************************
 Make one synthetic seismogram 
 ******************************************************************************
@@ -401,16 +300,6 @@ trace		array[nt] containing synthetic seismogram
 		tsd,asd,sgsd,tgd,agd,sggd,
 		*temp;
 	ReflectorSegment *rs;
-	int lhd=LHD,nhd=NHD;
-	static float hd[NHD];
-	static int madehd=0;
-
-	/* if half-derivative filter not yet made, make it */
-	if (!madehd) {
-		mkhdiff(dt,lhd,hd);
-		madehd = 1;
-	}
- 
 	/* zero trace */
 	for (it=0; it<nt; ++it)
 		trace[it] = 0.0;

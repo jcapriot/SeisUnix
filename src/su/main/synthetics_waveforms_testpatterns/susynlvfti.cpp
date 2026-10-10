@@ -4,9 +4,9 @@
 /* SUSYLVTI: $Revision: 1.8 $ ; $Date: 2015/06/02 20:15:23 $	*/
 
 #include "su.h"
-#include "segy.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUSYNLVFTI - SYNthetic seismograms for Linear Velocity function in a  ",
@@ -81,6 +81,8 @@ char *sdoc[] = {
 " is the result. This is caused primarly by the break down in the two point", 
 " ray-tracing. Also keep the values of delta and epsilon between 2 and -2.",
 NULL};
+#endif
+
 /**************** end self doc ***********************************/
 
 /*
@@ -90,275 +92,31 @@ NULL};
  */
 
 
-/* these structures are defined in par.h -- this is documentation only
+
+/* Library version of SUSYNLVFTI
  *
- * typedef struct ReflectorSegmentStruct {
- *	float x;	( x coordinate of segment midpoint )
- *	float z;	( z coordinate of segment midpoint )
- *	float s;	( x component of unit-normal-vector )
- *	float c;	( z component of unit-normal-vector )
- * } ReflectorSegment;
- * typedef struct ReflectorStruct {
- *	int ns;			( number of reflector segments )
- *	float ds;		( segment length )
- *	float a;		( amplitude of reflector )
- *	ReflectorSegment *rs;	( array[ns] of reflector segments )
- * } Reflector;
- * typedef struct WaveletStruct {
- *	int lw;			( length of wavelet )
- *	int iw;			( index of first wavelet sample )
- *	float *wv;		( wavelet sample values )
- * } Wavelet;
- *
+ * The main program (the parameters, the loops over shots or midpoints and offsets, the trace headers) is left to the caller, with
+ * the reflectors (decodeReflectors, breakReflectors, makeref), the Ricker wavelet (makericker) and the half-derivative filter
+ * (mkhdiff) made by it. What is here is the part that makes one seismogram, which holds no static state (the half-derivative
+ * filter, which the program made on its first trace, is passed in), and the ray tracing of the transversely isotropic medium as
+ * it is. The sinc table of addsinc is made by su_addsinc_table.
  */
 
-/* parameters for half-derivative filter */
-#define LHD 20
-#define NHD 1+2*LHD
-
-/* prototypes for functions defined and used internally */
-static void makeone (float v00, float dvdx, float dvdz,
-	int ls, int er, int ob, Wavelet *w, int trans,
-	int nitmax, float epst, int zeroff,
-	int ntries, float epsx, float angxs,
-	float xs, float zs, float xg, float zg,
-	float a, float f, float l,
-	int nr, Reflector *r, int nt, float dt, float ft, float *trace);
+/* prototype for the function used internally */
 static void raylvt (float v00, float dvdx, float dvdz,
 	float x0, float z0, float x, float z,
 	float a, float f, float l, int ntries,
 	float nitmax, float epst, float epsx, float angxs,
 	float *c, float *s, float *t, float *q);
 
-/* segy trace */
-segy tr;
-
-int
-main (int argc, char **argv)
-{
-	int nr,er,ob,ir,ixz,ls,smooth,ndpfz,ns,
-		ixo,ixsm,nxo,nxs,nxm,nt,nxsm,
-		shots,midpoints,verbose,tracl,zeroff,
-		*nxz,kilounits;
-	int nitmax,ntries,trans;
-	float x0,z0,v00,dvdx,dvdz,vmin,tmin,tminr,
-		x,z,v,t,dsmax,fpeak,
-		dxs,dxm,dxo,dt,fxs,fxm,fxo,ft,dxsm,
-		xs,zs,xg,zg,angxs,torad,delta,epsilon,
-		*xo,*ar,**xr,**zr;
-	float epst,epsx,a,f,l;
-	Reflector *r;
-	Wavelet *w;
-
-	/* hook up getpar to handle the parameters */
-	initargs(argc,argv);
-	requestdoc(0);
-
-	/* get parameters */
-	if (!getparint("nt",&nt)) nt = 101;
-	if (!getparfloat("dt",&dt)) dt = 0.04;
-	if (!getparfloat("ft",&ft)) ft = 0.0;
-        if (!getparint("kilounits",&kilounits)) kilounits = 1;
-	if ((nxo=countparval("xo"))!=0) {
-		xo = ealloc1float(nxo);
-		getparfloat("xo",xo);
-	} else {
-		if (!getparint("nxo",&nxo)) nxo = 1;
-		if (!getparfloat("dxo",&dxo)) dxo = 0.05;
-		if (!getparfloat("fxo",&fxo)) fxo = 0.0;
-		xo = ealloc1float(nxo);
-		for (ixo=0; ixo<nxo; ++ixo)
-			xo[ixo] = fxo+ixo*dxo;
-	}
-	shots = (getparint("nxs",&nxs) || 
-		getparfloat("dxs",&dxs) || 
-		getparfloat("fxs",&fxs));
-	midpoints = (getparint("nxm",&nxm) || 
-		getparfloat("dxm",&dxm) || 
-		getparfloat("fxm",&fxm)); 
-	if (shots && midpoints)
-		err("cannot specify both shot and midpoint sampling!\n");
-	if (shots) {
-		if (!getparint("nxs",&nxs)) nxs = 101;
-		if (!getparfloat("dxs",&dxs)) dxs = 0.05;
-		if (!getparfloat("fxs",&fxs)) fxs = 0.0;
-		nxsm = nxs;
-		dxsm = dxs;
-	} else {
-		midpoints = 1;
-		if (!getparint("nxm",&nxm)) nxm = 101;
-		if (!getparfloat("dxm",&dxm)) dxm = 0.05;
-		if (!getparfloat("fxm",&fxm)) fxm = 0.0;
-		nxsm = nxm;
-		dxsm = dxm;
-	}
-	if (!getparint("nxm",&nxm)) nxm = 101;
-	if (!getparfloat("dxm",&dxm)) dxm = 0.05;
-	if (!getparfloat("fxm",&fxm)) fxm = 0.0;
-	if (!getparfloat("x0",&x0)) x0 = 0.0;
-	if (!getparfloat("z0",&z0)) z0 = 0.0;
-	if (!getparfloat("v00",&v00)) v00 = 2.0;
-	if (!getparfloat("dvdx",&dvdx)) dvdx = 0.0;
-	if (!getparfloat("dvdz",&dvdz)) dvdz = 0.0;
-	if (!getparfloat("fpeak",&fpeak)) fpeak = 0.2/dt;
-	if (!getparint("ls",&ls)) ls = 0;
-	if (!getparint("er",&er)) er = 0;
-	if (!getparint("ob",&ob)) ob = 0;
-	if (!getparfloat("tmin",&tmin)) tmin = 10.0*dt;
-	if (!getparint("ndpfz",&ndpfz)) ndpfz = 5;
-	if (!getparint("smooth",&smooth)) smooth = 0;
-	if (!getparint("verbose",&verbose)) verbose = 1;
-	decodeReflectors(&nr,&ar,&nxz,&xr,&zr);
-	if (!smooth) breakReflectors(&nr,&ar,&nxz,&xr,&zr);
-
-	/********************************/
-	/* get optional parameters relating to anisotropy*/
-	if (!getparfloat("angxs",&angxs))     angxs   = 0.;
-	if (!getparfloat("a",&a))	 	a     = 1.0;
-	if (!getparfloat("f",&f))	 	f     = 0.4;
-	if (!getparfloat("l",&l))		l     = 0.3;
-	if (!getparfloat("delta",&delta))	delta     = 0.0;
-	if (!getparfloat("epsilon",&epsilon))  epsilon     = 0.0;
-	/********************************/
-	/* for computing incidence and reflection angles and velocities */
-	if (!getparint("ntries",&ntries))	ntries   = 20;
-	if (!getparfloat("epsx",&epsx)) epsx  = .001;
-	if (!getparfloat("epst",&epst)) epst  = .0001;
-
-	if (!getparint("nitmax",&nitmax))  nitmax  = 12;
-	/********************************/
-
-	trans=0;
-	if(a != 1 || (f+2*l) != 1) trans=1;
-	if(delta != 0 || epsilon != 0){
-		a=1+2*epsilon;
-		f=sqrt(2*delta*(1-l)+(1-l)*(1-l))-l;
-		trans=1;
-	}
-
-	/*determine wether it's zero-offset*/
-	zeroff = 0;
-	if((nxo==1) && (fxo==0.0)) zeroff = 1;
-
-	/* convert velocity v(x0,z0) to v(0,0) */
-	v00 -= dvdx*x0+dvdz*z0;
-	
-	/*transform to radians*/
-	torad = PI/180;
-	/* determine minimum velocity and minimum reflection time */
-	for (ir=0,vmin=FLT_MAX,tminr=FLT_MAX; ir<nr; ++ir) {
-		for (ixz=0; ixz<nxz[ir]; ++ixz) {
-			x = xr[ir][ixz];
-			z = zr[ir][ixz];
-			v = v00+dvdx*x+dvdz*z;
-			if (v<vmin) vmin = v;
-			t = 2.0*z/v;
-			if (t<tminr) tminr = t;
-		}
-	}
-
-	/* determine maximum reflector segment length */
-	tmin = MAX(tmin,MAX(ft,dt));
-	dsmax = vmin/(2*ndpfz)*sqrt(tmin/fpeak);
- 	
-	/* make reflectors */
-	makeref(dsmax,nr,ar,nxz,xr,zr,&r);
-
-	/* count reflector segments */
-	for (ir=0,ns=0; ir<nr; ++ir)
-		ns += r[ir].ns;
-
-	/* make wavelet */
-	makericker(fpeak,dt,&w);
-	
-	/* if requested, print information */
-	if (verbose) {
-		fprintf(stderr,"\nSYNLVXZ:\n");
-		fprintf(stderr,
-			"Minimum possible reflection time (assuming sources\n"
-			"and receivers are at the surface Z=0) is %g s.\n"
-			"You may want to adjust the \"minimum time of \n"
-			"interest\" parameter.\n",tminr);
-		fprintf(stderr,
-			"Total number of small reflecting\n"
-			"segments is %d.\n",ns);
-		fprintf(stderr,"\n");
-	}
-	
-
-	/* set constant segy trace header parameters */
-	memset( (void *) &tr, 0, sizeof(segy));
-	tr.trid = 1;
-	tr.counit = 1;
-	tr.ns = nt;
-	tr.dt = 1.0e6*dt;
-	tr.delrt = 1.0e3*ft;
-	
-	/* loop over shots or midpoints */
-	for (ixsm=0,tracl=0; ixsm<nxsm; ++ixsm) {
-	
-		/* loop over offsets */
-		for (ixo=0; ixo<nxo; ++ixo) {
-		
-			/* compute source and receiver coordinates */
-			if (shots)
-				xs = fxs+ixsm*dxs;
-			else
-				xs = fxm+ixsm*dxm-0.5*xo[ixo];
-			zs = 0.0;
-			xg = xs+xo[ixo];
-			zg = 0.0;
-			
-			/* set segy trace header parameters */
-			tr.tracl = tr.tracr = ++tracl;
-			if (shots) {
-				tr.fldr = 1+ixsm;
-				tr.tracf = 1+ixo;
-                                tr.d2 = dxo;
-                                tr.f2 = fxo;
-
-			} else {
-				tr.cdp = 1+ixsm;
-				tr.cdpt = 1+ixo;
-                                tr.d2 = dxm;
-                                tr.f2 = fxm;
-			}
-
-			if (kilounits==1) {
- 		  	    tr.offset = NINT(1000.0*(dxsm>0.0?xo[ixo]:-xo[ixo]));
-			    tr.sx = NINT(1000.0*xs);
-			    tr.gx = NINT(1000.0*xg);
-                        } else {
-                            tr.offset = NINT((dxsm>0.0?xo[ixo]:-xo[ixo]));
-                            tr.sx = NINT(xs);
-                            tr.gx = NINT(xg);
-                        }
-
-				
-			/* make one trace */
-			makeone(v00,dvdx,dvdz,
-				ls,er,ob,w,trans,
-				nitmax,epst,zeroff,
-				ntries,epsx,angxs*torad,
-				xs,zs,xg,zg,
-				a,f,l,
-				nr,r,nt,dt,ft,tr.data);
-			
-			/* write trace */
-			puttr(&tr);
-		}
-	}
-	return(CWP_Exit());
-}
-
-
-static void makeone (float v00, float dvdx, float dvdz, 
+void su_synlvfti(float *trace, float v00, float dvdx, float dvdz,
 	int ls, int er, int ob, Wavelet *w, int trans,
 	int nitmax, float epst, int zeroff,
 	int ntries, float epsx, float angxs,
 	float xs, float zs, float xg, float zg,
 	float a, float f, float l,
-	int nr, Reflector *r, int nt, float dt, float ft, float *trace)
+	int nr, Reflector *r, int nt, float dt, float ft,
+	int lhd, int nhd, float *hd)
 /*****************************************************************************
 Make one synthetic seismogram for linear velocity v(x,z) = v00+dvdx*x+dvdz*z
 ******************************************************************************
@@ -366,6 +124,13 @@ Input:
 v00		velocity v at (x=0,z=0)
 dvdx		derivative dv/dx of velocity v with respect to x
 dvdz		derivative dv/dz of velocity v with respect to z
+trans		=1 for a transversely isotropic medium (a, f, l are used), =0 for an isotropic one
+zeroff		=1 if the data are zero offset, where the ray of the source is used for the receiver
+nitmax, epst	maximum number of iterations and tolerance of the travel time integrations
+ntries, epsx	number of iterations and the lateral offset tolerance of the search for the ray
+angxs		angle of the symmetry axis with the vertical (radians)
+a, f, l		ratios of the elastic coefficients c1111/c3333, c1133/c3333, c1313/c3333
+lhd, nhd, hd	the half-derivative filter, array[nhd], nhd = 1+2*lhd (from mkhdiff)
 ls		=1 for line source amplitudes; =0 for point source
 er		=1 for exploding, =0 for normal reflector amplitudes
 ob		=1 to include cos obliquity factors; =0 to omit
@@ -388,15 +153,6 @@ trace		array[nt] containing synthetic seismogram
 	float ar,ds,xd,zd,cd,sd,vs,vg,vd,cs,ss,ts,qs,cg,sg,tg,qg,
 		ci,cr,time,amp,*temp;
 	ReflectorSegment *rs;
-	int lhd=LHD,nhd=NHD;
-	static float hd[NHD];
-	static int madehd=0;
-	
-	/* if half-derivative filter not yet made, make it */
-	if (!madehd) {
-		mkhdiff(dt,lhd,hd);
-		madehd = 1;
-	}
 
 	/* zero trace */
 	for (it=0; it<nt; ++it)
@@ -519,6 +275,8 @@ trace		array[nt] containing synthetic seismogram
 }
 
 
+
+
 static void raylvt (float v00, float dvdx, float dvdz,
 	float x0, float z0, float x, float z,
 	float a, float f, float l, int ntries,
@@ -553,7 +311,7 @@ q		integral of velocity along raypath
 
 	double px0,v0,aa,alfa,beta=0.0,vcp=0.0,oa;
 	double v,c1,c2,f1,fx,cr,sr;
-	double r,or,vcpi=0.0,vcps=0.0,p11,so,co=0.0,ci=0.0,cz2,
+	double r,orr,vcpi=0.0,vcps=0.0,p11,so,co=0.0,ci=0.0,cz2,
 			dso,so1=0.0,ss=0.0,cs=0.0;
 	double si2,co2,sc,sx=0.0,cx=0.0,so3,diff,so4,diff1=0.0,sz2;
 	double w1,w2,w3,px2,pz2,betaa,betab,alpha,pz0,betat,xx,dvcp,bbb,soo;
@@ -604,8 +362,8 @@ q		integral of velocity along raypath
 		x  -= x0;
 		z  -= z0;
 		r   = sqrt(x*x+z*z);
-		or  = 1.0/r;
-		*s  = x*or;
+		orr  = 1.0/r;
+		*s  = x*orr;
 		so  = *s;
 		dso = .1;
 		so4 =0;

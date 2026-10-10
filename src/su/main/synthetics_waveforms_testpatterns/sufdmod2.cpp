@@ -10,6 +10,7 @@
 #include "segy.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 " 									",
 " SUFDMOD2 - Finite-Difference MODeling (2nd order) for acoustic wave equation",
@@ -63,6 +64,8 @@ char *sdoc[] = {
 " method. 								",
 " 									",
 NULL};
+#endif
+
 
 /*
  * Authors:  CWP:Dave Hale
@@ -89,561 +92,11 @@ NULL};
  */
 /**************** end self doc ********************************/
 
-#define	ABS0	1
-#define	ABS1	1
-#define	ABS2	1
-#define	ABS3	1
-
-void ptsrc (float sstrength, float xs, float zs,
-	int nx, float dx, float fx,
-	int nz, float dz, float fz,
-	float dt, float t, float fmax, float fpeak, float tdelay, int mono, float **s);
-void exsrc (int ns, float *xs, float *zs,
-	int nx, float dx, float fx,
-	int nz, float dz, float fz,
-	float dt, float t, float fmax, int pwt, int mono, float **s);
-void tstep2 (int nx, float dx, int nz, float dz, float dt,
-	float **dvv, float **od, float **s,
-	float **pm, float **p, float **pp, int *abs);
 static float ricker (float t, float fpeak, int mono);
-
-segy cubetr; 	/* data cube traces */
-segy srctr;	/* source seismogram traces */
-segy horiztr;	/* horizontal line seismogram traces */
-segy verttr;	/* vertical line seismogram traces */
-
-int
-main(int argc, char **argv)
-{
-	int ix,iz,it,is;	/* counters */
-	int nx,nz,nt,mt;	/* x,z,t,tsizes */
-
-	int verbose;		/* is verbose? */
-	int nxs;		/* number of source x coordinates */
-	int nzs;		/* number of source y coordinates */
-	int ns;			/* total number of sources ns=nxs=nxz */
-	int pw;			/* plane wave source flag 0=no 1=yes */
-	float ztmp=0.0;		/* tmp var to hold src depth in pw=1 case */
-
-	int vs2;		/* depth in samples of horiz rec line */
-	int hs1;		/* horiz sample of vert rec line */
-
-	float fx;		/* first x value */
-	float dx;		/* x sample interval */
-
-	float fz;		/* first z value */
-	float dz;		/* z sample interval */
-	float h;		/* minumum spatial sample interval */
-
-	float hsz;		/* z position of horiz receiver line */
-	float vsx;		/* x position of vertical receiver line */
-
-	float dt;		/* time sample interval */
-	float fmax;		/* maximum temporal frequency allowable */
-	float fpeak;		/* peak frequency of ricker wavelet */
-	float tdelay=0.0;	/* time delay of source beginning */
-
-	float vmin;		/* minimum wavespeed in vfile */
-	float vmax;		/* maximum wavespeed in vfile */
-
-	float dmin=0.0;		/* minimum density in dfile */
-	float dmax=0.0;		/* maximum density in dfile */
-
-	float sstrength=0.0;	/* source strength */
-
-	float tmax;		/* maximum time to compute */
-	float t;		/* time */
-	float *xs=NULL;		/* array of source x coordinates */
-	float *zs=NULL;		/* array of source z coordinates */
-	int *ixs=NULL;		/* array of source x sample locations */
-	int *izs=NULL;		/* array of source z sample locations */
-	float **s=NULL;		/* array of source pressure values */
-	float **dvv=NULL;	/* array of velocity values from vfile */
-	float **od=NULL;	/* array of density values from dfile */
-
-
-	/* pressure field arrays */
-	float **pm=NULL;	/* pressure field at t-dt */
-	float **p=NULL;		/* pressure field at t */
-	float **pp=NULL;		/* pressure field at t+dt */
-	float **ptemp=NULL;		/* temp pressure array */
-
-	/* output data arrays */
-	float **ss=NULL;	/* source point seismogram array */
-	float **hs=NULL;	/* seismograms from horiz receiver line */
-	float **vs=NULL;	/* seismograms from vert receiver line */
-
-	/* file names */
-	char *dfile="";		/* density file name */
-	char *vsfile="";	/* vert receiver seismogram line file  name */
-	char *hsfile="";	/* horiz receiver seismogram line file name */
-	char *ssfile="";	/* source point seismogram file name */
-	char *spfile="";	/* TK: source point file name */
-
-	/* input file pointers */
-	FILE *velocityfp=stdin; /* pointer to input velocity data */
-	FILE *densityfp=NULL;	/* pointer to input density data file */
-	FILE *srpntfp=NULL;	/* TK: pointer to source point location file.*/
-
-	/* output file pointers */
-	FILE *hseisfp=NULL;	/* pointer to output horiz rec line file  */
-	FILE *vseisfp=NULL;	/* pointer to output vert rec line file  */	
-	FILE *sseisfp=NULL;	/* pointer to source point seis output file */
-
-	/* SEGY fields */
-	long tracl=0;		/* trace number within a line */
-	long tracr=0;		/* trace number within a reel */
-
-	/* Absorbing boundary conditions related stuff*/
-	int abs[4];		/* absorbing boundary cond. flags */
-	int nabs;		/* number of values given */
-
-	int pwt;		/* taper length in grid points */
-	int mono;		/* single fequency src flag */
-
-	/* hook up getpar to handle the parameters */
-	initargs(argc,argv);
-	requestdoc(0);
-	
-	/* get required parameters */
-	if (!getparint("nx",&nx)) err("must specify nx!\n");
-	if (!getparint("nz",&nz)) err("must specify nz!\n");
-	if (!getparfloat("tmax",&tmax)) err("must specify tmax!\n");
-
-	/*--------------------------------------------------------------------*\
-	  TK:
-	    First, see if the value supplied to the xs= command line switch is
-	  actually the name of a file of source point locations. If a file
-	  by that name can be opened and the number of (x,z) source locations
-	  read, then we will use that file for the source location information.
-	    Otherwise, we will fall back to the default behaviour and read the
-	  shot point location x-coordinates from the command line argument
-	  itself.
-	\*--------------------------------------------------------------------*/
-	getparstring("xs",&spfile); /* See if the user specified a source
-                                       point file name. */
-	srpntfp = fopen (spfile, "r");
-	if ( srpntfp != (FILE *)NULL ) {
-		if ( (is = fscanf (srpntfp, "%d", &nxs)) != 1 ) {
-			fclose (srpntfp);
-			err("error reading nxs from spfile=%s\n", spfile);
-		}
-		nzs = nxs;
-	} else {
-		nxs = countparval("xs");
-		nzs = countparval("zs");
-	}
-	if (nxs!=nzs)
-		err("number of xs = %d must equal number of zs = %d\n",
-			nxs,nzs);
-	ns = nxs;
-
-	/* plane wave src */
-	if (!getparint("pw",&pw)) pw=0;
-	if (pw==1) ns = nx;
-
-	if (ns==0) err("must specify xs and zs!\n");
-	xs = alloc1float(ns);
-	zs = alloc1float(ns);
-	ixs = alloc1int(ns);
-	izs = alloc1int(ns);
-	/*--------------------------------------------------------------------*\
-	  TK:
-	    If the user supplied the name of a file for the shot locations,
-	  then the points are read from that file. Recall that the first record
-	  of that file is the number of such locations and that the actual (x,z)
-	  points follow int the file.
-	    If the user didn't supply the name of a file for the shot locations,
-	  then the coordinates are read from the xs= and zs= command line
-	  arguments as usual.
-	\*--------------------------------------------------------------------*/
-	if ( srpntfp != (FILE *)NULL ) {
-		for (it = 0; it < ns; it++) {
-		if ((is = fscanf (srpntfp, "%f %f", &xs[it], &zs[it])) != 2 ) {
-			fclose (srpntfp);
-	      		err("error reading xs[%d], zs[%d] from spfile=%s\n",it,it,spfile);
-		}
-	}
-		fclose (srpntfp);
-	} else {
-	  getparfloat("xs",xs);
-	  getparfloat("zs",zs);
-	}
-	if (!getparfloat("sstrength",&sstrength))	sstrength =1.0;
-
-	if (pw==1) ztmp = zs[0];
-	
-	nabs = countparval("abs");
-	if (nabs==4) {
-		getparint("abs", abs);	
-	} else {
-		abs[0] = ABS0;
-		abs[1] = ABS1;
-		abs[2] = ABS2;
-		abs[3] = ABS3;
-
-		if (!((nabs==4) || (nabs==0)) ) 
-			warn("Number of abs %d, using abs=1,1,1,1",nabs);
-	}
-	
-	/* get optional parameters */
-	if (!getparint("nt",&nt)) nt = 0;
-	if (!getparint("mt",&mt)) mt = 1;
-	if (!getparfloat("dx",&dx)) dx = 1.0;
-	if (!getparfloat("fx",&fx)) fx = 0.0;
-	if (!getparfloat("dz",&dz)) dz = 1.0;
-	if (!getparfloat("fz",&fz)) fz = 0.0;
-	if (!getparint("pwt",&pwt)) pwt = 20;
-	if (!getparint("mono",&mono)) mono = 0;
-
-	/* source coordinates in samples */
-	for (is=0 ; is < ns ; ++is) {
-		ixs[is] = NINT( ( xs[is] - fx )/dx );
-		izs[is] = NINT( ( zs[is] - fz )/dz ); /* TK: dz had been dx */
-	}
-
-	if (!getparfloat("hsz",&hsz)) hsz = 0.0;
-	hs1 = NINT( (hsz - fz)/dz );
-
-	if (!getparfloat("vsx",&vsx)) vsx = 0.0;
-	vs2 = NINT((vsx - fx)/dx );
-	
-	if (!getparint("verbose",&verbose)) verbose = 0;
-	getparstring("dfile",&dfile);
-	getparstring("hsfile",&hsfile);
-	getparstring("vsfile",&vsfile);
-	getparstring("ssfile",&ssfile);
-	
-	/* allocate space */
-	s = alloc2float(nz,nx);
-	dvv = alloc2float(nz,nx);
-	od = alloc2float(nz,nx);
-	pm = alloc2float(nz,nx);
-	p = alloc2float(nz,nx);
-	pp = alloc2float(nz,nx);
-	
-	/* read velocities */
-	fread(dvv[0],sizeof(float),nx*nz,velocityfp);
-	
-	/* determine minimum and maximum velocities */
-	vmin = vmax = dvv[0][0];
-	for (ix=0; ix<nx; ++ix) {
-		for (iz=0; iz<nz; ++iz) {
-			vmin = MIN(vmin,dvv[ix][iz]);
-			if (verbose==1 && dvv[ix][iz]==0) {
-				warn("v=0 at (ix,iz)=(%i,%i)",ix,iz);
-			}
-			vmax = MAX(vmax,dvv[ix][iz]);
-		}
-	}
-	
-	/* determine mininum spatial sampling interval */
-	h = MIN(ABS(dx),ABS(dz));
-	
-	/* determine time sampling interval to ensure stability */
-	dt = h/(2.0*vmax);
-	warn("stable dt=%g",dt);
-	
-	/* determine maximum temporal frequency to avoid dispersion */
-	if (!getparfloat("fmax", &fmax))	fmax = vmin/(10.0*h);
-
-	/* compute or set peak frequency for ricker wavelet */
-	if (!getparfloat("fpeak", &fpeak))	fpeak = 0.5*fmax;
-
-	/* determine number of time steps required to reach maximum time */
-	if (nt==0) nt = 1+tmax/dt;
-
-	/* if requested, open file and allocate space for seismograms */
-	if (*hsfile!='\0') {
-		if((hseisfp=fopen(hsfile,"w"))==NULL)
-			err("cannot open hsfile=%s\n",hsfile);
-		hs = alloc2float(nt,nx);
-	} else {
-		hs = NULL;
-	}
-
-	if (*vsfile!='\0') {
-		if((vseisfp=fopen(vsfile,"w"))==NULL)
-			err("cannot open vsfile=%s\n",vsfile);
-		vs = alloc2float(nt,nz);
-	} else {
-		vs = NULL;
-	}
-
-	if (*ssfile!='\0') {
-		if((sseisfp=fopen(ssfile,"w"))==NULL)
-			err("cannot open ssfile=%s\n",ssfile);
-		ss = alloc2float(nt,ns);
-	} else {
-		ss = NULL;
-	}
-	
-	/* if specified, read densities */
-	if (*dfile!='\0') {
-		if((densityfp=fopen(dfile,"r"))==NULL)
-			err("cannot open dfile=%s\n",dfile);
-		if (fread(od[0],sizeof(float),nx*nz,densityfp)!=nx*nz)
-			err("error reading dfile=%s\n",dfile);
-		fclose(densityfp);
-		dmin = dmax = od[0][0];
-		for (ix=0; ix<nx; ++ix) {
-			for (iz=0; iz<nz; ++iz) {
-				dmin = MIN(dmin,od[ix][iz]);
-				dmax = MAX(dmax,od[ix][iz]);
-			}
-		}
-	}
-	
-	/* if densities not specified or constant, make densities = 1 */
-	if (*dfile=='\0' || dmin==dmax ) {
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz)
-				od[ix][iz] = 1.0;
-		dmin = dmax = 1.0;
-	}
-	
-	/* compute density*velocity^2 and 1/density and zero time slices */	
-	for (ix=0; ix<nx; ++ix) {
-		for (iz=0; iz<nz; ++iz) {
-			dvv[ix][iz] = od[ix][iz]*dvv[ix][iz]*dvv[ix][iz];
-			od[ix][iz] = 1.0/od[ix][iz];
-			pp[ix][iz] = p[ix][iz] = pm[ix][iz] = 0.0;
-		}
-	}
-	
-	/* if densities constant, free space and set NULL pointer */
-	if (dmin==dmax) {
-		free2float(od);
-		od = NULL;
-	}
-	
-	/* if verbose, print parameters */
-	if (verbose) {
-		fprintf(stderr,"nx = %d\n",nx);
-		fprintf(stderr,"dx = %g\n",dx);
-		fprintf(stderr,"nz = %d\n",nz);
-		fprintf(stderr,"dz = %g\n",dz);
-		fprintf(stderr,"nt = %d\n",nt);
-		fprintf(stderr,"dt = %g\n",dt);
-		fprintf(stderr,"tmax = %g\n",tmax);
-		fprintf(stderr,"fmax = %g\n",fmax);
-		fprintf(stderr,"fpeak = %g\n",fpeak);
-		fprintf(stderr,"vmin = %g\n",vmin);
-		fprintf(stderr,"vmax = %g\n",vmax);
-		fprintf(stderr,"mt = %d\n",mt);
-		if (dmin==dmax) {
-			fprintf(stderr,"constant density\n");
-		} else {
-			fprintf(stderr,"dfile=%s\n",dfile);
-			fprintf(stderr,"dmin = %g\n",dmin);
-			fprintf(stderr,"dmax = %g\n",dmax);
-		}
-	}
-
-	/* if plane wave src */
-	if (pw==1) {
-		for (ix=0; ix<nx; ++ix) {
-			xs[ix]  = ix*dx;
-			ixs[ix] = ix;
-			zs[ix]  = ztmp;
-			izs[ix] = ztmp/dz;
-		}
-	}
-	
-
-	/* loop over time steps */
-	for (it=0,t=0.0; it<nt; ++it,t+=dt) {
-	
-		/* if verbose, print time step */
-		if (verbose>1) fprintf(stderr,"it=%d  t=%g\n",it,t);
-	
-		/* update source function */
-		if (ns==1)
-			ptsrc(sstrength,xs[0],zs[0],nx,dx,fx,nz,dz,fz,dt,t,
-			      fmax,fpeak,tdelay,mono,s);
-		else
-			exsrc(ns,xs,zs,nx,dx,fx,nz,dz,fz,dt,t,fmax,pwt,mono,s);
-		
-		/* do one time step */
-		tstep2(nx,dx,nz,dz,dt,dvv,od,s,pm,p,pp,abs);
-		
-		/* write waves */
-	/* if (it%mt==0) fwrite(pp[0],sizeof(float),nx*nz,stdout); */
-		if (it%mt==0) {
-
-			cubetr.sx = xs[0];
-			cubetr.sdepth = zs[0];
-			cubetr.trid = 30 ;
-			cubetr.ns = nz ;
-			cubetr.d1 = dz ;
-			cubetr.d2 = dx ;
-			/* account for delay in source starting time */
-			cubetr.delrt = - 1000.0 * tdelay;
-
-			tracl = 0 ;
-
-			for (ix=0 ; ix < nx ; ++ix) {
-				++tracl;
-				++tracr;
-				
-
-				cubetr.offset = ix * dx - xs[0];
-				cubetr.gx = ix * dx ;
-				cubetr.tracl = (int) tracl;
-				cubetr.tracr = (int) tracr;
-
-				for (iz=0 ; iz < nz ; ++iz) {	
-					cubetr.data[iz] = pp[ix][iz];
-				}
-				fputtr(stdout, &cubetr);
-			}
-		}
-
-		/* if requested, save horizontal line of seismograms */
-		if (hs!=NULL) {
-			for (ix=0; ix<nx; ++ix)
-				hs[ix][it] = pp[ix][hs1];
-		}
-
-		/* if requested, save vertical line of seismograms */
-		if (vs!=NULL) {
-			for (iz=0; iz<nz; ++iz)
-				vs[iz][it] = pp[vs2][iz];
-		}
-
-                /* if requested, save seismograms at source locations */
-                if (ss!=NULL) {
-                        for (is=0; is<ns; ++is)
-                                ss[is][it] = pp[ixs[is]][izs[is]];
-                }
-
-		/* roll time slice pointers */
-		ptemp = pm;
-		pm = p;
-		p = pp;
-		pp = ptemp;
-	}
-
-	/* if requested, write horizontal line of seismograms */
-	if (hs!=NULL) {
-
-		horiztr.sx = xs[0];
-		horiztr.sdepth = zs[0];
-		horiztr.trid = 1;
-		horiztr.ns = nt ;
-		horiztr.dt = 1000000 * dt ;
-		horiztr.d2 = dx ;
-
-		/* account for delay in source starting time */
-		horiztr.delrt = -1000.0 * tdelay ; 
-
-		tracl = tracr = 0;
-
-		for (ix=0 ; ix < nx ; ++ix){
-			++tracl;
-			++tracr;
-
-			/* offset from first source location */
-			horiztr.offset = ix * dx - xs[0];
-			horiztr.gx = ix * dx;
-
-			horiztr.tracl = (int) tracl;
-			horiztr.tracr = (int) tracr;
-
-			for (it = 0 ; it < nt ; ++it){
-				horiztr.data[it] = hs[ix][it];
-			}
-			
-			fputtr(hseisfp , &horiztr);
-		}
-
-			
-		fclose(hseisfp);
-	}
-
-	/* if requested, write vertical line of seismograms */
-	if (vs!=NULL) {
-
-		verttr.trid = 1;
-		verttr.ns = nt ;
-		verttr.sx = xs[0];
-		verttr.sdepth = zs[0];
-		verttr.dt = 1000000 * dt ;
-		verttr.d2 = dx ;
-		/* account for delay source starting time */
-		verttr.delrt = -1000.0 * tdelay ;
-
-		tracl = tracr = 0;
-		for (iz=0 ; iz < nz ; ++iz){
-			++tracl;
-			++tracr;
-
-			/* vertical line implies offset in z */
-			verttr.offset = iz * dz - zs[0];
-
-			verttr.tracl = (int) tracl;
-			verttr.tracr = (int) tracr;
-
-			for (it = 0 ; it < nt ; ++it){
-				verttr.data[it] = vs[iz][it];
-			}
-			
-			fputtr(vseisfp , &verttr);
-		}
-
-		fclose(vseisfp);
-	}
-
-	/* if requested, write seismogram at source position */
-	if (ss!=NULL) {
-
-		srctr.trid = 1;
-		srctr.ns = nt ;
-		srctr.dt = 1000000 * dt ;
-		srctr.d2 = dx ;
-		srctr.delrt = -1000.0 * tdelay ;
-
-		tracl = tracr = 0;
-		for (is=0 ; is < ns ; ++is){
-			++tracl;
-			++tracr;
-
-			srctr.sx = xs[is];
-			srctr.sdepth = zs[is];
-			srctr.tracl = (int) tracl;
-			srctr.tracr = (int) tracr;
-
-			for (it = 0 ; it < nt ; ++it){
-				srctr.data[it] = ss[is][it];
-			}
-			
-			fputtr(sseisfp , &srctr);
-		}
-
-		fclose(sseisfp);
-	}
-
-	
-	/* free space before returning */
-	free2float(s);
-	free2float(dvv);
-	free2float(pm);
-	free2float(p);
-	free2float(pp);
-	
-	if (od!=NULL) free2float(od);
-	if (hs!=NULL) free2float(hs);
-	if (vs!=NULL) free2float(vs);
-	if (ss!=NULL) free2float(ss);
-	
-	return(CWP_Exit());
-}
-
-
-void exsrc (int ns, float *xs, float *zs,
+static void exsrc (int ns, float *xs, float *zs, float *vs, float (*xsd)[4], float (*zsd)[4],
 	int nx, float dx, float fx,
 	int nz, float dz, float fz,
-	float dt, float t, float fmax, int pwt, int mono, float **s)
+	float dt, float t, float fpeak, int pwt, int mono, float **s)
 /*****************************************************************************
 update source pressure function for an extended source
 ******************************************************************************
@@ -659,7 +112,7 @@ dz		z sampling interval
 fz		first z sample
 dt		time step (ignored)
 t		time at which to compute source function
-fmax		maximum frequency
+fpeak		peak frequency (the program took 0.5*fmax, or fmax for the single frequency source, whatever fpeak was)
 pwt		src taper in grid points
 mono		=0 use ricker src... =1 use monofreq src (2*fpeak)
 
@@ -672,36 +125,15 @@ Author:  Dave Hale, Colorado School of Mines, 03/01/90
 	int ix,iz,izv,is;
 	float ts,xn,zn,v,xv,zv,dxdv,dzdv,xvn,zvn;
 	float amp,dv,dist,distprev;
-	static float *vs,(*xsd)[4],(*zsd)[4];
-	static int made=0;
 	float a, pio2, opwt;
-	float fpeak, tdelay;
-	
-	/* if not already made, make spline coefficients */
-	if (!made) {
-		vs = alloc1float(ns);
-		xsd = (float(*)[4])alloc1float(ns*4);
-		zsd = (float(*)[4])alloc1float(ns*4);
-		for (is=0; is<ns; ++is)
-			vs[is] = is;
-		cmonot(ns,vs,xs,xsd);
-		cmonot(ns,vs,zs,zsd);
-		made = 1;
-	}
-	
+	float tdelay;
+
 	/* zero source array */
 	for (ix=0; ix<nx; ++ix)
 		for (iz=0; iz<nz; ++iz)
 			s[ix][iz] = 0.0 *dt ;
 	
 	/* compute time-dependent part of source function */
-	if (mono==0) {
-		/* ricker src */
-		fpeak = 0.5*fmax;
-	} else {
-		/* mono src */
-		fpeak = fmax;
-	}
 	tdelay = 1.0/fpeak;
 	if (t>2.0*tdelay && mono==0) return;
 	ts = ricker(t-tdelay,fpeak,mono);
@@ -751,7 +183,7 @@ Author:  Dave Hale, Colorado School of Mines, 03/01/90
 	}
 }
 
-void ptsrc (float sstrength, float xs, float zs,
+static void ptsrc (float sstrength, float xs, float zs,
 	int nx, float dx, float fx,
 	int nz, float dz, float fz,
 	float dt, float t, float fmax, float fpeak, float tdelay, int mono, float **s)
@@ -860,7 +292,7 @@ static void absorb (int nx, float dx, int nz, float dz, float dt,
 	float **dvv, float **od, float **pm, float **p, float **pp,
 	int *abs);
 
-void tstep2 (int nx, float dx, int nz, float dz, float dt,
+static void tstep2 (int nx, float dx, int nz, float dz, float dt,
 	float **dvv, float **od, float **s,
 	float **pm, float **p, float **pp, int *abs)
 /*****************************************************************************
@@ -1198,4 +630,66 @@ static void absorb (int nx, float dx, int nz, float dz, float dt,
 			pp[ix+1][iz] = 0.0;
 		}
 	}
+}
+
+
+/* Library version of SUFDMOD2
+ *
+ * The main program (the parameters, the files, the headers of the traces, the seismograms) is left to the caller. What is here are
+ * the pieces of the computation, with no static state, and all of the arrays are owned by the caller. The 2-D arrays are flat, with z
+ * the fast axis: [nx][nz].
+ *
+ *	su_fdmod2_exsrc_setup:	the cubic splines through the points of an extended source (the program made them on its first call)
+ *	su_fdmod2_ptsrc:	the source pressure at a time step, for a point source
+ *	su_fdmod2_exsrc:	the same for an extended source, or a plane wave
+ *	su_fdmod2_tstep:	one time step of the finite-difference solution, with the absorbing boundaries
+ *
+ * Differences from the program:
+ *  - The extended source takes the peak frequency fpeak that is given, where the program used 0.5*fmax (or fmax for the single
+ *    frequency source, so that its frequency was 2*fmax and not the documented 2*fpeak).
+ *  - The checks of the parameters are the caller's.
+ */
+
+static float **fd_rows(const float *base, int n, int m)
+{
+	int i;
+	float **rows = (float**)ealloc1(n,sizeof(float*));
+	for (i=0; i<n; ++i) rows[i] = (float*)base+(size_t)i*m;
+	return rows;
+}
+
+/* vs[ns], xsd[ns][4], zsd[ns][4] are made from the ns points (xs,zs) */
+void su_fdmod2_exsrc_setup(int ns, const float *xs, const float *zs, float *vs, float *xsd, float *zsd)
+{
+	int is;
+	for (is=0; is<ns; ++is) vs[is] = is;
+	cmonot(ns,vs,(float*)xs,(float(*)[4])xsd);
+	cmonot(ns,vs,(float*)zs,(float(*)[4])zsd);
+}
+
+void su_fdmod2_ptsrc(float sstrength, float xs, float zs, int nx, float dx, float fx, int nz, float dz, float fz,
+	float dt, float t, float fmax, float fpeak, int mono, float *s)
+{
+	float **rows = fd_rows(s,nx,nz);
+	ptsrc(sstrength,xs,zs,nx,dx,fx,nz,dz,fz,dt,t,fmax,fpeak,0.0,mono,rows);
+	free1(rows);
+}
+
+void su_fdmod2_exsrc(int ns, const float *xs, const float *zs, const float *vs, const float *xsd, const float *zsd,
+	int nx, float dx, float fx, int nz, float dz, float fz,
+	float dt, float t, float fpeak, int pwt, int mono, float *s)
+{
+	float **rows = fd_rows(s,nx,nz);
+	exsrc(ns,(float*)xs,(float*)zs,(float*)vs,(float(*)[4])xsd,(float(*)[4])zsd,nx,dx,fx,nz,dz,fz,dt,t,fpeak,pwt,mono,rows);
+	free1(rows);
+}
+
+/* od is NULL for a constant density of 1 */
+void su_fdmod2_tstep(int nx, float dx, int nz, float dz, float dt, const float *dvv, const float *od, const float *s,
+	const float *pm, const float *p, float *pp, const int *abs)
+{
+	float **rdvv = fd_rows(dvv,nx,nz), **rod = (od!=NULL) ? fd_rows(od,nx,nz) : NULL, **rs = fd_rows(s,nx,nz);
+	float **rpm = fd_rows(pm,nx,nz), **rp = fd_rows(p,nx,nz), **rpp = fd_rows(pp,nx,nz);
+	tstep2(nx,dx,nz,dz,dt,rdvv,rod,rs,rpm,rp,rpp,(int*)abs);
+	free1(rdvv); if (rod!=NULL) free1(rod); free1(rs); free1(rpm); free1(rp); free1(rpp);
 }

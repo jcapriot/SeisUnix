@@ -8,6 +8,7 @@
 #include "segy.h"
 
 /************************** self documentation *************************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUFCTANISMOD - Flux-Corrected Transport correction applied to the 2D",
@@ -148,6 +149,8 @@ char *sdoc[] = {
 "		1 use moving boundaries					",
 "									",
 NULL};
+#endif
+
 
 /*
  * Author: Tong Fei,	Center for Wave Phenomena, 
@@ -195,9 +198,7 @@ References:
 /********************** end self doc ***********************************/
 
 /* function prototypes for subroutines used internally */
-void 	read_parameter(int nx, int nz, float dx, float dz, 
-		       float p00, float dpdx, float dpdz, char *file, float **pp);
-void	anis_solver2(int it, float **u, float **v, float **w, 
+static void	anis_solver2(int it, float **u, float **v, float **w, 
 		     float **e11, float **e33, float **e23, float **e12, float **e13,  
 		     float **aa, float **cc, float **ff, float **ll, float **nn, 
 		     float **rho, float **xzsource, float *fx, float *fy, float *fz, 
@@ -205,566 +206,68 @@ void	anis_solver2(int it, float **u, float **v, float **w,
 		     int dofct, int isurf, float eta0, float eta, 
 		     float deta0dx, float deta0dz, float detadx, float detadz, 
 		     int mbx1, int mbx2, int mbz1, int mbz2);
-void	absorb1(int it, int  nx,  int  nz, float dx, 
+static void	absorb1(int it, int  nx,  int  nz, float dx, 
 		float dz, float dt, 
 		float **u, float **u1, float **cc, float **rho, 
 		int isurf, int mbx1, int mbx2, int mbz1, int mbz2, 
 		int side, int tb);
-void	absorb2(int it, int  nx,  int  nz, float dx, 
+static void	absorb2(int it, int  nx,  int  nz, float dx, 
 		float dz, float dt, 
 		float **u, float **u1, float **cc, float **rho, 
 		int isurf, int mbx1, int mbx2, int mbz1, int mbz2, 
 		int side, int tb);
-void	boundary_vel(float **cc, float **rho, 
+static void	boundary_vel(float **cc, float **rho, 
 		     float *vell, float *velr, float *velt, float *velb, 
 		     int nx, int nz, int mbx1, int mbz1, int mbx2, int mbz2);
-void	locate_source(int nx, int nz, int sx, int sz, 
+static void	locate_source(int nx, int nz, int sx, int sz, 
 		      float **xzsource, int source);
-void tforce_ricker(int n, float *tforce, float dt, float fpeak);
-void tforce_akb(int n, float *tforce, float dt, float fpeak);
-void tforce_spike(int n, float *tforce, float dt, float fpeak);
-void tforce_unit(int n, float *tforce, float dt, float fpeak);
-void	moving_bc (int it, int nx, int nz, int sx, int sz, 
+static void tforce_ricker(int n, float *tforce, float dt, float fpeak);
+static void tforce_akb(int n, float *tforce, float dt, float fpeak);
+static void tforce_spike(int n, float *tforce, float dt, float fpeak);
+static void tforce_unit(int n, float *tforce, float dt, float fpeak);
+static void	moving_bc (int it, int nx, int nz, int sx, int sz, 
 		   float dx, float dz, int impulse, int movebc, 
 		   float *t, float vmax, int *mbx1, int *mbz1, int *mbx2, int *mbz2);
-void	moving_fctbc (int mbx1, int mbz1, int mbx2, int mbz2, 
+static void	moving_fctbc (int mbx1, int mbz1, int mbx2, int mbz2, 
 		      int nxcc1, int nzcc1, int nxcc2, int nzcc2, 
 		      int *fctxbeg, int *fctzbeg, int *fctxend, int *fctzend);
-void	strain2_x(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_x(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dx, float **a, float **da);
-void	strain2_z(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_z(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dz, float **a, float **da);
-void	strain2_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float **ay, float **da);
-void	strain2_xz(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_xz(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float dz, float **ax, float **az, float **da);
-void	strain2_yz(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_yz(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dz, float **ay, float **da);
-void	strain4_x(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_x(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dx, float **a, float **da);
-void	strain4_z(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_z(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dz, float **a, float **da);
-void	strain4_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float **ay, float **da);
-void	strain4_xz(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_xz(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float dz, float **ax, float **az, float **da);
-void	strain4_yz(int mbx1, int mbx2, int mbz1, int mbz2, float dz, float **ay, float **da);
-void	difference(int mbx1, int mbx2, int mbz1, int mbz2, int it, 
+static void	strain4_yz(int mbx1, int mbx2, int mbz1, int mbz2, float dz, float **ay, float **da);
+static void	difference(int mbx1, int mbx2, int mbz1, int mbz2, int it, 
 		   float **u1, float **u, 
 		   float **xzsource, float *f, float dt, float rdxdz); 
-void	difference_2x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_2x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdz, float **u, float **e, float **c);
-void	difference_2z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_2z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdz, float **u, float **e, float **c);
-void	difference_4x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_4x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdz, float **u, float **e, float **c);
-void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdz, float **u, float **e, float **c);
 
-void	fct2d1o(float **u, float **u1, int nx, int nz, 
+static void	fct2d1o(float **u, float **u1, int nx, int nz, 
 		float eta0, float eta, float deta0dx, float deta0dz, 
 		float detadx, float detadz, float dx, float dz, 
 		int mbx1, int mbx2, int mbz1, int mbz2, 
 		float **f0, float **f1);
 
-void    su_output(int nx, int sx, int sdepth, int ns, float dx, 
-		  float dt, FILE *outputfile, float **data);
-
-
-int
-main (int  argc,  char  **argv)
-{
-
-  int receiverdepth,suhead;
-  int	ix, iz, it, nx, nz,  
-    nt, sx, sz, vspnx;
-  int	isurf, impulse, dofct, mbx1, mbx2, mbz1, mbz2;
-  int 	fctxbeg, fctxend, fctzbeg, fctzend,
-    nxcc1=0, nxcc2=0, nzcc1=0, nzcc2=0;
-  int 	indexux, indexuy, indexuz, wavelet, movebc;
-  int 	source, order; 
-  int   mt, verbose;
-  float	dx, dz, dt, fpeak, rho00, vmax;
-  float	eta, eta0;
-  float	daadx, daadz, 
-    dccdx, dccdz, dffdx, dffdz, dlldx, dlldz, 
-    dnndx, dnndz, drhodx, drhodz; 
-  float	deta0dx, deta0dz, detadx, detadz;
-  float 	aa00, cc00, ff00, ll00, nn00;
-  float	**u=NULL,  **v=NULL,  **w=NULL,   
-    **e11=NULL, **e33=NULL, **e12=NULL, **e13=NULL, **e23=NULL, 
-    **xzsource=NULL, **aa=NULL, **cc=NULL, **ff=NULL, **ll=NULL, **nn=NULL, **rho=NULL, 
-    *fx=NULL, *fy=NULL, *fz, *t=NULL, 
-    **refl_x=NULL, **refl_y=NULL, **refl_z=NULL,
-    **vsp_x=NULL, **vsp_y=NULL, **vsp_z=NULL;
-  FILE	*outfp=stdout;
-  FILE	*outfpx=NULL, *outfpy=NULL, *outfpz=NULL;
-  FILE	*outreflx=NULL, *outrefly=NULL, *outreflz=NULL,  
-    *outvspx=NULL, *outvspy=NULL, *outvspz=NULL; 
-  /* input file names */
-  char *sfile="";		/* source file name */
-  char *dfile="";		/* density file name */
-  char *afile="";		/* file name for elastic parameter aa*/
-  char *cfile="";		/* file name for elastic parameter cc*/
-  char *ffile="";		/* file name for elastic parameter ff*/
-  char *lfile="";		/* file name for elastic parameter ll*/
-  char *nfile="";		/* file name for elastic parameter nn*/
-  /* output file names */
-  char *reflxfile="";	/* reflection seismogram file name, x-comp */
-  char *reflyfile="";	/* reflection seismogram file name, y-comp */
-  char *reflzfile="";	/* reflection seismogram file name, z-comp */
-  char *vspxfile="";	/* VSP seismogram file name, x-comp */
-  char *vspyfile="";	/* VSP seismogram file name, y-comp */
-  char *vspzfile="";	/* VSP seismogram file name, z-comp */
-  
-  initargs (argc, argv);
-  requestdoc(0);
-  
-  /* get required parameters  */
-  if (!getparint("nt", &nt)) nt=250;
-  if (!getparint("nx", &nx)) nx=300;
-  if (!getparint("nz", &nz)) nz=250;
-  if (!getparint("sx", &sx)) sx=nx/2;
-	if (sx>nx) err("Source sx=%i is greater than nx=%i. Exit",sx,nx);
-  if (!getparint("sz", &sz)) sz=nz/2;
-	if (sz>nz) err("Source sz=%f is greater than nz=%i. Exit",sz,nx);
-	if (!getparint("receiverdepth", &receiverdepth)) receiverdepth=sz;
-  if (!getparint("vspnx", &vspnx)) vspnx=sx;
-  if (!getparint("impulse", &impulse)) impulse=0;
-  if (!getparint("source", &source)) source=0;
-  if (!getparint("isurf", &isurf)) isurf=1;
-  if (!getparint("dofct", &dofct)) dofct=0;
-  if (!getparint("fctxbeg", &fctxbeg)) fctxbeg=0;
-  if (!getparint("fctzbeg", &fctzbeg)) fctzbeg=0;
-  if (!getparint("fctxend", &fctxend)) fctxend=nx;
-  if (!getparint("fctzend", &fctzend)) fctzend=nz;
-  if (!getparint("indexux", &indexux)) indexux=0;
-  if (!getparint("indexuy", &indexuy)) indexuy=0;
-  if (!getparint("indexuz", &indexuz)) indexuz=0;
-  if (!getparint("wavelet", &wavelet)) wavelet=1;
-  if (!getparint("movebc", &movebc)) movebc=0;
-  if (!getparint("order", &order)) order=2;
-  if (!getparint("suhead",&suhead)) suhead=1;
-  if (!getparint("mt",&mt)) mt=1;
-  if (!getparint("verbose",&verbose)) verbose=0;
-  if (!getparfloat("dx", &dx)) dx=0.02;
-  if (!getparfloat("dz", &dz)) dz=0.02;
-  if (!getparfloat("dt", &dt)) dt=0.002;
-  if (!getparfloat("fpeak", &fpeak)) fpeak=20.0;
-  if (!getparfloat("aa00", &aa00)) aa00=2.0;
-  if (!getparfloat("cc00", &cc00)) cc00=2.0;
-  if (!getparfloat("ff00", &ff00)) ff00=2.0;
-  if (!getparfloat("ll00", &ll00)) ll00=2.0;
-  if (!getparfloat("nn00", &nn00)) nn00=2.0;
-  if (!getparfloat("daadx", &daadx)) daadx=0.0;
-  if (!getparfloat("daadz", &daadz)) daadz=0.0;
-  if (!getparfloat("dccdx", &dccdx)) dccdx=0.0;
-  if (!getparfloat("dccdz", &dccdz)) dccdz=0.0;
-  if (!getparfloat("dffdx", &dffdx)) dffdx=0.0;
-  if (!getparfloat("dffdz", &dffdz)) dffdz=0.0;
-  if (!getparfloat("dlldx", &dlldx)) dlldx=0.0;
-  if (!getparfloat("dlldz", &dlldz)) dlldz=0.0;
-  if (!getparfloat("dnndx", &dnndx)) dnndx=0.0;
-  if (!getparfloat("dnndz", &dnndz)) dnndz=0.0;
-  if (!getparfloat("drhodx", &drhodx)) drhodx=0.0;
-  if (!getparfloat("drhodz", &drhodz)) drhodz=0.0;
-  if (!getparfloat("rho00", &rho00)) rho00=1.0;
-  if (!getparfloat("eta0", &eta0)) eta0=0.03;
-  if (!getparfloat("eta", &eta)) eta=0.04;
-  if (!getparfloat("deta0dx", &deta0dx)) deta0dx=0.0;
-  if (!getparfloat("deta0dz", &deta0dz)) deta0dz=0.0;
-  if (!getparfloat("detadx", &detadx)) detadx=0.0;
-  if (!getparfloat("detadz", &detadz)) detadz=0.0;
-  getparstring("sfile",&sfile);
-  getparstring("dfile",&dfile);
-  getparstring("afile",&afile);
-  getparstring("cfile",&cfile);
-  getparstring("ffile",&ffile);
-  getparstring("lfile",&lfile);
-  getparstring("nfile",&nfile);
-  getparstring("nfile",&nfile);
-  getparstring("reflxfile",&reflxfile);
-  getparstring("reflyfile",&reflyfile);
-  getparstring("reflzfile",&reflzfile);
-  getparstring("vspxfile",&vspxfile);
-  getparstring("vspyfile",&vspyfile);
-  getparstring("vspzfile",&vspzfile);
-	
-	
-  /*   allocate space	*/
-  u = alloc2float(nz, nx);
-  v = alloc2float(nz,nx);
-  w = alloc2float(nz,nx);
-  e11 = alloc2float(nz,nx);
-  e33 = alloc2float(nz,nx);
-  e23 = alloc2float(nz,nx);
-  e12 = alloc2float(nz,nx);
-  e13 = alloc2float(nz,nx);
-  xzsource = alloc2float(nz,nx);	
-  aa = alloc2float(nz,nx);	
-  cc = alloc2float(nz,nx);	
-  ff = alloc2float(nz,nx);	
-  ll = alloc2float(nz,nx);	
-  nn = alloc2float(nz,nx);	
-  rho = alloc2float(nz,nx);	
-  fx = alloc1float(nt);
-  fy = alloc1float(nt);
-  fz = alloc1float(nt);
-  t = alloc1float(nt);
-
- 	
-  /* allocate optional space for store reflection and VSP seismogram */
-  if (*reflxfile != '\0') {  /* allocate space for refl_x  */
-    refl_x = alloc2float(nt, nx); 
-  }
-  if (*reflyfile != '\0') {  /* allocate space for refl_y  */
-    refl_y = alloc2float(nt, nx); 
-  }
-  if (*reflzfile != '\0') {  /* allocate space for refl_z  */
-    refl_z = alloc2float(nt, nx); 
-  }
-  if (*vspxfile != '\0') {  /* allocate space for vsp_x  */
-    vsp_x = alloc2float(nt, nz); 
-  }
-  if (*vspyfile != '\0') {  /* allocate space for vsp_y  */
-    vsp_y = alloc2float(nt, nz); 
-  }
-  if (*vspzfile != '\0') {  /* allocate space for vsp_z  */
-    vsp_z = alloc2float(nt, nz); 
-  }
-
-	warn("Memory usage approximately %f MB", (float) (15*nz*nx*4+4*nt*4+6*nt*nx*4)/(1024*1024));
-
-  /*   initial condition  */
-  for (ix=0; ix < nx; ix++)
-    for (iz=0; iz < nz; iz++)
-      {
-	u[ix][iz]=0.0;
-	v[ix][iz]=0.0;
-	w[ix][iz]=0.0;
-	xzsource[ix][iz]=0.0;
-      }
-		
-  for (ix=0; ix<nx; ix++)
-    for (iz=0; iz<nz; iz++)
-      {
-	e11[ix][iz]=0.0;
-	e33[ix][iz]=0.0;
-	e23[ix][iz]=0.0;
-	e13[ix][iz]=0.0;
-	e12[ix][iz]=0.0;
-      }
-
-  /*   get time response of the source function */
-  for (it=0; it<nt; it++) 
-    {
-      t[it]=it*dt;
-      fx[it]=0.0;
-      fy[it]=0.0;
-      fz[it]=0.0;
-    }
-
-  if (indexux) {		/*  x-component of the force  */
-    if (wavelet == 1)
-      tforce_akb(nt, fx, dt, fpeak);
-    if (wavelet == 2)
-      tforce_ricker(nt, fx, dt, fpeak);
-    if (wavelet == 3) 	
-      tforce_spike(nt, fx, dt, fpeak);
-    if (wavelet == 4) 	
-      tforce_unit(nt, fx, dt, fpeak);
-  }
-  if (indexuy) {		/*  y-component of the force  */
-    if (wavelet == 1)
-      tforce_akb(nt, fy, dt, fpeak);
-    if (wavelet == 2)
-      tforce_ricker(nt, fy, dt, fpeak);
-    if (wavelet == 3) 	
-      tforce_spike(nt, fy, dt, fpeak);
-    if (wavelet == 4) 	
-      tforce_unit(nt, fy, dt, fpeak);
-  }
-  if (indexuz) {		/*  z-component of the force  */
-    if (wavelet == 1)
-      tforce_akb(nt, fz, dt, fpeak);
-    if (wavelet == 2)
-      tforce_ricker(nt, fz, dt, fpeak);
-    if (wavelet == 3) 	
-      tforce_spike(nt, fz, dt, fpeak);
-    if (wavelet == 4) 	
-      tforce_unit(nt, fz, dt, fpeak);
-  }
-
-  warn("Source function set");
-
-
-  /*    obtain density and elastic parameters  */
-  vmax = 0.0;
-  read_parameter(nx, nz, dx, dz, rho00, drhodx, drhodz, dfile, rho); 
-  read_parameter(nx, nz, dx, dz, aa00, daadx, daadz, afile, aa); 
-  read_parameter(nx, nz, dx, dz, cc00, dccdx, dccdz, cfile, cc); 
-  read_parameter(nx, nz, dx, dz, ff00, dffdx, dffdz, ffile, ff); 
-  read_parameter(nx, nz, dx, dz, ll00, dlldx, dlldz, lfile, ll); 
-  read_parameter(nx, nz, dx, dz, nn00, dnndx, dnndz, nfile, nn); 
-	
-	warn("Parameter grids read");
-
-    /*  compute density inverse and maximum velocity  */	
-	for (ix=0; ix < nx; ix++)   {
-		for (iz=0; iz < nz; iz++) {
-			rho[ix][iz]=1.0/rho[ix][iz];
-			if ( cc[ix][iz]*rho[ix][iz] > vmax ) vmax = cc[ix][iz]*rho[ix][iz];
-		}
-	}
-    vmax = sqrt(vmax);
-	
-	warn("vmax = %f", vmax);
-	if (dz <= dx) {
-		warn("stability check:  vmax*dt/(sqrt(2)*min(dx,dz)) = %f (should be < 1)", vmax*dt /(sqrt(2)*dz));
-	} else {
-		warn("stability check:  vmax*dt/(sqrt(2)*min(dx,dz)) = %f (should be < 1)", vmax*dt /(sqrt(2)*dx));
-	}
-	
-  /*  give source location  */
-  if (*sfile != '\0') {
-    read_parameter(nx, nz, dx, dz, aa00, daadx, daadz, sfile, xzsource); 
-  } else {
-    locate_source(nx, nz, sx, sz, xzsource, source);
-  }
-
-  /* Debugging */
-  nxcc2=nx;
-  nzcc2=nz;
-  /* end debugging */
-
-  /*     evolve in time    */
-  outfpx = fopen("snapshotx.data", "w");
-  outfpy = fopen("snapshoty.data", "w");
-  outfpz = fopen("snapshotz.data", "w");
-	
-	warn("Snapshot files open");
-
-  /* begin time loop */
-  for (it=0; it < nt; it++) {
-      
-	  if (verbose==2) fprintf (stderr,"it= %d\n", it);
-
-      moving_bc (it, nx, nz, sx, sz, 
-		 dx, dz, impulse, movebc, t, vmax, 
-		 &mbx1, &mbz1, &mbx2, &mbz2);
-
-      /* FCT correction is localized to the area bounded by */
-      /* (fctxend - fctxbeg) by (fctzend-fctzbeg) */
-      /* contain the FCT correction boundary by the model boundary */
-      /* computed by moving_bc */
-      moving_fctbc (mbx1, mbz1, mbx2, mbz2, 
-		    nxcc1, nzcc1, nxcc2, nzcc2, 
-		    &fctxbeg, &fctzbeg, &fctxend, &fctzend);
-
-      anis_solver2(it, u, v, w, e11,  
-		   e33, e23, e12, e13, aa, cc, ff, ll, nn, 
-		   rho, xzsource, fx, fy, fz, 
-		   dx, dz, dt, nx, nz, dofct, isurf, 
-		   eta0, eta, deta0dx, deta0dz, 
-		   detadx, detadz, mbx1, mbx2, mbz1, mbz2);
-
-      /*  get reflection seismogram  */
-      if (*reflxfile != '\0') {  /* get refl_x  */
-		  for (ix=0; ix<nx; ix++) {
-			  refl_x[ix][it]=u[ix][receiverdepth];
-		  }
-      }
-	  
-      if (*reflyfile != '\0') {  /* get refl_y  */
-		  for (ix=0; ix<nx; ix++) {
-			  refl_y[ix][it]=v[ix][receiverdepth];
-		  }
-      }	/*  end get reflection seismogram  */
-	  
-      if (*reflzfile != '\0') {  /* get refl_z  */
-		  for (ix=0; ix<nx; ix++) {
-			  if (w[ix][receiverdepth]>1){
-				 warn("problems at it=%d x=%d \n",it, ix);
-			  }
-			  refl_z[ix][it]=w[ix][receiverdepth];
-		  }
-      }
-	 /* warn("got here 1, vspnx=%i vspxfile=%s",vspnx,vspxfile); */
-
-      /*  get VSP seismogram  */
-      if ( vspnx >= 0 && vspnx < nx) {   /*position not out of range*/
-		
-	
-		  if (*vspxfile != '\0') {  /* get vsp_x  */
-			  for (iz=0; iz<nz; iz++) {
-				  vsp_x[iz][it]=u[vspnx][iz];
-				  /* warn("got here 2, iz=%i, u[vspnx][iz]=%f",iz,u[vspnx][iz]);	*/
-			  }
-		  }
-		  if (*vspyfile != '\0') {  /* get vsp_x  */
-			  for (iz=0; iz<nz; iz++) {
-				  vsp_y[iz][it]=v[vspnx][iz];
-			  }
-		  }
-		  
-		  if (*vspzfile != '\0') {  /* get vsp_x  */
-			  for (iz=0; iz<nz; iz++) {
-				  vsp_z[iz][it]=w[vspnx][iz];
-			  }
-		  }
-
-		  
-      }  /*  end get VSP seismogram  */
-
-	  /* write snaps every mt time steps */
-	  if (it%mt==0) {
-		  fwrite(u[0], sizeof(float), nz*nx, outfpx);	
-		  fwrite(v[0], sizeof(float), nz*nx, outfpy);	
-		  fwrite(w[0], sizeof(float), nz*nx, outfpz);
-		  if (verbose>=1) warn("snap at it=%i",it);
-	  }
-
-    }	/* end time loop */
-
-	/* write last x-component snap to std out */
-	fwrite(u[0], sizeof(float), nz*nx, outfp);	
-	
-	warn("Source function set");
-
-	/*  output seismogram  */
-	if (*reflxfile != '\0') {  /* write refl_x */
-	if ((outreflx = fopen(reflxfile, "w"))==NULL) {
-	  fprintf(stderr, "Cannot open file=%s\n", reflxfile); 
-	  exit(1);
-	}
-	if (suhead==1){
-	  su_output(nx,sx,sz,nt,dx,dt,outreflx,refl_x);
-	}
-	else
-	  {
-	fwrite(refl_x[0], sizeof(float), nx*nt, outreflx);
-	  }
-	fclose(outreflx);
-	}
-	if (*reflyfile != '\0') {  /* write refl_y */
-	if ((outrefly = fopen(reflyfile, "w"))==NULL) {
-	  fprintf(stderr, "Cannot open file=%s\n", reflyfile); 
-	  exit(1);
-	}
-	if (suhead==1){
-	  su_output(nx,sx,sz,nt,dx,dt,outrefly,refl_y);
-	}
-	else
-	  {
-	fwrite(refl_y[0], sizeof(float), nx*nt, outrefly);
-	  }
-	fclose(outrefly);
-	}
-	if (*reflzfile != '\0') {  /* write refl_z */
-	if ((outreflz = fopen(reflzfile, "w"))==NULL) {
-	  fprintf(stderr, "Cannot open file=%s\n", reflzfile); 
-	  exit(1);
-	}
-	if (suhead==1){
-	  su_output(nx,sx,sz,nt,dx,dt,outreflz,refl_z);
-	}
-	else
-	  {
-	fwrite(refl_z[0], sizeof(float), nx*nt, outreflz);
-	  }
-	fclose(outreflz);
-	}
-	if (*vspxfile != '\0') {  /* write vsp_x */
-	if ((outvspx = fopen(vspxfile, "w"))==NULL) {
-	  fprintf(stderr, "Cannot open file=%s\n", vspxfile); 
-	  exit(1);
-	}
-	if (suhead==1){
-	  su_output(nz,sx,sz,nt,dx,dt,outvspx,vsp_x);
-	}
-	else
-	  {
-	fwrite(vsp_x[0], sizeof(float), nz*nt, outvspx);
-	  }
-	fclose(outvspx);
-	}
-	if (*vspyfile != '\0') {  /* write vsp_x */
-	if ((outvspy = fopen(vspyfile, "w"))==NULL) {
-	  fprintf(stderr, "Cannot open file=%s\n", vspyfile); 
-	  exit(1);
-	}	
-	if (suhead==1){
-	  su_output(nz,sx,sz,nt,dx,dt,outvspy,vsp_y);
-	}
-	else
-	  {
-	fwrite(vsp_y[0], sizeof(float), nz*nt, outvspy);
-	  }
-	}
-	if (*vspzfile != '\0') {  /* write vsp_z */
-	if ((outvspz = fopen(vspzfile, "w"))==NULL) {
-	  fprintf(stderr, "Cannot open file=%s\n", vspzfile); 
-	  exit(1);
-	}
-	if (suhead==1){
-	  su_output(nz,sx,sz,nt,dx,dt,outvspz,vsp_z);
-	}
-	else
-	  {
-	fwrite(vsp_z[0], sizeof(float), nz*nt, outvspz);
-	  }
-	}
-
-	return(CWP_Exit());
-}
-/*------------------ end of main program ----------------------------*/
-
-/************************************************************************
-* read_parameter --  Obtain elastic parameter, either read from a file 
-*			or assume linear variation
-*************************************************************************
-*************************************************************************
-* Input: 
-*	int nx		number of grids in x direction 
-*	int nz		number of grids in z direction
-*	float dx	spatial step in x-direction 	
-*	float dz	spatial step in z-direction 	
-*	float p00=2.0	elastic parameter at (0, 0) 
-*	float dpdx=0.0	parameter gradient in x-direction  d(p)/dx
-*	float dpdz=0.0	parameter gradient in z-direction  d(p)/dz 
-*	char *file	file name store the elastic parameter
-*	
-*************************************************************************
-* Output: float **pp	elastic parameter array
-*
-*************************************************************************
-*************************************************************************
-* Author: Tong Fei, 1993, Colorado School of Mines.
-*************************************************************************/
-void 	read_parameter(int nx, int nz, float dx, float dz, 
-		       float p00, float dpdx, float dpdz, char *file, float **pp)
-{
-  int 	ix, iz;
-  FILE	*infp;
-
-  /*    obtain  elastic parameter  */
-  if (*file != '\0') {  /* open requested parameter file */
-    if ((infp = fopen(file, "r"))==NULL) {
-      fprintf(stderr, "Cannot open file=%s\n", file); 
-      exit(1);
-    }
-
-    /* read elastic parameter into the array pp[nz][nx] */
-    fread(pp[0], sizeof(float), nz*nx, infp);
-  } else { /* assume a linear parameter profile */
-    for (ix=0; ix < nx; ix++)
-      for (iz=0; iz < nz; iz++)
-	{
-	  pp[ix][iz]=p00+dpdx*(ix-1)*dx
-	    +dpdz*(iz-1)*dz;
-	}
-  } 
-}
 
 
 
@@ -827,7 +330,7 @@ void 	read_parameter(int nx, int nz, float dx, float dz,
 ************************************************************************
 * Author:	Tong Fei (1993), Colorado School of Mines
 ************************************************************************/
-void	anis_solver2(int it, float **u, float **v, float **w, 
+static void	anis_solver2(int it, float **u, float **v, float **w, 
 		     float **e11, float **e33, float **e23, float **e12, float **e13,  
 		     float **aa, float **cc, float **ff, float **ll, float **nn, 
 		     float **rho, float **xzsource, float *fx, float *fy, float *fz, 
@@ -1049,7 +552,7 @@ void	anis_solver2(int it, float **u, float **v, float **w,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	absorb1(int it, int  nx,  int  nz, float dx, 
+static void	absorb1(int it, int  nx,  int  nz, float dx, 
 		float dz, float dt, 
 		float **u, float **u1, float **cc, float **rho, 
 		int isurf, int mbx1, int mbx2, int mbz1, int mbz2, 
@@ -1153,7 +656,7 @@ void	absorb1(int it, int  nx,  int  nz, float dx,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	absorb2(int it, int  nx,  int  nz, float dx, 
+static void	absorb2(int it, int  nx,  int  nz, float dx, 
 		float dz, float dt, 
 		float **u, float **u1, float **cc, float **rho, 
 		int isurf, int mbx1, int mbx2, int mbz1, int mbz2, 
@@ -1243,7 +746,7 @@ void	absorb2(int it, int  nx,  int  nz, float dx,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	boundary_vel(float **cc, float **rho, 
+static void	boundary_vel(float **cc, float **rho, 
 		     float *vell, float *velr, float *velt, float *velb, 
 		     int nx, int nz, int mbx1, int mbz1, int mbx2, int mbz2)
 {
@@ -1314,7 +817,7 @@ void	boundary_vel(float **cc, float **rho,
 ********************************************************************
 * Author: Tong Fei, Colorado School of Mines, 1993.
 ********************************************************************/
-void	fct2d1o(float **u, float **u1, int nx, int nz, 
+static void	fct2d1o(float **u, float **u1, int nx, int nz, 
 		float eta0, float eta, float deta0dx, float deta0dz, 
 		float detadx, float detadz, float dx, float dz, 
 		int mbx1, int mbx2, int mbz1, int mbz2, 
@@ -1582,7 +1085,7 @@ void	fct2d1o(float **u, float **u1, int nx, int nz,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void tforce_ricker(int nt, float *tforce, float dt, float fpeak)
+static void tforce_ricker(int nt, float *tforce, float dt, float fpeak)
 {
   int	it;
   float	t1, t0; 
@@ -1620,7 +1123,7 @@ void tforce_ricker(int nt, float *tforce, float dt, float fpeak)
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void tforce_akb(int nt, float *tforce, float dt, float fpeak)
+static void tforce_akb(int nt, float *tforce, float dt, float fpeak)
 {
   int	it;
   float	t1; 
@@ -1650,7 +1153,7 @@ void tforce_akb(int nt, float *tforce, float dt, float fpeak)
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void tforce_spike(int nt, float *tforce, float dt, float fpeak)
+static void tforce_spike(int nt, float *tforce, float dt, float fpeak)
 {
   int	it;
   /* float	t1; */
@@ -1681,7 +1184,7 @@ void tforce_spike(int nt, float *tforce, float dt, float fpeak)
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void tforce_unit(int nt, float *tforce, float dt, float fpeak)
+static void tforce_unit(int nt, float *tforce, float dt, float fpeak)
 {
   int	it;
   float	t1;
@@ -1717,7 +1220,7 @@ void tforce_unit(int nt, float *tforce, float dt, float fpeak)
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	locate_source(int nx, int nz, int sx, int sz, 
+static void	locate_source(int nx, int nz, int sx, int sz, 
 		      float **xzsource, int source)
 {
   int	ix, iz;
@@ -1791,7 +1294,7 @@ void	locate_source(int nx, int nz, int sx, int sz,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	moving_bc (int it, int nx, int nz, int sx, int sz, 
+static void	moving_bc (int it, int nx, int nz, int sx, int sz, 
 		   float dx, float dz, int impulse, int movebc, 
 		   float *t, float vmax, int *mbx1, int *mbz1, int *mbx2, int *mbz2)
 {
@@ -1882,7 +1385,7 @@ void	moving_bc (int it, int nx, int nz, int sx, int sz,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	moving_fctbc (int mbx1, int mbz1, 
+static void	moving_fctbc (int mbx1, int mbz1, 
 		      int mbx2, int mbz2, 
 		      int nxcc1, int nzcc1, 
 		      int nxcc2, int nzcc2, 
@@ -1938,7 +1441,7 @@ void	moving_fctbc (int mbx1, int mbz1,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain2_x(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_x(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dx, float **a, float **da)
 {
   int 	i, k;
@@ -1973,7 +1476,7 @@ void	strain2_x(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain2_z(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_z(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dz, float **a, float **da)
 {
   int 	i, k;
@@ -2008,7 +1511,7 @@ void	strain2_z(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain2_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain2_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float **ay, float **da)
 {
   int 	i, k;
@@ -2045,7 +1548,7 @@ void	strain2_xy(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain2_xz(int mbx1, int mbx2,  int mbz1, int mbz2, 
+static void	strain2_xz(int mbx1, int mbx2,  int mbz1, int mbz2, 
 		   float dx, float dz, float **ax, float **az, float **da)
 {
   int 	i, k;
@@ -2082,7 +1585,7 @@ void	strain2_xz(int mbx1, int mbx2,  int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain2_yz(int mbx1, int mbx2,  int mbz1, int mbz2, 
+static void	strain2_yz(int mbx1, int mbx2,  int mbz1, int mbz2, 
 		   float dz, float **ay,  float **da)
 {
   int 	i, k;
@@ -2118,7 +1621,7 @@ void	strain2_yz(int mbx1, int mbx2,  int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain4_x(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_x(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dx, float **a, float **da)
 {
   int 	i, k;
@@ -2162,7 +1665,7 @@ void	strain4_x(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain4_z(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_z(int mbx1, int mbx2, int mbz1, int mbz2, 
 		  float dz, float **a, float **da)
 {
   int 	i, k;
@@ -2206,7 +1709,7 @@ void	strain4_z(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain4_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_xy(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float **ay, float **da)
 {
   int 	i, k;
@@ -2252,7 +1755,7 @@ void	strain4_xy(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain4_xz(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_xz(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dx, float dz, float **ax, float **az, float **da)
 {
   int 	i, k;
@@ -2308,7 +1811,7 @@ void	strain4_xz(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	strain4_yz(int mbx1, int mbx2, int mbz1, int mbz2, 
+static void	strain4_yz(int mbx1, int mbx2, int mbz1, int mbz2, 
 		   float dz, float **ay, float **da)
 {
   int 	i, k;
@@ -2356,7 +1859,7 @@ void	strain4_yz(int mbx1, int mbx2, int mbz1, int mbz2,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	difference(int mbx1, int mbx2, int mbz1, int mbz2, int it, 
+static void	difference(int mbx1, int mbx2, int mbz1, int mbz2, int it, 
 		   float **u1, float **u, 
 		   float **xzsource, float *f, float dt, float rdxdz) 
 {
@@ -2392,7 +1895,7 @@ void	difference(int mbx1, int mbx2, int mbz1, int mbz2, int it,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	difference_2x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_2x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdx, float **u, float **e, float **c) 
 {
   int	i, k;
@@ -2431,7 +1934,7 @@ void	difference_2x(int mbx1, int mbx2, int mbz1, int mbz2, int shift,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	difference_2z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_2z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdz, float **u, float **e, float **c)
 { 
   int	i, k;
@@ -2471,7 +1974,7 @@ void	difference_2z(int mbx1, int mbx2, int mbz1, int mbz2, int shift,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	difference_4x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_4x(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdx, float **u, float **e, float **c) 
 {
   int	i, k;
@@ -2512,7 +2015,7 @@ void	difference_4x(int mbx1, int mbx2, int mbz1, int mbz2, int shift,
 *************************************************************************
 * Author: Tong Fei, 1993, Colorado School of Mines.
 *************************************************************************/
-void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
+static void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift, 
 		      float dtdz, float **u, float **e, float **c)
 { 
   int	i, k;
@@ -2530,60 +2033,203 @@ void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift,
       }
 }
 
-/************************************************************************
-* su_output --  Given seismic data this rutine will create output with 
-*               the proper SU header set.
-*************************************************************************
-*************************************************************************
-* Input: 
-* nx - number of gridpoints in x-direction
-* dx - gridsize x - direction
-* sx - source x-coord
-* sdepth - source depth
-* ns - number of timesteps
-* dt - steplength in time
-* outputfile - file to contain output with SU header set
-* data - the data to be stored
-************************************************************************
-*  type of data: 
-*     (1) horizontal seismograms 	
-*     (2) vertical seismograms (nx -> nz)
-*************************************************************************
-*************************************************************************
-* Author: Stig-Kyrre Foss, CWP 2001
-*************************************************************************/
-void su_output(int nx, int sx, int sdepth, int ns, float dx, 
-	       float dt, FILE *outputfile, float **data)
-{ 
-  segy sudata;
-  int	tracl, tracr, ix, it;
 
 
-  /* Setting su-data */
-  sudata.trid   = 1; /* Data is seismic data (id-code)*/
-  sudata.sx     = sx;
-  sudata.sdepth = sdepth;
-  sudata.ns     = ns;
-  sudata.dt     = (short)(1000000*dt);
-  sudata.d2     = dx;
+/* Library version of SUFCTANISMOD
+ *
+ * The main program (the parameters, the files of the model and of the source, the files of snapshots and seismograms with their
+ * headers) is left to the caller. The computation is made in steps, on a model that the caller makes, steps and frees; the arrays
+ * that the caller gives are not changed:
+ *
+ *	su_fctanismod_create:	the source functions, the density and elastic parameters (aa=c11, cc=c33, ff=c13, ll=c44, nn=c66)
+ *	su_fctanismod_step:	the next time step (the program's loop body), recording the reflection and VSP seismograms
+ *	su_fctanismod_snapshot:	copies a component of the wavefield at this time
+ *	su_fctanismod_records:	the recorded seismograms: refl[3][nx][nt] and vsp[3][nz][nt], for the x, y and z components
+ *	su_fctanismod_free:	frees the model
+ *
+ * The 2-D arrays are flat, [nx][nz] with z the fast axis, as the program has them.
+ *
+ * Differences from the program:
+ *  - The program accepts order=2 or 4 but only has the second order solver wired in; so does the library (no order argument).
+ *  - The source is the point source (source=1) by default; the program's default (0) had no source in space.
+ *  - The checks of the parameters return a code.
+ */
 
-  /*Initializing trace counters*/	
-  tracl=tracr=0;
-	
-  for (ix=0; ix<nx; ++ix)
-    {
-      ++tracr;
-      ++tracl;
-      sudata.offset = ix*dx - sx;
-      sudata.tracl = tracl;
-      sudata.tracr = tracr;
+struct FctModel {
+	int nx, nz, nt, it, isurf, dofct, movebc, impulse, sx, sz, receiverdepth, vspnx;
+	int fctxbeg, fctxend, fctzbeg, fctzend, nxcc1, nxcc2, nzcc1, nzcc2;
+	float dx, dz, dt, vmax, eta0, eta, deta0dx, deta0dz, detadx, detadz;
+	float **u, **v, **w, **e11, **e33, **e23, **e12, **e13, **xzsource, **aa, **cc, **ff, **ll, **nn, **rho;
+	float *fx, *fy, *fz, *t;
+	float *refl, *vsp;	/* [3][nx][nt], [3][nz][nt] */
+};
 
-      for (it=0; it<ns; ++it)
-	{
-	  sudata.data[it] = data[ix][it];
+/* Returns the model, or NULL and in *err: -3 parameters that are not allowed, -4 an unknown wavelet, -5 a source outside of the grid. */
+struct FctModel *su_fctanismod_create(int nx, int nz, int nt, float dx, float dz, float dt, int sx, int sz,
+	int receiverdepth, int vspnx, int impulse, int source, int isurf, int dofct, int fctxbeg, int fctzbeg, int fctxend, int fctzend,
+	int forcex, int forcey, int forcez, int wavelet, int movebc, float fpeak, float eta0, float eta,
+	float deta0dx, float deta0dz, float detadx, float detadz,
+	const float *aa, const float *cc, const float *ff, const float *ll, const float *nn, const float *rho,
+	const float *xzsource, int *err)
+{
+	struct FctModel *M;
+	int ix, iz, it;
+	float vmax = 0.0;
+	void (*tforce)(int, float*, float, float) = NULL;
+
+	*err = 0;
+	if (nx<3 || nz<3 || nt<1 || dx<=0.0 || dz<=0.0 || dt<=0.0 || fpeak<=0.0 || isurf<1 || isurf>3) { *err = -3; return NULL; }
+	if (wavelet==1) tforce = tforce_akb;
+	else if (wavelet==2) tforce = tforce_ricker;
+	else if (wavelet==3) tforce = tforce_spike;
+	else if (wavelet==4) tforce = tforce_unit;
+	else { *err = -4; return NULL; }
+	if (nt<2 && wavelet==3) { *err = -3; return NULL; }
+	if (xzsource==NULL && (sx<0 || sx>=nx || sz<0 || sz>=nz)) { *err = -5; return NULL; }
+	if (receiverdepth<0 || receiverdepth>=nz || vspnx<0 || vspnx>=nx) { *err = -5; return NULL; }
+
+	M = (struct FctModel*)calloc(1,sizeof(struct FctModel));
+	M->u = alloc2float(nz, nx);
+	M->v = alloc2float(nz,nx);
+	M->w = alloc2float(nz,nx);
+	M->e11 = alloc2float(nz,nx);
+	M->e33 = alloc2float(nz,nx);
+	M->e23 = alloc2float(nz,nx);
+	M->e12 = alloc2float(nz,nx);
+	M->e13 = alloc2float(nz,nx);
+	M->xzsource = alloc2float(nz,nx);
+	M->aa = alloc2float(nz,nx);
+	M->cc = alloc2float(nz,nx);
+	M->ff = alloc2float(nz,nx);
+	M->ll = alloc2float(nz,nx);
+	M->nn = alloc2float(nz,nx);
+	M->rho = alloc2float(nz,nx);
+	M->fx = alloc1float(nt);
+	M->fy = alloc1float(nt);
+	M->fz = alloc1float(nt);
+	M->t = alloc1float(nt);
+	M->refl = (float*)calloc((size_t)3*nx*nt,sizeof(float));
+	M->vsp = (float*)calloc((size_t)3*nz*nt,sizeof(float));
+
+	/*   initial condition  */
+	for (ix=0; ix < nx; ix++)
+		for (iz=0; iz < nz; iz++) {
+			M->u[ix][iz]=0.0;
+			M->v[ix][iz]=0.0;
+			M->w[ix][iz]=0.0;
+			M->xzsource[ix][iz]=0.0;
+			M->e11[ix][iz]=0.0;
+			M->e33[ix][iz]=0.0;
+			M->e23[ix][iz]=0.0;
+			M->e13[ix][iz]=0.0;
+			M->e12[ix][iz]=0.0;
+		}
+
+	/*   get time response of the source function */
+	for (it=0; it<nt; it++) {
+		M->t[it]=it*dt;
+		M->fx[it]=0.0;
+		M->fy[it]=0.0;
+		M->fz[it]=0.0;
 	}
-	    
-      fputtr(outputfile,&sudata);
-    }
+	if (forcex) tforce(nt, M->fx, dt, fpeak);
+	if (forcey) tforce(nt, M->fy, dt, fpeak);
+	if (forcez) tforce(nt, M->fz, dt, fpeak);
+
+	/*    density and elastic parameters, the density inverse and the maximum velocity  */
+	for (ix=0; ix < nx; ix++)
+		for (iz=0; iz < nz; iz++) {
+			size_t j = (size_t)ix*nz+iz;
+			M->aa[ix][iz] = aa[j];
+			M->cc[ix][iz] = cc[j];
+			M->ff[ix][iz] = ff[j];
+			M->ll[ix][iz] = ll[j];
+			M->nn[ix][iz] = nn[j];
+			M->rho[ix][iz] = 1.0/rho[j];
+			if ( M->cc[ix][iz]*M->rho[ix][iz] > vmax ) vmax = M->cc[ix][iz]*M->rho[ix][iz];
+		}
+	vmax = sqrt(vmax);
+
+	/*  give source location  */
+	if (xzsource != NULL) {
+		for (ix=0; ix < nx; ix++)
+			for (iz=0; iz < nz; iz++) M->xzsource[ix][iz] = xzsource[(size_t)ix*nz+iz];
+	} else {
+		locate_source(nx, nz, sx, sz, M->xzsource, source);
+	}
+
+	M->nx = nx; M->nz = nz; M->nt = nt; M->it = 0; M->isurf = isurf; M->dofct = dofct; M->movebc = movebc; M->impulse = impulse;
+	M->sx = sx; M->sz = sz; M->receiverdepth = receiverdepth; M->vspnx = vspnx;
+	M->fctxbeg = fctxbeg; M->fctxend = fctxend; M->fctzbeg = fctzbeg; M->fctzend = fctzend;
+	M->nxcc1 = 0; M->nxcc2 = nx; M->nzcc1 = 0; M->nzcc2 = nz;
+	M->dx = dx; M->dz = dz; M->dt = dt; M->vmax = vmax; M->eta0 = eta0; M->eta = eta;
+	M->deta0dx = deta0dx; M->deta0dz = deta0dz; M->detadx = detadx; M->detadz = detadz;
+	return M;
 }
-	
+
+float su_fctanismod_vmax(const struct FctModel *M) { return M->vmax; }
+
+int su_fctanismod_done(const struct FctModel *M) { return M->it; }
+
+/* The next time step. Returns 1 if the model was stepped, 0 if it has done nt steps. */
+int su_fctanismod_step(struct FctModel *M)
+{
+	int ix, iz, it = M->it, nx = M->nx, nz = M->nz, nt = M->nt;
+	int mbx1, mbx2, mbz1, mbz2;
+
+	if (it>=nt) return 0;
+
+	moving_bc (it, nx, nz, M->sx, M->sz, M->dx, M->dz, M->impulse, M->movebc, M->t, M->vmax, &mbx1, &mbz1, &mbx2, &mbz2);
+
+	/* FCT correction is localized to the area bounded by */
+	/* (fctxend - fctxbeg) by (fctzend-fctzbeg) */
+	/* contain the FCT correction boundary by the model boundary */
+	/* computed by moving_bc */
+	moving_fctbc (mbx1, mbz1, mbx2, mbz2, M->nxcc1, M->nzcc1, M->nxcc2, M->nzcc2,
+		&M->fctxbeg, &M->fctzbeg, &M->fctxend, &M->fctzend);
+
+	anis_solver2(it, M->u, M->v, M->w, M->e11, M->e33, M->e23, M->e12, M->e13, M->aa, M->cc, M->ff, M->ll, M->nn,
+		M->rho, M->xzsource, M->fx, M->fy, M->fz, M->dx, M->dz, M->dt, nx, nz, M->dofct, M->isurf,
+		M->eta0, M->eta, M->deta0dx, M->deta0dz, M->detadx, M->detadz, mbx1, mbx2, mbz1, mbz2);
+
+	/*  get reflection seismogram  */
+	for (ix=0; ix<nx; ix++) {
+		M->refl[((size_t)0*nx+ix)*nt+it] = M->u[ix][M->receiverdepth];
+		M->refl[((size_t)1*nx+ix)*nt+it] = M->v[ix][M->receiverdepth];
+		M->refl[((size_t)2*nx+ix)*nt+it] = M->w[ix][M->receiverdepth];
+	}
+
+	/*  get VSP seismogram  */
+	for (iz=0; iz<nz; iz++) {
+		M->vsp[((size_t)0*nz+iz)*nt+it] = M->u[M->vspnx][iz];
+		M->vsp[((size_t)1*nz+iz)*nt+it] = M->v[M->vspnx][iz];
+		M->vsp[((size_t)2*nz+iz)*nt+it] = M->w[M->vspnx][iz];
+	}
+
+	M->it = it+1;
+	return 1;
+}
+
+/* Copies a component, [nx][nz], to out: which is 0 u, 1 v, 2 w */
+void su_fctanismod_snapshot(const struct FctModel *M, int which, float *out)
+{
+	float **f = (which==0) ? M->u : (which==1) ? M->v : M->w;
+	memcpy(out, f[0], sizeof(float)*(size_t)M->nx*M->nz);
+}
+
+void su_fctanismod_records(const struct FctModel *M, const float **refl, const float **vsp)
+{
+	*refl = M->refl;
+	*vsp = M->vsp;
+}
+
+void su_fctanismod_free(struct FctModel *M)
+{
+	if (M==NULL) return;
+	free2float(M->u); free2float(M->v); free2float(M->w); free2float(M->e11); free2float(M->e33); free2float(M->e23);
+	free2float(M->e12); free2float(M->e13); free2float(M->xzsource); free2float(M->aa); free2float(M->cc); free2float(M->ff);
+	free2float(M->ll); free2float(M->nn); free2float(M->rho);
+	free1float(M->fx); free1float(M->fy); free1float(M->fz); free1float(M->t);
+	free(M->refl); free(M->vsp);
+	free(M);
+}

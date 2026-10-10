@@ -684,6 +684,19 @@ void su_fdmod2_exsrc(int ns, const float *xs, const float *zs, const float *vs, 
 	free1(rows);
 }
 
+/* The finite-difference star only (no absorbing boundaries); od is NULL for a constant density of 1 */
+void su_fdmod2_star(int nx, float dx, int nz, float dz, float dt, const float *dvv, const float *od, const float *s,
+	const float *pm, const float *p, float *pp)
+{
+	float **rdvv = fd_rows(dvv,nx,nz), **rod = (od!=NULL) ? fd_rows(od,nx,nz) : NULL, **rs = fd_rows(s,nx,nz);
+	float **rpm = fd_rows(pm,nx,nz), **rp = fd_rows(p,nx,nz), **rpp = fd_rows(pp,nx,nz);
+	if (od!=NULL && dx!=dz) star1(nx,dx,nz,dz,dt,rdvv,rod,rs,rpm,rp,rpp);
+	else if (od!=NULL && dx==dz) star2(nx,dx,nz,dz,dt,rdvv,rod,rs,rpm,rp,rpp);
+	else if (od==NULL && dx!=dz) star3(nx,dx,nz,dz,dt,rdvv,rod,rs,rpm,rp,rpp);
+	else star4(nx,dx,nz,dz,dt,rdvv,rod,rs,rpm,rp,rpp);
+	free1(rdvv); if (rod!=NULL) free1(rod); free1(rs); free1(rpm); free1(rp); free1(rpp);
+}
+
 /* od is NULL for a constant density of 1 */
 void su_fdmod2_tstep(int nx, float dx, int nz, float dz, float dt, const float *dvv, const float *od, const float *s,
 	const float *pm, const float *p, float *pp, const int *abs)

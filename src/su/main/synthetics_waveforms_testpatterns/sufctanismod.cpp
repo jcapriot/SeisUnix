@@ -348,6 +348,10 @@ static void	anis_solver2(int it, float **u, float **v, float **w,
   u1 = alloc2float(nz, nx);
   f0 = alloc2float(nz, nx);
   f1 = alloc2float(nz, nx);
+  /* (the program read what it had not set, in the parts that the moving boundary leaves out) */
+  memset(u1[0], 0, sizeof(float)*(size_t)nx*nz);
+  memset(f0[0], 0, sizeof(float)*(size_t)nx*nz);
+  memset(f1[0], 0, sizeof(float)*(size_t)nx*nz);
 
 
   /*  solve u at next time step  */
@@ -2052,6 +2056,8 @@ static void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift,
  * Differences from the program:
  *  - The program accepts order=2 or 4 but only has the second order solver wired in; so does the library (no order argument).
  *  - The source is the point source (source=1) by default; the program's default (0) had no source in space.
+ *  - The work arrays of the solver (u1, f0, f1) start at 0: the program read parts that it had not set, which made the
+ *    result depend on what was in the memory (it differed between runs on some systems).
  *  - The checks of the parameters return a code.
  */
 

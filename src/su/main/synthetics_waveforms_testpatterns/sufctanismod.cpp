@@ -980,7 +980,7 @@ static void	fct2d1o(float **u, float **u1, int nx, int nz,
       {
 	f0[ix][iz]=u1[ix][iz+1]-u1[ix][iz]; 
       }
-  for (iz=mbx1; iz<mbz2-1; iz++)
+  for (iz=mbz1; iz<mbz2-1; iz++)
     f0[mbx2-1][iz]=u1[mbx2-1][iz+1]-u1[mbx2-1][iz]; 
 			
 
@@ -1355,6 +1355,12 @@ static void	moving_bc (int it, int nx, int nz, int sx, int sz,
     *mbz2=nz;
   }
 
+  /* the limiters of fct2d1o read three samples before the end of the window (f0[ix][mbz2-3], f0[mbx2-3][iz]), and the
+     solver of w and v gives it a window that is one sample shorter: early in a run, when the moving boundary is only a
+     sample or two, SU read before the start of the arrays (and wrote there too). Keep the window four samples long
+     (nx and nz are at least 4). */
+  if (*mbx2 < 4) *mbx2 = 4;
+  if (*mbz2 < 4) *mbz2 = 4;
 }
 
 
@@ -2058,6 +2064,11 @@ static void	difference_4z(int mbx1, int mbx2, int mbz1, int mbz2, int shift,
  *  - The source is the point source (source=1) by default; the program's default (0) had no source in space.
  *  - The work arrays of the solver (u1, f0, f1) start at 0: the program read parts that it had not set, which made the
  *    result depend on what was in the memory (it differed between runs on some systems).
+ *  - The moving boundary is kept at least four samples long in x and in z (the limiters of the FCT correction read three samples
+ *    before the end of the window: early in a run with movebc=1 the program read, and wrote, before the start of the arrays, which
+ *    corrupted the heap), so nx and nz must be at least 4.
+ *  - The first difference of the diffused u in the second sweep of the FCT correction starts at the top of the window (the
+ *    program had mbx1 where mbz1 was meant, a difference only when the window does not start at the same sample in x and in z).
  *  - The checks of the parameters return a code.
  */
 
@@ -2084,7 +2095,7 @@ struct FctModel *su_fctanismod_create(int nx, int nz, int nt, float dx, float dz
 	void (*tforce)(int, float*, float, float) = NULL;
 
 	*err = 0;
-	if (nx<3 || nz<3 || nt<1 || dx<=0.0 || dz<=0.0 || dt<=0.0 || fpeak<=0.0 || isurf<1 || isurf>3) { *err = -3; return NULL; }
+	if (nx<4 || nz<4 || nt<1 || dx<=0.0 || dz<=0.0 || dt<=0.0 || fpeak<=0.0 || isurf<1 || isurf>3) { *err = -3; return NULL; }
 	if (wavelet==1) tforce = tforce_akb;
 	else if (wavelet==2) tforce = tforce_ricker;
 	else if (wavelet==3) tforce = tforce_spike;

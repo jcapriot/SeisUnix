@@ -178,7 +178,7 @@ Author:  Dave Hale, Colorado School of Mines, 11/23/91
 			sa += xa*ya;
 			yb = y[i+1-j];
 			sb += xa*yb;
-			xb = x[j-1];
+			if (j>jlow) xb = x[j-1];  /* no read before the first sample */
 		}
 		z[i] = sa;
 		z[i+1] = sb;
@@ -216,7 +216,7 @@ Author:  Dave Hale, Colorado School of Mines, 11/23/91
 				sb += xb*ya;
 				yb = y[i-1-j];
 				sa += xb*yb;
-				xa = x[j+2];
+				if (j+2<=jhigh) xa = x[j+2];  /* no read past the last sample */
 			}
 			z[i] = sa;
 			z[i+1] = sb;
@@ -236,7 +236,7 @@ Author:  Dave Hale, Colorado School of Mines, 11/23/91
 				sb += xb*ya;
 				yb = y[i-1-j];
 				sa += xb*yb;
-				xa = x[j+2];
+				if (j+2<=jhigh) xa = x[j+2];  /* no read past the last sample */
 			}
 			z[i] = sa+x[jhigh]*y[i-jhigh];
 			z[i+1] = sb+x[jhigh]*y[i+1-jhigh];

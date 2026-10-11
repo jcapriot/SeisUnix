@@ -7,6 +7,7 @@
 #include "segy.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUGASSMAN - Model reflectivity change with rock/fluid properties	",
@@ -47,6 +48,8 @@ char *sdoc[] = {
 " Creates a reflection coefficient series based on Gassmann		",
 " theory of velocity and density for porous elastic media		",
 NULL};
+#endif
+
 
 /* 
  * Credits: UHouston: Chris Liner	9/23/2009
@@ -55,37 +58,45 @@ NULL};
  */
 /**************** end self doc ***********************************/
 
+/* Library version of SUGASSMANN: the rock and fluid physics of the program (Gassmann's fluid substitution of the rock, with the
+ * Batzle and Wang properties of brine, oil and gas); its main program, which makes traces from them, is left to the caller.
+ *
+ * Differences from the program:
+ *  - the functions are prefixed gassmann_;
+ *  - a mixture with so + sg > 1 gives NaN where the program ended the process.
+ * (The program's modes 1 and 2 could not be used: mode 1 does nothing, and mode 2 was changed to 0 by the program.)
+ */
 /* Function prototypes */
-float rockT0(float h, float kmin, float mumin, float rmin, 
+float gassmann_rockT0(float h, float kmin, float mumin, float rmin, 
 		float phi, float a, float b, float c, float api, 
 		float g, float s, float so, float sg, float t, float p);
-float rockR0(float v1, float r1, float kmin, float mumin, 
+float gassmann_rockR0(float v1, float r1, float kmin, float mumin, 
 		float rmin, float phi, float a, float b, float c, 
 		float api, float g, float s, float so, float sg, 
 		float t, float p);
-float rockIp(float kmin, float mumin, float rmin, float phi, float a,
+float gassmann_rockIp(float kmin, float mumin, float rmin, float phi, float a,
 		float b, float c, float api, float g, float s, 
 		float so, float sg, float t, float p);
-float rockVp(float kmin, float mumin, float rmin, float phi, 
+float gassmann_rockVp(float kmin, float mumin, float rmin, float phi, 
 		float a, float b, float c, float api, float g, 
 		float s, float so, float sg, float t, float p);
-float rockDensity(float rmin, float phi, float api, float g, 
+float gassmann_rockDensity(float rmin, float phi, float api, float g, 
 			float s, float so, float sg, float t, float p);
-float fluidVelocity(float api, float g, float s, float so, 
+float gassmann_fluidVelocity(float api, float g, float s, float so, 
 			float sg, float t, float p);
-float fluidModulus(float api, float g, float s, float so, 
+float gassmann_fluidModulus(float api, float g, float s, float so, 
 			float sg, float t, float p);
-float fluidDensity(float api, float g, float s, float so, float sg, 
+float gassmann_fluidDensity(float api, float g, float s, float so, float sg, 
 			float t, float p);
-float brineVelocity(float s, float t, float p);
-float brineModulus(float s, float t, float p);
-float brineDensity(float s, float t, float p);
-float oilModulus(float api, float g, float t, float p);
-float oilVelocity(float api, float g, float t, float p);
-float oilDensity(float api, float g, float t, float p);
-float gasVelocity(float g, float t, float p);
-float gasModulus(float g, float t, float p);
-float gasDensity(float g, float t, float p);
+float gassmann_brineVelocity(float s, float t, float p);
+float gassmann_brineModulus(float s, float t, float p);
+float gassmann_brineDensity(float s, float t, float p);
+float gassmann_oilModulus(float api, float g, float t, float p);
+float gassmann_oilVelocity(float api, float g, float t, float p);
+float gassmann_oilDensity(float api, float g, float t, float p);
+float gassmann_gasVelocity(float g, float t, float p);
+float gassmann_gasModulus(float g, float t, float p);
+float gassmann_gasDensity(float g, float t, float p);
 
 /* C language definitions for use with Mathematica output */
 #define Power(x, y)	(pow((double)(x), (double)(y)))
@@ -106,135 +117,7 @@ float gasDensity(float g, float t, float p);
 #define pi		3.14159265358979323846264
 #define Degree		0.01745329251994329576924
 
-segy tr;
-
-int
-main(int argc, char **argv)
-{
-	int nt;		/* number of time samples		*/
-	int ntr;	/* number of traces			*/
-	int itr;	/* trace counter			*/
-	int mode;	/* operation mode (see selfdoc)		*/
-	float dt;	/* time sampling interval		*/
-	int it, it1;	/* time sample of gassmann spike	*/
-	/* environment variables */
-	float temp;	/* temperature in deg C			*/
-	float pres;	/* pressure in megaPascals		*/
-	/* caprock variables */
-	float v1;	/* p-wave speed (m/s) 			*/
-	float r1;	/* mass density (g/cc)			*/
-	/* reservoir fluid properties */
-	float g;	/* gas specific gravity			*/
-			/*     0.56 (methane) - 1.8 (condensate)*/
-	float api;	/* oil API gravity... 			*/
-			/*	10 (heavy) - 50 (ultra light)	*/	
-	float s;	/* brine salinity ppm/(1 000 000)	*/ 
-	float so, sg;	/* oil and gas saturation 		*/
-	/* reservoir rock properties */
-	float kmin;	/* bulk modulus (MPa) of frame mineral(s) */
-	float mumin;	/* shear modulus (MPa) of frame mineral(s)*/
-	float rmin;	/* density (g/cc) of frame mineral(s) 	*/
-	float phi;	/* rock frame porosity (0-1)		*/
-	float a,b,c;	/* fitting params: 			*/
-			/*	Mdry/Mmineral ~ 1/(a + b phi^c) */
-	float h;	/* reservoir thickness (m)		*/
-	float p;	/* parameter sensitivity test % (if mode=2)*/
-	float x, y;	/* temporary variable */
-
-	/* Initialize */
-	initargs(argc, argv);
-	requestdoc(0); /* stdin not used */
-
-	/* get parameters */
-	nt = 500;	getparint("nt", &nt);
-	CHECK_NT("nt",nt);				tr.ns = nt;
-	ntr = 200;	getparint("ntr", &ntr);
-	dt = 0.004;	getparfloat("dt", &dt);		tr.dt = dt*1000000;
-	mode = 0;	getparint("mode", &mode);
-	if (mode != 0 && mode != 1) mode = 0;
-	it1 = nt/2;	getparint("it1", &it1);
-
-	/* environment vars */
-	temp = 140;		getparfloat("temp", &temp);
-	pres = 200;		getparfloat("pres", &pres);
-	/* caprock vars */
-	v1 = 3300;		getparfloat("v1", &v1);
-	r1 = 2.6;		getparfloat("r1", &r1);
-	/* fluid vars */
-	g = 0.56;		getparfloat("g", &g);
-	api = 50;		getparfloat("api", &api);
-	s = .35;		getparfloat("s", &s);
-	so = .7;		getparfloat("so", &so);
-	sg = .2;		getparfloat("sg", &sg);
-	/* rock frame vars */
-	kmin = 37900;	getparfloat("kmin", &kmin);
-	mumin = 44300;	getparfloat("mumin", &mumin);
-	rmin = 2.67;	getparfloat("rmin", &rmin);
-	phi = 0.24;		getparfloat("phi", &phi);
-	a = 1;			getparfloat("a", &a);
-	b = 15;			getparfloat("b", &b);
-	c = 1;			getparfloat("c", &c);
-	h = 20;			getparfloat("h", &h);
-	/* mode opertation vars */
-	p = .15;		getparfloat("p", &p);
-	
-
-	/* select mode */
-	if (mode == 0) {
-		ntr	= 1;
-		nt	= 200;
-		tr.ns = nt;
-		memset( (void *) tr.data, 0, nt * FSIZE);
-		x = sg;
-		y = 0.0;
-		for (it = 0; it < nt; it++) {
-			y = (1 - p) * x + 2 * (float) it * p * x / (float) nt ;
-			tr.data[it] = 100 * rockR0(v1,r1,kmin, mumin, rmin, phi, a, b, c, api, g, s, so, y, temp, pres)/
-					rockR0(v1,r1,kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, temp, pres);
-		}
-		tr.f1 = ( 1 - p ) * x;
-		tr.d1 = 2 * p * x / nt;
-		puttr(&tr);
-
-	}
-
-	if (mode == 2) {
-		temp = 0;
-		for (itr = 0; itr < ntr; itr++) {
-			memset( (void *) tr.data, 0, nt * FSIZE);
-			temp += 350 / ntr;
-			pres = 100;
-			for (it = 0; it < nt; it++) {
-				pres -= (100 - .1) / nt;
-				tr.data[it] = rockT0(h,kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, temp, pres);
-				/* tr.data[it] = rockR0(v1,r1,kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, temp, pres);
-				 tr.data[it] = rockIp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, temp, pres);
-				 tr.data[it] = rockVp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, temp, pres);
-				 tr.data[it] = rockDensity(rmin, phi, api, g, s, so, sg, temp, pres);
-				 tr.data[it] = fluidVelocity(api, g, s, so, sg, temp, pres);
-				 tr.data[it] = fluidModulus(api, g, s, so, sg, temp, pres);
-				 tr.data[it] = fluidDensity(api, g, s, so, sg, temp, pres);
-				 tr.data[it] = brineVelocity(s, temp, pres);
-				 tr.data[it] = brineModulus(s, temp, pres);
-				 tr.data[it] = brineDensity(s, temp, pres);
-				 tr.data[it] = oilModulus(api, g, temp, pres);
-				 tr.data[it] = oilVelocity(api, g, temp, pres);
-				 tr.data[it] = oilDensity(api, g, temp, pres);
-				 tr.data[it] = gasVelocity(g, temp, pres);
-				 tr.data[it] = gasModulus(g, temp, pres);
-				 tr.data[it] = gasDensity(g, temp, pres); */
-			}
-			puttr(&tr);
-		}
-		
-	}
-	
-
-	return(CWP_Exit());
-}
-
-
-float rockT0(float h, float kmin, float mumin, float rmin, 
+float gassmann_rockT0(float h, float kmin, float mumin, float rmin, 
 		float phi, float a, float b, float c, 
 		float api, float g, float s, float so, 
 		float sg, float t, float p)
@@ -258,13 +141,13 @@ Credits: UHouston: Chris Liner	9/23/2009
 	float v;
 	float x;
 
-	v = rockVp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, t, p);
+	v = gassmann_rockVp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, t, p);
 	x = 2 * h / v;
 
 	return x;
 }
 
-float rockR0(float v1, float r1, float kmin, float mumin,
+float gassmann_rockR0(float v1, float r1, float kmin, float mumin,
 		float rmin, float phi, float a, float b, float c, 
 		float api, float g, float s, float so, 
 		float sg, float t, float p)
@@ -288,18 +171,18 @@ Credits: UHouston: Chris Liner	9/23/2009
 	float x;
 
 	ip1 = v1 * r1;
-	ip2 = rockIp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, t, p);
+	ip2 = gassmann_rockIp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, t, p);
 	x = (ip2 - ip1)/(ip2 + ip1);
 
 	return x;
 }
 
 
-float rockIp(float kmin, float mumin, float rmin, float phi,
+float gassmann_rockIp(float kmin, float mumin, float rmin, float phi,
 		float a, float b, float c, float api, float g,
 		float s, float so, float sg, float t, float p)
 /*******************************************************************
-rockIp - Calculate P-wave acoustic impedance (m/s)*(g/cc) of a fluid 
+gassmann_rockIp - Calculate P-wave acoustic impedance (m/s)*(g/cc) of a fluid 
 	 saturated reservoir rock. 
 ********************************************************************
 Notes:
@@ -317,18 +200,18 @@ Credits: UHouston: Chris Liner	9/23/2009
 	float rsat, vsat;
 	float x;
 
-	rsat = rockDensity(rmin, phi, api, g, s, so, sg, t, p);
-	vsat = rockVp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, t, p);
+	rsat = gassmann_rockDensity(rmin, phi, api, g, s, so, sg, t, p);
+	vsat = gassmann_rockVp(kmin, mumin, rmin, phi, a, b, c, api, g, s, so, sg, t, p);
 	x = rsat * vsat;
 
 	return x;
 }
 
-float rockVp(float kmin, float mumin, float rmin, float phi,
+float gassmann_rockVp(float kmin, float mumin, float rmin, float phi,
 		float a, float b, float c, float api, float g,
 		float s, float so, float sg, float t, float p)
 /*******************************************************************
-rockVp - Calculate P-wave speed (m/s) of a fluid saturated reservoir rock.	
+gassmann_rockVp - Calculate P-wave speed (m/s) of a fluid saturated reservoir rock.	
 ********************************************************************
 Notes:
 Constituent mineral properties are bulk modulus kmin (MPa), 
@@ -345,21 +228,21 @@ Credits: UHouston: Chris Liner	9/23/2009
 	float kf, mmin, mdry, rhs, msat, rsat;
 	float x;
 
-	kf	= fluidModulus(api, g, s, so, sg, t, p);
+	kf	= gassmann_fluidModulus(api, g, s, so, sg, t, p);
 	mmin = kmin + 4 * mumin / 3;
 	mdry = mmin /(a + b * Power(phi,c));
 	rhs	= mdry / (mmin - mdry) + kf / ( phi * (mmin - kf) );
 	msat = mmin * rhs / (1 + rhs);
-	rsat = rockDensity(rmin, phi, api, g, s, so, sg, t, p);
+	rsat = gassmann_rockDensity(rmin, phi, api, g, s, so, sg, t, p);
 	x = Sqrt(1000 * msat / rsat);
 
 	return x;
 }
 
-float rockDensity(float rmin, float phi, float api, float g, float s, 
+float gassmann_rockDensity(float rmin, float phi, float api, float g, float s, 
 			float so, float sg, float t, float p)
 /*******************************************************************
-rockDensity - Calculate mass density (g/cc) of a fluid 
+gassmann_rockDensity - Calculate mass density (g/cc) of a fluid 
 		saturated reservoir rock.	\[Continuation]
 ********************************************************************
 Notes:
@@ -376,16 +259,16 @@ Credits: UHouston: Chris Liner	9/23/2009
 {
 	float x1, x;
 
-	x1 = fluidDensity(api, g, s, so, sg, t, p);
+	x1 = gassmann_fluidDensity(api, g, s, so, sg, t, p);
 	x = rmin * (1 - phi) + phi * x1;
 
 	return x;
 }
 
-float fluidVelocity(float api, float g, float s, float so,
+float gassmann_fluidVelocity(float api, float g, float s, float so,
 			float sg, float t, float p)
 /*******************************************************************
-fluidVelocity - Calculate sound speed (m/s) for a reservoir fluid mix. 
+gassmann_fluidVelocity - Calculate sound speed (m/s) for a reservoir fluid mix. 
 ********************************************************************
 The oil component is characterized by oil gravity 
 API, gas by specific gravity G, and brine by weight 
@@ -399,17 +282,17 @@ Credits: UHouston: Chris Liner	9/23/2009
 {
 	float x1, x2, x;
 
-	x1 = fluidModulus(api, g, s, so, sg, t, p);
-	x2 = fluidDensity(api, g, s, so, sg, t, p);
+	x1 = gassmann_fluidModulus(api, g, s, so, sg, t, p);
+	x2 = gassmann_fluidDensity(api, g, s, so, sg, t, p);
 	x = Sqrt( 1000 * x1 / x2 );
 
 	return x;
 }
 
-float fluidModulus(float api, float g, float s, float so, 
+float gassmann_fluidModulus(float api, float g, float s, float so, 
 			float sg, float t, float p)
 /*******************************************************************
-fluidModulus - Calculate bulk modulus (MPa) of a reservoir fluid mix. 
+gassmann_fluidModulus - Calculate bulk modulus (MPa) of a reservoir fluid mix. 
 ********************************************************************
 The oil component is characterized by oil gravity 
 API, gas by specific gravity G, and brine by weight 
@@ -424,21 +307,21 @@ Credits: UHouston: Chris Liner	9/23/2009
 	float brine, gas, oil;
 	float x;
 
-	if ( so + sg > 1 ) err("so + sg > 1...impossible");
+	if ( so + sg > 1 ) return NAN;
 
-	brine = brineModulus(s,t,p);
-	gas	= gasModulus(g,t,p);
-	oil	= oilModulus(api,g,t,p);
+	brine = gassmann_brineModulus(s,t,p);
+	gas	= gassmann_gasModulus(g,t,p);
+	oil	= gassmann_oilModulus(api,g,t,p);
 
 	x = 1.0 / ( (1 - so - sg)/brine + so/oil + sg/gas );
 
 	return x;
 }
 
-float fluidDensity(float api, float g, float s, float so,
+float gassmann_fluidDensity(float api, float g, float s, float so,
 			float sg, float t, float p)
 /*******************************************************************
-fluidDensity - Calculate mass density (g/cc) of a reservoir fluid mix. 
+gassmann_fluidDensity - Calculate mass density (g/cc) of a reservoir fluid mix. 
 ********************************************************************
 Notes:
 The oil component is characterized by oil gravity 
@@ -454,20 +337,20 @@ Credits: UHouston: Chris Liner	9/23/2009
 	float brine, gas, oil;
 	float x;
 
-	if ( so + sg > 1 ) err("so + sg > 1...impossible");
+	if ( so + sg > 1 ) return NAN;
 
-	brine = brineDensity(s,t,p);
-	gas	= gasDensity(g,t,p);
-	oil	= oilDensity(api,g,t,p);
+	brine = gassmann_brineDensity(s,t,p);
+	gas	= gassmann_gasDensity(g,t,p);
+	oil	= gassmann_oilDensity(api,g,t,p);
 
 	x = (1 - so - sg)*brine + so*oil + sg*gas;
 
 	return x;
 }
 
-float brineModulus(float s, float t, float p)
+float gassmann_brineModulus(float s, float t, float p)
 /*******************************************************************
-brineModulus - Calculate bulk modulus (MPa) of saline solution characterized 
+gassmann_brineModulus - Calculate bulk modulus (MPa) of saline solution characterized 
 	  by weight fraction of sodium chloride S (ppm/1,000,000) as 
 	  a function of temperature (deg C) and pressure (MPa)
 *******************************************************************
@@ -511,9 +394,9 @@ Credits: UHouston: Chris Liner	9/23/2009
 	return x;
 }
 
-float brineVelocity(float s, float t, float p)
+float gassmann_brineVelocity(float s, float t, float p)
 /*******************************************************************
-brineVelocity - Calculate sound speed (m/s) of saline solution characterized 
+gassmann_brineVelocity - Calculate sound speed (m/s) of saline solution characterized 
 	  by weight fraction of sodium chloride S (ppm/1,000,000) as 
 	  a function of temperature (deg C) and pressure (MPa)
 *******************************************************************
@@ -546,9 +429,9 @@ Credits: UHouston: Chris Liner	9/23/2009
 }
 
 
-float brineDensity(float s, float t, float p)
+float gassmann_brineDensity(float s, float t, float p)
 /*******************************************************************
-brineDensity - Calculate mass density (g/cc) of saline solution characterized 
+gassmann_brineDensity - Calculate mass density (g/cc) of saline solution characterized 
 		by weight fraction of sodium chloride S (ppm/1,000,000) as 
 		a function of temperature (deg C) and pressure (MPa)
 *******************************************************************
@@ -569,9 +452,9 @@ Credits: UHouston: Chris Liner	9/23/2009
 }
 
 
-float oilModulus(float api, float g, float t, float p)
+float gassmann_oilModulus(float api, float g, float t, float p)
 /*******************************************************************
-oilModulus - Calculate bulk modulus (MPa) of live oil (including solution gas)
+gassmann_oilModulus - Calculate bulk modulus (MPa) of live oil (including solution gas)
 	characterized by oil gravity API, gas specific gravity G, 
 	at temperature T (deg C) and pressure P (MPa)
 *******************************************************************
@@ -580,14 +463,14 @@ Credits: UHouston: Chris Liner	9/23/2009
 {
 	float x;
 
-	x = oilDensity(api,g,t,p) * Power( oilVelocity(api,g,t,p), 2) / 1000.;
+	x = gassmann_oilDensity(api,g,t,p) * Power( gassmann_oilVelocity(api,g,t,p), 2) / 1000.;
 
 	return x;
 }
 
-float oilVelocity(float api, float g, float t, float p)
+float gassmann_oilVelocity(float api, float g, float t, float p)
 /*******************************************************************
-oilVelocity - Calculate sound speed (m/s) of live oil (including solution gas)
+gassmann_oilVelocity - Calculate sound speed (m/s) of live oil (including solution gas)
 	characterized by oil gravity API, gas specific gravity G, 
 	at temperature T (deg C) and pressure P (MPa)
 *******************************************************************
@@ -633,9 +516,9 @@ Credits: UHouston: Chris Liner	9/23/2009
 }
 
 
-float oilDensity(float api, float g, float t, float p)
+float gassmann_oilDensity(float api, float g, float t, float p)
 /*******************************************************************
-oilDensity - Calculate mass density (g/cc) of live oil (including solution gas) 
+gassmann_oilDensity - Calculate mass density (g/cc) of live oil (including solution gas) 
 	characterized by oil gravity API, gas specific gravity G, 
 	at temperature T (deg C) and pressure P (MPa)
 *******************************************************************
@@ -666,9 +549,9 @@ Credits: UHouston: Chris Liner	9/23/2009
 }
 
 
-float gasVelocity(float g, float t, float p)
+float gassmann_gasVelocity(float g, float t, float p)
 /*******************************************************************
-gasVelocity - Calculate sound speed (m/s) of natural gas characterized by 
+gassmann_gasVelocity - Calculate sound speed (m/s) of natural gas characterized by 
 	specific gravity G, at temperature T (deg C) and pressure P (MPa)
 *******************************************************************
 Credits: UHouston: Chris Liner	9/23/2009
@@ -676,15 +559,15 @@ Credits: UHouston: Chris Liner	9/23/2009
 {
 	float x;
 
-	x = sqrt( ( 1000. * gasModulus(g,t,p) ) / gasDensity(g,t,p) );
+	x = sqrt( ( 1000. * gassmann_gasModulus(g,t,p) ) / gassmann_gasDensity(g,t,p) );
 
 	return x;
 }
 
 
-float gasModulus(float g, float t, float p)
+float gassmann_gasModulus(float g, float t, float p)
 /*******************************************************************
-gasModulus - Calculate bulk modulus (MPa) of natural gas characterized by 
+gassmann_gasModulus - Calculate bulk modulus (MPa) of natural gas characterized by 
 	specific gravity G, at temperature T (deg C) and pressure P (MPa)
 *******************************************************************
 Credits: UHouston: Chris Liner	9/23/2009
@@ -728,9 +611,9 @@ Credits: UHouston: Chris Liner	9/23/2009
 }
 
 
-float gasDensity(float g, float t, float p)
+float gassmann_gasDensity(float g, float t, float p)
 /*******************************************************************
-gasDensity - Calculate mass density (g/cc) of natural gas 
+gassmann_gasDensity - Calculate mass density (g/cc) of natural gas 
 	characterized by specific gravity G, at temperature T 
 	(deg C) and pressure P (MPa)
 *******************************************************************

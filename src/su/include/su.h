@@ -400,4 +400,24 @@ int su_ktmig2d(int ntr, int nt, float dt, float dx, float h, float angmax, int n
 void su_ints8_tables(void);
 
 
+// well logs
+float gassmann_rockT0(float h, float kmin, float mumin, float rmin, float phi, float a, float b, float c, float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_rockR0(float v1, float r1, float kmin, float mumin, float rmin, float phi, float a, float b, float c, float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_rockIp(float kmin, float mumin, float rmin, float phi, float a, float b, float c, float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_rockVp(float kmin, float mumin, float rmin, float phi, float a, float b, float c, float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_rockDensity(float rmin, float phi, float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_fluidVelocity(float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_fluidModulus(float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_fluidDensity(float api, float g, float s, float so, float sg, float t, float p);
+float gassmann_brineVelocity(float s, float t, float p);
+float gassmann_brineModulus(float s, float t, float p);
+float gassmann_brineDensity(float s, float t, float p);
+float gassmann_oilModulus(float api, float g, float t, float p);
+float gassmann_oilVelocity(float api, float g, float t, float p);
+float gassmann_oilDensity(float api, float g, float t, float p);
+float gassmann_gasVelocity(float g, float t, float p);
+float gassmann_gasModulus(float g, float t, float p);
+float gassmann_gasDensity(float g, float t, float p);
+
+
 #endif

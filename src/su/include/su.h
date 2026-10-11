@@ -420,4 +420,27 @@ float gassmann_gasModulus(float g, float t, float p);
 float gassmann_gasDensity(float g, float t, float p);
 
 
+// dip moveout
+void su_dmofk_vrms(int ndmo, const float *tdmo_in, const float *vdmo_in, int nt, float dt, float ft, float *vrms);
+int su_dmofk_nxfft(int nx, float dx, float offset);
+void su_dmofk_offset(float offset, float fmax, float sdmo, int nx, float dx, int nt, float dt, float ft, const float *vrms_in, float *ptx);
+int su_dmotx_tables(float dxcdp, float dt, float offmax, float tmute, float vrms, int nsmax, int lds, int ifds, float *ts, float *as, float *ds);
+void su_dmotx_trace(int ns, const float *ts, const float *as, float offset, int icdp, int ncdp, float dxcdp, int nt, float dt, float ft, const float *p, float *q);
+void su_dmotx_shape(int ncdp, int nt, int lds, int ifds, const float *ds_in, float *q);
+int su_dmofkcw_table(int ntable, float gamma, float *zoh, float *boh);
+void su_dmofkcw_stretch(float sdmo, float gamma, float *s1, float *s2);
+void su_dmofkcw_offset(float offset, float fmax, int nx, float dx, int nt, float dt, float ft, const float *vrms_in, float *ptx, float gamma, const float *boh, const float *zoh, int ntable, float s1, float s2, float sign);
+struct DmoVz;
+struct DmoVz *su_dmovz_create(int nt, float dt, const float *vt_in, int nptab, int *err);
+int su_dmovz_nxfft(int nx, float dx, float offset);
+int su_dmovz_offset(const struct DmoVz *M, int nx, float dx, float offset, float fmax, float smute, float speed, float *q);
+void su_dmovz_free(struct DmoVz *M);
+struct DmoTivz;
+struct DmoTivz *su_dmotivz_create(int nt, float dt, const float *vn_in, const float *v_in, const float *eta_in, int nptab, int *err);
+int su_dmotivz_nxfft(int nx, float dx, float offset);
+int su_dmotivz_offset(const struct DmoTivz *M, int nx, float dx, float offset, float fmax, float smute, float speed, float *q);
+void su_dmotivz_free(struct DmoTivz *M);
+int su_tihaledmo(int nx, int nt, float dt, float dx, float h, float v, int option, int ntpad, int nxpad, int np, float dp, const float *vnmo, float e, float d, const float *data, float *out);
+
+
 #endif

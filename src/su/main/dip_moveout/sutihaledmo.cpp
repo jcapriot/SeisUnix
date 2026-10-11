@@ -5,10 +5,9 @@
 
 #include "su.h"
 #include "segy.h"
-#include "header.h" 
-#include "VND.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = { 
 " SUTIHALEDMO - TI Hale Dip MoveOut (based on Hale's PhD thesis)	",
 "									",
@@ -54,7 +53,9 @@ char *sdoc[] = {
 " using other modules.							",
 "									",
 " Test run:   suspike | sutihaledmo nxmax=32 option=1 v=1500 | suxwigb & ",
-NULL}; 
+NULL};
+#endif
+ 
 
 /*
  * Author:  (Visitor to CSM from Mobil) John E. Anderson Spring 1994
@@ -63,191 +64,7 @@ NULL};
  */
 /**************** end self doc ********************************/
 
-/* implementation notes: requires VND routines */
-void haledmo(float h,float k,complex *p,complex *pwork,
-		int nt,int ntfft,float dt, float v);
-void bleisteindmo(float h,float k,complex *p,complex *pwork,
-		int nt,int ntfft,float dt, float v);
-void bleisteindmo2(float h,float k,complex *p,complex *pwork,
-		int nt,int ntfft,float dt, float v);
-void zhangdmo(float h,float k,complex *p,complex *pwork,
-		int nt,int ntfft,float dt, float v);
-void tsvankindmo(float h,float k,complex *p,complex *pwork,
-		int nt,int ntfft,float dt, int np, float dp, 
-		float *vnmo);
-void weakdmo(float h,float k,complex *p,complex *pwork,
-		int nt,int ntfft,float dt, float e, float d,float v);
-/* the main program */
-
-segy tr;	/* Input and output trace data of length nt */
-int main (int argc, char **argv)
-{
-	int 	ntfft;
-	int	ntpad;
-	int 	nxmax;
-	int	nxfft;
-	int	nxpad;
-	int 	nmax;
-	int	option;
-	int 	np;
-	int	ip;
-	long	nt;
-	long	it;
-	long	nx;
-	long	ix;
-	long	ik;
-	float	dt;
-	float	dx;
-	float	v;
-	float	h;
-	float	k;
-	float 	dk;
-	float	scale;
-	float	dp;
-	float	*rt;
-	float	*vnmo=NULL;
-	float	d;
-	float	e;
-	complex *crt;
-	complex *ctemp;
-	char	*ccrt;
-	char	*file;
-	char 	*fname;
-	VND	*vnd;
-	FILE	*hfp;
-	FILE	*fp;
-
-	/* hook up getpar to handle the parameters */
-	initargs(argc,argv);
-	requestdoc(1);
-		
-	/* Get info from first trace */
-	if (!gettr(&tr))  err("can't get first trace");
-	nt = tr.ns;
-	dt = 0.000001*tr.dt;
-	nx = 0;
-
-	/* get optional parameters */
-	if (!getparfloat("dx",&dx)) dx = 50.;
-	if (!getparfloat("v",&v)) v = 1500.0;
-	if (!getparfloat("h",&h)) h = 200.0;
-	if (!getparfloat("e",&e)) e = 0.0;
-	if (!getparfloat("d",&d)) d = 0.0;
-	if (!getparint("nxpad",&nxpad)) nxpad = h/dx;
-	if (!getparint("ntpad",&ntpad)) ntpad = 0;
-	if (!getparint("option",&option)) option = 1;
-	if (!getparstring("file",&file)) file="vnmo";
-	if (v <= 0.0 && (option==3 || option==6)) 
-		err("must enter positive value for v when option=3"); 
-	
-	/* get required parameters */
-	if (!getparint("nxmax",&nxmax)) err("must enter nxmax");
-
-        checkpars();
-
-	hfp = tmpfile();
-
-	if(option==5) {
-		if((fp=efopen(file,"r"))==NULL)
-		   err("suhaledmo: couldn't open vnmo(p) file, option=5");
-		fscanf(fp,"%d",&np);
-		vnmo=(float *)VNDemalloc(np*sizeof(float),"vnmo");
-		fscanf(fp,"%e",&dp);
-		fprintf(stderr,"suhaledmo: np=%d dp=%e\n",np,dp);
-		for(ip=0;ip<np;ip++)
-			fscanf(fp,"%e",&vnmo[ip]);
-		fclose(fp);
-		}
-
-	ntfft=npfao(nt+ntpad,2*(nt+ntpad));
-	nxfft=npfar(nxmax+nxpad);
-	dk=2.*PI/(nxfft*dx);
-	fprintf(stderr,"suhaledmo: ntfft=%d nxfft=%d\n",ntfft,nxfft);
-	scale=1./(nxfft);
-
-	nmax = nxfft/2 + 1;
-	if(nt > nmax) nmax=nt;
-	crt = (complex *)VNDemalloc(nmax*sizeof(complex),"crt");
-	ctemp = (complex *)VNDemalloc(ntfft*sizeof(complex),"crt");
-	rt = (float *)crt;
-	ccrt = (char *)crt;
-	
-	nx=nxfft+2;
-	fname=VNDtempname("suhaledmo");
-	vnd = V2Dop(2,100000,sizeof(float),fname,nx,nt);
-	
-	/* Main loop for saving input traces */
-	nx=0;
-	do {
-		for(it=0;it<nt;it++) tr.data[it]*=scale;
-		V2Dw1(vnd,nx,(char *)tr.data,1);
-		efwrite(&tr,HDRBYTES,1,hfp);
-		nx++;
-		if(nx>nxmax) break;
-	} while ( gettr(&tr) );
-
-	/* Do forward FFT from x to k */
-	for(it=0;it<nt;it++) {
-		V2Dr0(vnd,it,ccrt,3);
-		for(ix=nx;ix<nxfft;ix++) rt[ix]=0.;
-		pfarc(1,nxfft,rt,crt); 
-		V2Dw0(vnd,it,ccrt,4);
-	}
-
-	/* change vnd dimension 0 from real to complex */
-	VNDr2c(vnd);
-
-	/* Do DMO correction on each wavenumber component */
-	for(ik=0;ik<(nxfft/2 + 1);ik++) {
-		V2Dr1(vnd,ik,ccrt,5);
-		k = ik*dk;
-		if(option==1) 
-			haledmo(h,k,crt,ctemp,nt,ntfft,dt,v);
-		if(option==2)
-			bleisteindmo(h,k,crt,ctemp,nt,ntfft,dt,v);
-		if(option==3)
-			bleisteindmo2(h,k,crt,ctemp,nt,ntfft,dt,v);
-		if(option==4)
-			zhangdmo(h,k,crt,ctemp,nt,ntfft,dt,v);
-		if(option==5)
-			tsvankindmo(h,k,crt,ctemp,nt,ntfft,dt,np,dp,vnmo);
-		if(option==6)
-			weakdmo(h,k,crt,ctemp,nt,ntfft,dt,e,d,v);
-
-		V2Dw1(vnd,ik,ccrt,6);
-	}
-
-
-	/* Do inverse FFT from k to x */
-	for(it=0;it<nt;it++) {
-		V2Dr0(vnd,it,ccrt,7);
-		pfacr(-1,nxfft,crt,rt); 
-		V2Dw0(vnd,it,ccrt,8);
-	}
-
-	/* change vnd dimension 0 from complex to real */
-	VNDc2r(vnd);
-
-	/* output the DMO result */
-	efseek(hfp,(off_t)0L,SEEK_SET);
-	for(ix=0;ix<nx;ix++) {
-		V2Dr1(vnd,ix,(char *)tr.data,7);
-		efread(&tr,HDRBYTES,1,hfp);
-		puttr(&tr);
-	}
-
-	/* close files and return */
-	VNDcl(vnd,1);
-	VNDfree(crt,"crt");
-	VNDfree(ctemp,"ctemp");
-	if(option==5) VNDfree(vnmo ,"vnmo");
-	if(VNDtotalmem()!=0) {
-		fprintf(stderr,"total VND memory at end = %ld\n",
-		VNDtotalmem());
-	}
-	return(CWP_Exit());
-}
-void haledmo(float h,float k,complex *p,complex *pwork,
+static void haledmo(float h,float k,complex *p,complex *pwork,
 		int nt,int ntfft,float dt,float v)
 /*  hale fk dmo
 
@@ -284,13 +101,13 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 	dw = 2*PI/(ntfft*dt);
 	scale=1./ntfft;
 	iwtest=ntfft/2+1;
-	pwork[0]=cmplx(0.,0.);
+	pwork[0]=complex(0.0f,0.0f);
 	for(iw=1;iw<ntfft;iw++) {
 		if(iw<iwtest)
 			w=iw*dw;
 		else
 			w=(iw-ntfft)*dw;
-		csum=cmplx(0.,0.);
+		csum=complex(0.0f,0.0f);
 		if( (k*v) < (2*fabs(w)) ) {
 			hkpw=hk/(w);
 			for(it=1;it<nt;it++) {
@@ -298,18 +115,18 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 				hkpwt=hkpw/tn;
 				A = sqrt(1. + hkpwt*hkpwt);
 				phase = w*tn*A;
-				cfac = cmplx( cos(phase)/A, sin(phase)/A ); 		
-				csum = cadd( csum, cmul(p[it],cfac) );
+				cfac = complex( cos(phase)/A, sin(phase)/A ); 		
+				csum += p[it]*cfac;
 
 			}
 		}
 		pwork[iw]=csum;
 	}
 	pfacc(-1,ntfft,pwork);
-	for(it=0;it<nt;it++) p[it]=crmul(pwork[it],scale);
+	for(it=0;it<nt;it++) p[it]=pwork[it]*scale;
 	return;
 }
-void bleisteindmo(float h,float k,complex *p,complex *pwork,
+static void bleisteindmo(float h,float k,complex *p,complex *pwork,
 		int nt,int ntfft,float dt,float v)
 /*  bleistein true amplitude fk dmo
 
@@ -347,13 +164,13 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 	dw = 2*PI/(ntfft*dt);
 	scale=1./ntfft;
 	iwtest=ntfft/2+1;
-	pwork[0]=cmplx(0.,0.);
+	pwork[0]=complex(0.0f,0.0f);
 	for(iw=1;iw<ntfft;iw++) {
 		if(iw<iwtest)
 			w=iw*dw;
 		else
 			w=(iw-ntfft)*dw;
-		csum=cmplx(0.,0.);
+		csum=complex(0.0f,0.0f);
 		if( (k*v) < (2*fabs(w)) ) {
 			hkpw=hk/(w);
 			for(it=1;it<nt;it++) {
@@ -362,17 +179,17 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 				A = sqrt(1. + hkpwt*hkpwt);
 				B = sqrt(1. + 2*hkpwt*hkpwt);
 				phase = w*tn*A;
-				cfac = cmplx( B*cos(phase)/A, B*sin(phase)/A ); 		
-				csum = cadd( csum, cmul(p[it],cfac) );
+				cfac = complex( B*cos(phase)/A, B*sin(phase)/A ); 		
+				csum += p[it]*cfac;
 			}
 		}
 		pwork[iw]=csum;
 	}
 	pfacc(-1,ntfft,pwork);
-	for(it=0;it<nt;it++) p[it]=crmul(pwork[it],scale);
+	for(it=0;it<nt;it++) p[it]=pwork[it]*scale;
 	return;
 }
-void bleisteindmo2(float h,float k,complex *p,complex *pwork,
+static void bleisteindmo2(float h,float k,complex *p,complex *pwork,
 		int nt,int ntfft,float dt,float v)
 /*  bleistein cos*cos weighted amplitude fk dmo
 
@@ -411,14 +228,14 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 	dw = 2*PI/(ntfft*dt);
 	scale=1./ntfft;
 	iwtest=ntfft/2+1;
-	pwork[0]=cmplx(0.,0.);
+	pwork[0]=complex(0.0f,0.0f);
 	hpv=2.*h/v;
 	for(iw=1;iw<ntfft;iw++) {
 		if(iw<iwtest)
 			w=iw*dw;
 		else
 			w=(iw-ntfft)*dw;
-		csum=cmplx(0.,0.);
+		csum=complex(0.0f,0.0f);
 		if( (k*v) < (2*fabs(w)) ) {
 			hkpw=hk/(w);
 			for(it=1;it<nt;it++) {
@@ -430,17 +247,17 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 				A = sqrt(1. + hkpwt2);
 				B = (1.+2*hkpwt2)*(1+hkpwt2)/(1+hpvt2);
 				phase = w*tn*A;
-				cfac = cmplx( B*cos(phase)/A, B*sin(phase)/A ); 		
-				csum = cadd( csum, cmul(p[it],cfac) );
+				cfac = complex( B*cos(phase)/A, B*sin(phase)/A ); 		
+				csum += p[it]*cfac;
 			}
 		}
 		pwork[iw]=csum;
 	}
 	pfacc(-1,ntfft,pwork);
-	for(it=0;it<nt;it++) p[it]=crmul(pwork[it],scale);
+	for(it=0;it<nt;it++) p[it]=pwork[it]*scale;
 	return;
 }
-void zhangdmo(float h,float k,complex *p,complex *pwork,
+static void zhangdmo(float h,float k,complex *p,complex *pwork,
 		int nt,int ntfft,float dt,float v)
 /*  zhang fk dmo
 
@@ -478,13 +295,13 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 	dw = 2*PI/(ntfft*dt);
 	scale=1./ntfft;
 	iwtest=ntfft/2+1;
-	pwork[0]=cmplx(0.,0.);
+	pwork[0]=complex(0.0f,0.0f);
 	for(iw=1;iw<ntfft;iw++) {
 		if(iw<iwtest)
 			w=iw*dw;
 		else
 			w=(iw-ntfft)*dw;
-		csum=cmplx(0.,0.);
+		csum=complex(0.0f,0.0f);
 		if( (k*v) < (2*fabs(w)) ) {
 			hkpw=hk/(w);
 			for(it=1;it<nt;it++) {
@@ -494,17 +311,17 @@ v	velocity in m/sec (used to limit aperature of DMO response)
 				A = sqrt(1. + hkpwt2);
 				B = (1.+2*hkpwt2)/(1+hkpwt2);
 				phase = w*tn*A;
-				cfac = cmplx( B*cos(phase)/A, B*sin(phase)/A ); 		
-				csum = cadd( csum, cmul(p[it],cfac) );
+				cfac = complex( B*cos(phase)/A, B*sin(phase)/A ); 		
+				csum += p[it]*cfac;
 			}
 		}
 		pwork[iw]=csum;
 	}
 	pfacc(-1,ntfft,pwork);
-	for(it=0;it<nt;it++) p[it]=crmul(pwork[it],scale);
+	for(it=0;it<nt;it++) p[it]=pwork[it]*scale;
 	return;
 }
-void tsvankindmo(float h,float k,complex *p,complex *pwork,
+static void tsvankindmo(float h,float k,complex *p,complex *pwork,
 		int nt,int ntfft,float dt,int np, float dp, float *vnmo)
 /*  tsvankin fk dmo
 
@@ -551,7 +368,7 @@ vnmo	nmo velocity in m/sec as a function of p
 	dw = 2*PI/(ntfft*dt);
 	scale=1./ntfft;
 	iwtest=ntfft/2+1;
-	pwork[0]=cmplx(0.,0.);
+	pwork[0]=complex(0.0f,0.0f);
 	for(iw=1;iw<ntfft;iw++) {
 
 		if(iw<iwtest)
@@ -559,7 +376,7 @@ vnmo	nmo velocity in m/sec as a function of p
 		else
 			w=(iw-ntfft)*dw;
 
-		csum=cmplx(0.,0.);
+		csum=complex(0.0f,0.0f);
 		pp=fabs(k/(2.*w));
 		rp=pp/dp;
 		ip=rp;
@@ -578,17 +395,17 @@ vnmo	nmo velocity in m/sec as a function of p
 				tn2=tn*tn;
 				A=sqrt(1. + fac/tn2);
 				phase = w*tn*A;
-				cfac = cmplx( cos(phase)/A, sin(phase)/A ); 		
-				csum = cadd( csum, cmul(p[it],cfac) );	
+				cfac = complex( cos(phase)/A, sin(phase)/A ); 		
+				csum += p[it]*cfac;	
 			}
 		}
 		pwork[iw]=csum;
 	}
 	pfacc(-1,ntfft,pwork);
-	for(it=0;it<nt;it++) p[it]=crmul(pwork[it],scale);
+	for(it=0;it<nt;it++) p[it]=pwork[it]*scale;
 	return;
 }
-void weakdmo(float h,float k,complex *p,complex *pwork,
+static void weakdmo(float h,float k,complex *p,complex *pwork,
 		int nt,int ntfft,float dt,float e,float d, float v)
 /*  tsvankin fk dmo weak approximation
 
@@ -628,7 +445,7 @@ v	v0 velocity
 	dw = 2*PI/(ntfft*dt);
 	scale=1./ntfft;
 	iwtest=ntfft/2+1;
-	pwork[0]=cmplx(0.,0.);
+	pwork[0]=complex(0.0f,0.0f);
 	for(iw=1;iw<ntfft;iw++) {
 
 		if(iw<iwtest)
@@ -636,7 +453,7 @@ v	v0 velocity
 		else
 			w=(iw-ntfft)*dw;
 
-		csum=cmplx(0.,0.);
+		csum=complex(0.0f,0.0f);
 		pp=fabs(k/(2.*w));
 		if(pp<(1/v)) {
 			y=pp*pp*v*v;
@@ -651,13 +468,86 @@ v	v0 velocity
 				tn2=tn*tn;
 				A=sqrt(1. + fac/tn2);
 				phase = w*tn*A;
-				cfac = cmplx( cos(phase)/A, sin(phase)/A ); 		
-				csum = cadd( csum, cmul(p[it],cfac) );	
+				cfac = complex( cos(phase)/A, sin(phase)/A ); 		
+				csum += p[it]*cfac;	
 			}
 		}
 		pwork[iw]=csum;
 	}
 	pfacc(-1,ntfft,pwork);
-	for(it=0;it<nt;it++) p[it]=crmul(pwork[it],scale);
+	for(it=0;it<nt;it++) p[it]=pwork[it]*scale;
 	return;
+}
+
+/* Library version of SUTIHALEDMO
+ *
+ * The main program (the parameters, the traces and their headers, the file of the VND library that held the transform of
+ * the traces) is left to the caller.
+ *
+ *	su_tihaledmo:	DMO of one common-offset gather data[nx][nt] (NMO corrected) in the f-k domain, with the operators
+ *			option 1 to 6 of the program: Hale, Bleistein's true amplitude, Bleistein's cos*cos weighted,
+ *			Zhang, Tsvankin (with vnmo(p)), and Tsvankin's VTI weak anisotropy approximation
+ *
+ * Differences from the program:
+ *  - The program kept nxmax + 1 traces: the last could be past the length of the transform (nxmax + nxpad is not enough
+ *    when nxpad is small) and be lost; the number of traces is nx.
+ *  - The arrays are in memory, as the program's file of the transform was a means of not having it so.
+ */
+int su_tihaledmo(int nx, int nt, float dt, float dx, float h, float v, int option, int ntpad, int nxpad, int np, float dp,
+	const float *vnmo, float e, float d, const float *data, float *out)
+{
+	int ntfft, nxfft, nk, ik, it, ix;
+	float k, dk, scale;
+	float *rt;
+	complex *crt, *ctemp, *ck;
+
+	if (nx<1 || nt<2 || dt<=0.0 || dx==0.0 || h<0.0 || option<1 || option>6 || ntpad<0 || nxpad<0) return -3;
+	if ((option==3 || option==6) && v<=0.0) return -3;
+	if (option==5 && (np<3 || dp<=0.0 || vnmo==NULL)) return -3;
+
+	ntfft = npfao(nt+ntpad,2*(nt+ntpad));
+	nxfft = npfar(nx+nxpad);
+	if (nxfft<nx) return -3;
+	dk = 2.0*PI/(nxfft*dx);
+	scale = 1.0/nxfft;
+	nk = nxfft/2+1;
+
+	rt = ealloc1float(nxfft+2);
+	crt = ealloc1complex(nk > nt ? nk : nt);
+	ctemp = ealloc1complex(ntfft);
+	ck = ealloc1complex((size_t)nk*nt);
+
+	/* forward FFT from x to k, for each time sample */
+	for (it=0; it<nt; ++it) {
+		for (ix=0; ix<nx; ++ix) rt[ix] = data[(size_t)ix*nt+it]*scale;
+		for (ix=nx; ix<nxfft; ++ix) rt[ix] = 0.0;
+		pfarc(1,nxfft,rt,crt);
+		for (ik=0; ik<nk; ++ik) ck[(size_t)ik*nt+it] = crt[ik];
+	}
+
+	/* DMO correction of each wavenumber component */
+	for (ik=0; ik<nk; ++ik) {
+		complex *p = ck+(size_t)ik*nt;
+
+		k = ik*dk;
+		if (option==1) haledmo(h,k,p,ctemp,nt,ntfft,dt,v);
+		else if (option==2) bleisteindmo(h,k,p,ctemp,nt,ntfft,dt,v);
+		else if (option==3) bleisteindmo2(h,k,p,ctemp,nt,ntfft,dt,v);
+		else if (option==4) zhangdmo(h,k,p,ctemp,nt,ntfft,dt,v);
+		else if (option==5) tsvankindmo(h,k,p,ctemp,nt,ntfft,dt,np,dp,(float*)vnmo);
+		else weakdmo(h,k,p,ctemp,nt,ntfft,dt,e,d,v);
+	}
+
+	/* inverse FFT from k to x */
+	for (it=0; it<nt; ++it) {
+		for (ik=0; ik<nk; ++ik) crt[ik] = ck[(size_t)ik*nt+it];
+		pfacr(-1,nxfft,crt,rt);
+		for (ix=0; ix<nx; ++ix) out[(size_t)ix*nt+it] = rt[ix];
+	}
+
+	free1float(rt);
+	free1complex(crt);
+	free1complex(ctemp);
+	free1complex(ck);
+	return 0;
 }

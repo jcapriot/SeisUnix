@@ -6,10 +6,8 @@
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
-
-
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUDMOTIVZ - DMO for Transeversely Isotropic V(Z) media for common-offset",
@@ -63,423 +61,40 @@ char *sdoc[] = {
 "									",
 " Trace header fields accessed:  nt, dt, delrt, offset, cdp.		",
 NULL};
+#endif
+
 /**************** end self doc ********************************/
 
-/* Credits:
- *	CWP: Tariq Alkhalifah, Craig Artley
- *
- * Technical Reference:
- *
- *	Alkhalifah, T., 1994,
- *	Transformation to zero offset in transversely isotropic media,
- *	Center for Wave Phenomena, CWP-162.
- *
- *	Alkhalifah, T., Tsvankin, Ilya, 1994,
- *	Velocity analysis for transversely isotropic media,
- *	published at Center for Wave Phenomena report CWP-145.
- *
- *	Artley, C., 1992,
- *	Dip-moveout processing for depth-variable velocity,
- *	M.S. Thesis, Colorado School of Mines;
- *	also published at Center for Wave Phenomena report CWP-115.
- *	
- */
-
-#define NPTAB 401
 #define NITER 10
 #define TOL 1.0e-4
 
-/* function prototypes for functions defined below */
-void dmooff (float **x, float **a, float **s, float **tau,
-	 int nttab, float dt, float ft,
+static int dmooff (float **x, float **a, float **tau, float **s, int nttab, float dt, float ft,
 	int nptab, float dptab, float fp, float lp,
 	int nx, float dx, float offset, int nt,
 	float *vrms, float fmax, float smute, float speed, int verbose,
 	float **q);
-void dmomap (float **x, float **a, float **tau, float **s, int nt, float dt, float ft,
+static void dmomap (float **x, float **a, float **tau, float **s, int nt, float dt, float ft,
 	int nptab, float dptab, int np, float dp2, float fp, float lp,
 	int itn, float tn, float h, float *vrms,
 	int verbose, float **t0table);
-void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
+static void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
 	float h, float **tntable, int *it0min, int *nt0,
 	float tmin, float fmax, float **qx);
-void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
+static void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
 	float **tntable, int *it0min, int *nt0, float fmax, complex *qq);
-float tmute(float *vrms, int nt, float dt, float ft, float h, float smute);
-void getX (float tsg, float h, float p0, float v, float *vars);
-void getFJ (float **x, float **a, float **tau, float **s,
+static float tmute(float *vrms, int nt, float dt, float ft, float h, float smute);
+static void getX (float tsg, float h, float p0, float v, float *vars);
+static void getFJ (float **x, float **a, float **tau, float **s,
 	int nt, int np, float dt, float dp, float tsg, float h, float p0,
 	float *vars, float *eqns, float **jacob);
-void intder (float **f, int nx, float dx, float fx,
+static void intder (float **f, int nx, float dx, float fx,
 	int ny, float dy, float fy, float x, float y,
 	float *fxy, float *dfdx, float *dfdy);
-void rayvt (float p, int nt, float dt,
+static void rayvt (float p, int nt, float dt,
 	float a1111[], float a3333[], float a1313[], float a1133[],
 	float tau[], float x[], float a[], float s[]);
 
-segy tr,tro;
-
-int
-main(int argc, char **argv)
-{
-	int nt;		/* number of time samples per trace */
-	float dt;	/* time sampling interval */
-	float ft;	/* time of first sample */
-	int it;		/* time sample index */
-	int cdpmin;	/* minimum cdp to process */
-	int cdpmax;	/* maximum cdp to process */
-	float dx;	/* cdp sampling interval */
-	int nx;	        /* number of cdps to process */
-	int nxfft;	/* number of cdps after zero padding for fft */
-	int nxpad;	/* minimum number of cdps for zero padding */
-	int ix;		/* cdp index, starting with ix=0 */
-	int noffmix;	/* number of offsets to mix */
-	float *tdmo;	/* times at which rms velocities are specified */
-	float *vdmo,*etadmo,*vndmo;/* rms velocities at times specified in tdmo */
-	int ntdmo;	/* number tnmo values specified */
-	int itdmo;	/* index into tnmo array */
-	int nvdmo,netadmo,nvndmo;	/* number vnmo values specified */
-	float fmax;	/* maximum frequency */
-	float *vt,*etat,*vnt;	/* uniformly sampled v(t) */
-	float *vrms;	/* uniformly sampled vrms(t) */
-	float **q;	/* traces for one offset - common-offset gather */
-	float **qmix;	/* DMO-corrected and mixed traces to be output */
-	float offset;	/* source-receiver offset of current trace */
-	float oldoffset;/* offset of previous trace */
-	int noff;	/* number of offsets processed in current mix */
-	int ntrace;	/* number of traces processed in current mix */
-	int itrace;	/* trace index */
-	int gottrace;	/* non-zero if an input trace was read */
-	int done;	/* non-zero if done */
-	int verbose;	/* =1 for diagnostic print */
-	char *vfile=""; /* name of interval velocity file */
-	char *vnfile="";/* name of interval NMO velocity file */
-	char *etafile="";/* name of interval eta velocity file */
-	FILE *hfp;	/* file pointer for temporary header file */
-	int nttab;	/* number of times in ray tables */
-	int nptab=NPTAB;/* number of ray parameters in ray tables */
-	int ip;		/* ray parameter counter */
-	float smute;	/* NMO stretch mute */
-	float t;	/* time */
-	float sum;	/* sum accumulator */
-	float p;	/* ray parameter */
-	float fp;	/* first ray parameter */
-	float lp;	/* last ray parameter */
-	float dptab;	/* ray parameter sampling interval in ray tables */
-	float speed;	/* speed knob --- twist for speed and aliasing */
-	float **x;	/* table [nptab][nttab] of horizontal distance ray */
-	float **tau;	/* table [nptab][nttab] of time depth of ray */
-	float **a;	/* table [nptab][nttab] of propagation angle of ray */
-	float *a1111,*a3333,*a1313,*a1133,delta,vnt2,vt2,**s;
-
-	/* hook up getpar */
-	initargs(argc, argv);
-	requestdoc(1);
-
-	/* get information from the first header */
-	if (!gettr(&tr)) err("can't get first trace");
-	nt = tr.ns;
-	dt = tr.dt/1000000.0;
-	ft = tr.delrt/1000.0;
-	if (ft!=0.0) err("ft=%f --- nonzero ft not yet implemented!");
-	offset = tr.offset;
-
-	/* get parameters */
-	if (!getparint("cdpmin",&cdpmin)) err("must specify cdpmin");
-	if (!getparint("cdpmax",&cdpmax)) err("must specify cdpmax");
-	if (cdpmin>cdpmax) err("cdpmin must not be greater than cdpmax");
-	if (!getparfloat("dxcdp",&dx)) err("must specify dxcdp");
-	if (!getparint("noffmix",&noffmix)) err("must specify noffmix");
-	if (!getparfloat("fmax",&fmax)) fmax = 0.5/dt;
-	if (!getparint("verbose",&verbose)) verbose = 0;
-	if (!getparfloat("speed",&speed)) speed = 1.0;
-	if (!getparfloat("smute",&smute)) smute = 1.5;
-
-	/* allocate space for velocity arrays */
-	nttab = 2*nt-1;
-        vt = ealloc1float(nttab);
-	vnt = ealloc1float(nttab);
-	etat = ealloc1float(nttab);
-	a1111 = ealloc1float(nttab);
-	a3333 = ealloc1float(nttab);
-	a1313 = ealloc1float(nttab);
-	a1133 = ealloc1float(nttab);
-	vrms = ealloc1float(nttab);
-
-        /* determine NMO velocity function vnm(t) */
-        if (!getparstring("vnfile",&vnfile)) {
-                ntdmo = countparval("tdmo");
-                if (ntdmo==0) ntdmo = 1;
-                tdmo = ealloc1float(ntdmo);
-                if (!getparfloat("tdmo",tdmo)) tdmo[0] = 0.0;
-                nvndmo = countparval("vndmo");
-                if (nvndmo==0) nvndmo = 1;
-                if (nvndmo!=ntdmo) err("number of tdmo and vndmo must be equal");
-                vndmo = ealloc1float(nvndmo);
-                if (!getparfloat("vndmo",vndmo)) vndmo[0] = 1500.0;
-                for (itdmo=1; itdmo<ntdmo; ++itdmo)
-                        if (tdmo[itdmo]<=tdmo[itdmo-1])
-                                err("tdmo must increase monotonically");
-                for (it=0,t=0.0; it<nt; ++it,t+=dt)
-                        intlin(ntdmo,tdmo,vndmo,vndmo[0],vndmo[ntdmo-1],
-                                1,&t,&vnt[it]);
-        } else {
-                if (fread(vnt,sizeof(float),nt,fopen(vnfile,"r"))!=nt)
-                        err("cannot read %d velocities from file %s",nt,vnfile);
-        }
-
-	/* constant extrapolation of interval velocities */
-	for (it=nt; it<nttab; ++it)
-		vnt[it] = vnt[nt-1];
-
-	/* determine eta function eta(t) */
-        if (!getparstring("etafile",&etafile)) {
-                ntdmo = countparval("tdmo");
-                if (ntdmo==0) ntdmo = 1;
-                tdmo = ealloc1float(ntdmo);
-                if (!getparfloat("tdmo",tdmo)) tdmo[0] = 0.0;
-                netadmo = countparval("etadmo");
-                if (netadmo==0) netadmo = 1;
-                if (netadmo!=ntdmo) err("number of tdmo and etadmo must be equal");
-                etadmo = ealloc1float(netadmo);
-                if (!getparfloat("etadmo",etadmo)) etadmo[0] = 0.0;
-                for (itdmo=1; itdmo<ntdmo; ++itdmo)
-                        if (tdmo[itdmo]<=tdmo[itdmo-1])
-                                err("tdmo must increase monotonically");
-                for (it=0,t=0.0; it<nt; ++it,t+=dt)
-                        intlin(ntdmo,tdmo,etadmo,etadmo[0],etadmo[ntdmo-1],
-                                1,&t,&etat[it]);
-        } else {
-                if (fread(etat,sizeof(float),nt,fopen(etafile,"r"))!=nt)
-                        err("cannot read %d velocities from file %s",nt,etafile);
-        }
-
-	/* constant extrapolation of interval velocities */
-	for (it=nt; it<nttab; ++it)
-		etat[it] = etat[nt-1];
-
-	/* determine velocity function v(t) */
-        if (!getparstring("vfile",&vfile)) {
-                ntdmo = countparval("tdmo");
-                if (ntdmo==0) ntdmo = 1;
-                tdmo = ealloc1float(ntdmo);
-                if (!getparfloat("tdmo",tdmo)) tdmo[0] = 0.0;
-                nvdmo = countparval("vdmo");
-                if (nvdmo!=ntdmo){ 
-			for (it=0; it<nt; ++it)
-				vt[it] = vnt[it];
-		} else {
-                	vdmo = ealloc1float(nvdmo);
-                	if (!getparfloat("vdmo",vdmo)) vdmo[0] = vnt[0];
-                	for (itdmo=1; itdmo<ntdmo; ++itdmo)
-                        	if (tdmo[itdmo]<=tdmo[itdmo-1])
-                                	err("tdmo must increase monotonically");
-                	for (it=0,t=0.0; it<nt; ++it,t+=dt)
-                        	intlin(ntdmo,tdmo,vdmo,vdmo[0],vdmo[ntdmo-1],
-                                	1,&t,&vt[it]);
-		}
-        } else {
-                if (fread(vt,sizeof(float),nt,fopen(vfile,"r"))!=nt)
-                        err("cannot read %d velocities from file %s",nt,vfile);
-        }
-        checkpars();
-
-	/* constant extrapolation of interval velocities */
-	for (it=nt; it<nttab; ++it)
-		vt[it] = vt[nt-1];
-
-	/* compute vrms */
-	vrms[0] = vnt[0];
-	for (it=1,sum=0.0; it<nttab; ++it) {
-		sum += vnt[it-1]*vnt[it-1];
-			vrms[it] = sqrt(sum/it);
-	}
-        
-	/*convert eta and NMO velocity values to elastic coeffecients*/
-	for(it=0; it<nttab; ++it){
-		vnt2   =vnt[it]*vnt[it];
-		vt2    =vt[it]*vt[it];
-		a1111[it]=vnt2*(1+2*etat[it]);
-		a3333[it]=vt2;
-		a1313[it]=0.25*vt2;
-		delta= 0.5*(vnt2/vt2-1);
-		a1133[it]=sqrt(2*delta*a3333[it]*
-			(a3333[it]-a1313[it])+(a3333[it]-
-			a1313[it])*(a3333[it]-a1313[it]))-a1313[it];
-	}
-
-
-
-	/* compute half-velocities */
-        for (it=0; it<nttab; ++it){
-                a1111[it] *= 0.25;
-		a3333[it] *= 0.25;
-		a1313[it] *= 0.25;
-		a1133[it] *= 0.25;
-		vt[it]    *= 0.5;
-	}
-
-	/* compute extreme values */
-	ft = 0.0;
-	fp = 0.0;
-	lp = 1.0/sqrt(a1111[0]);
-
-	/* compute p sampling for ray tables */
-	dptab = lp/(nptab-1);
-
-	/* allocate space for ray tables */
-	tau = ealloc2float(nttab,nptab);
-	x = ealloc2float(nttab,nptab);
-	a = ealloc2float(nttab,nptab);
-	s = ealloc2float(nttab,nptab);
-
-	/* compute ray tables tau(p,t), x(p,t), a(p,t) */
-	if (verbose) fprintf(stderr,"Computing ray tables...\n");
-	for (ip=0,p=fp; ip<nptab; ++ip,p+=dptab)
-		rayvt(p,nttab,dt,a1111,a3333,a1313,
-			a1133,tau[ip],x[ip],a[ip],s[ip]);
-		
-	if (verbose) fprintf(stderr,"Ray tables ready...\n");
-	free1float(vt);
-	free1float(vnt);
-	free1float(etat);
-	free1float(a1111);
-	free1float(a3333);
-	free1float(a1133);
-	free1float(a1313);
-	
-
-	/* determine number of cdps to process */
-	nx = cdpmax-cdpmin+1;
-	
-	/* allocate and zero common-offset gather q(t,x) */
-	nxpad = 0.5*ABS(offset/dx);
-	nxfft = npfar(nx+nxpad);
-	q = ealloc2float(nt,nxfft+2);
-	for (ix=0; ix<nxfft; ++ix)
-		for (it=0; it<nt; ++it)
-			q[ix][it] = 0.0;
-
-	/* allocate and zero offset mix accumulator qmix(t,x) */
-	qmix = ealloc2float(nt,nx);
-	for (ix=0; ix<nx; ++ix)
-		for (it=0; it<nt; ++it)
-			qmix[ix][it] = 0.0;
-		
-	/* open temporary file for headers */
-	hfp = tmpfile();
-	
-	/* initialize */
-	oldoffset = offset;
-	gottrace = 1;
-	done = 0;
-	ntrace = 0;
-	noff = 0;
-
-	/* loop over traces */
-	do {
-		/* if got a trace, determine offset */
-		if (gottrace) offset = tr.offset;
-		
-		/* if an offset is complete */
-		if ((gottrace && offset!=oldoffset) || !gottrace) {
-
-			/* do dmo for old common-offset gather */
-			dmooff(x,a,tau,s,nttab,dt,ft,nptab,dptab,fp,lp,
-				nx,dx,oldoffset,nt,vrms,fmax,smute,speed,
-				verbose,q);
-			
-			/* add dmo-corrected traces to mix */
-			for (ix=0; ix<nx; ++ix)
-				for (it=0; it<nt; ++it)
-					qmix[ix][it] += q[ix][it];
-			
-			/* count offsets in mix */
-			++noff;
-							
-			/* free space for old common-offset gather */
-			free2float(q);
-			
-			/* if beginning a new offset */
-			if (offset!=oldoffset) {
-				
-				/* allocate space for new offset */
-				nxpad = 0.5*ABS(offset/dx);
-				nxfft = npfar(nx+nxpad);
-				q = ealloc2float(nt,nxfft+2);
-				for (ix=0; ix<nxfft; ++ix)
-					for (it=0; it<nt; ++it)
-						q[ix][it] = 0.0;
-			}
-		}
-		
-		/* if a mix of offsets is complete */
-		if (noff==noffmix || !gottrace) {
-			
-			/* rewind trace header file */
-			efseeko(hfp,(off_t) 0,SEEK_SET);
-			
-			/* loop over all output traces */
-			for (itrace=0; itrace<ntrace; ++itrace) {
-			
-				/* read trace header and determine cdp index */
-				efread(&tro,HDRBYTES,1,hfp);
-				
-				/* get dmo-corrected data */
-				memcpy((void *) tro.data,
-					(const void *) qmix[tro.cdp-cdpmin],
-					nt*sizeof(float));
-				
-				/* write output trace */
-				puttr(&tro);
-			}
-			
-			/* report */
-			if (verbose) 
-				fprintf(stderr,"\tCompleted mix of "
-					"%d offsets with %d traces\n",
-					noff,ntrace);
-			
-			/* if no more traces, break */
-			if (!gottrace) break;
-			
-			/* rewind trace header file */
-			efseeko(hfp,(off_t) 0,SEEK_SET);
-			
-			/* reset number of offsets and traces in mix */
-			noff = 0;
-			ntrace = 0;
-			
-			/* zero offset mix accumulator */
-			for (ix=0; ix<nx; ++ix)
-				for (it=0; it<nt; ++it)
-					qmix[ix][it] = 0.0;
-		}
-			
-		/* if cdp is within range to process */
-		if (tr.cdp>=cdpmin && tr.cdp<=cdpmax) {
-	
-			/* save trace header and update number of traces */
-			efwrite(&tr,HDRBYTES,1,hfp);
-			++ntrace;
-
-			/* remember offset */
-			oldoffset = offset;
-
-			/* get trace samples */
-			memcpy((void *) q[tr.cdp-cdpmin],
-				(const void *) tr.data, nt*sizeof(float));
-		}
-
-		/* get next trace (if there is one) */
-		if (!gettr(&tr)) gottrace = 0;
-		
-	} while (!done);
-
-	return(CWP_Exit());
-}
-
-void dmooff (float **x, float **a, float **tau, float **s, int nttab, float dt, float ft,
+static int dmooff (float **x, float **a, float **tau, float **s, int nttab, float dt, float ft,
 	int nptab, float dptab, float fp, float lp,
 	int nx, float dx, float offset, int nt,
 	float *vrms, float fmax, float smute, float speed, int verbose,
@@ -525,7 +140,7 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 	/* compute p sampling required to avoid aliasing */
 	lt = (nt-1)*dt;
 	if (tmin>=lt)
-		err("tmin=%f >= lt=%f:  no data survive the mute!\n",tmin,lt);
+		return -4;  /* no data survive the mute */
 
 	dtn = 10.0*dt;
 	ftn = tmin;
@@ -564,6 +179,7 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 		for (itn=0; itn<ntn; ++itn)
 			if (t0table[ip][itn]>0.0) break;
 		itnmin = itn;
+		if (itnmin>=ntn) break;  /* no sample of this row is set (the program read after its end) */
 		
 		it0min[ip] = NINT(t0table[ip][itnmin]/dt);
 		if (it0min[ip]>=nt) it0min[ip] = nt-1;
@@ -610,10 +226,10 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 	free1int(it0min);
 	free1int(nt0);
 	free2float(tntable);
-
+	return 0;
 }
 
-void dmomap (float **x, float **a, float **tau, float **s, int nt, float dt, float ft,
+static void dmomap (float **x, float **a, float **tau, float **s, int nt, float dt, float ft,
 	int nptab, float dptab, int np, float dp2, float fp, float lp,
 	int itn, float tn, float h, float *vrms,
 	int verbose, float **t0table)
@@ -649,7 +265,7 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 ****************************************************************************/
 {
 	int ip,i,neqns=5,niter=NITER,iter,*ipvt;
-	float p2,vtn,tsg,p0,tautp,dtaudt,dtaudp,error,rcond,
+	float p2,vtn,tsg,p0,tautp,dtaudt,dtaudp,error,rcond=1.0,
 		lt,tol=TOL,*vars,*eqns,*work,t0,x0,**jacob;
 
 	/* compute last time in ray tables */
@@ -758,7 +374,7 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 	free1int(ipvt);
 }
 
-void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
+static void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
 	float h, float **tntable, int *it0min, int *nt0,
 	float tmin, float fmax, float **qx)
 /*****************************************************************************
@@ -828,7 +444,7 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 	free1(qk);
 }
 
-void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
+static void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
 	float **tntable, int *it0min, int *nt0, float fmax, complex *qq)
 /*****************************************************************************
 Jakubowicz's dip decomposition DMO for one wavenumber
@@ -851,7 +467,7 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 {
 	int ntfft,nw,it,iw,iwlm,iwhm,iwlp,iwhp,ip;
 	float p,ph,pl,ph2,dw,fw,wl,wh,scale;
-	complex czero=cmplx(0.0,0.0),*qn,*q0;
+	complex czero(0.0f,0.0f),*qn,*q0;
 
 	/* determine frequency sampling */
 	ntfft = npfa(nt);
@@ -908,21 +524,18 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 
 			/* Fourier transform t to w, with w centered */
 			for (it=1; it<ntfft; it+=2) {
-				qn[it].r = -qn[it].r;
-				qn[it].i = -qn[it].i;
+				qn[it] = -qn[it];
 			}
 			pfacc(1,ntfft,qn);
 
 			/* accumulate into q0 for slopes near -p */
 			for (iw=iwhm; iw<=iwlm; ++iw) {
-				q0[iw].r += qn[iw].r;
-				q0[iw].i += qn[iw].i;
+				q0[iw] += qn[iw];
 			}
 
 			/* accumulate into q0 for slopes near +p */
 			for (iw=iwlp; iw<=iwhp; ++iw) {
-				q0[iw].r += qn[iw].r;
-				q0[iw].i += qn[iw].i;
+				q0[iw] += qn[iw];
 			}
 		}
 
@@ -936,12 +549,10 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 	pfacc(-1,ntfft,q0);
 	scale = 0.5/ntfft;
 	for (it=0; it<nt; it+=2) {
-		qq[it].r = q0[it].r*scale;
-		qq[it].i = q0[it].i*scale;
+		qq[it] = q0[it]*scale;
 	}
 	for (it=1; it<nt; it+=2) {
-		qq[it].r = -q0[it].r*scale;
-		qq[it].i = -q0[it].i*scale;
+		qq[it] = -q0[it]*scale;
 	}
 
 	/* free workspace */
@@ -949,7 +560,7 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 	free1complex(q0);	
 }
 	
-float tmute (float *vrms, int nt, float dt, float ft, float h, float smute)
+static float tmute (float *vrms, int nt, float dt, float ft, float h, float smute)
 /***************************************************************************
 Returns MUTE Time for given rms velocity function and half-offset.
 ****************************************************************************
@@ -986,7 +597,7 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 	return ft+it*dt;
 }
 
-void getX (float tsg, float h, float p0, float v, float *vars)
+static void getX (float tsg, float h, float p0, float v, float *vars)
 /***************************************************************************
 GET trial solution X to system of equations assuming constant velocity.
 ****************************************************************************
@@ -1036,7 +647,7 @@ Author: Craig Artley, Colorado School of Mines, 09/21/91
 	vars[4] = t0;
 }
 
-void getFJ (float **x, float **a, float **tau, float **s, int nt, int np,
+static void getFJ (float **x, float **a, float **tau, float **s, int nt, int np,
 	float dt, float dp, float tsg, float h, float p0,
 	float *vars, float *eqns, float **jacob)
 /***************************************************************************
@@ -1159,7 +770,7 @@ Author: Craig Artley and Tariq Alkhalifah, Colorado School of Mines, 94
 	jacob[4][4] +=  2.*signp0*stp*cos(sign*ftp-signp0*f0tp)*df0dt;
 }
 
-void intder (float **f, int nx, float dx, float fx,
+static void intder (float **f, int nx, float dx, float fx,
 	int ny, float dy, float fy, float x, float y,
 	float *fxy, float *dfdx, float *dfdy)
 /***************************************************************************
@@ -1234,7 +845,7 @@ Author: Craig Artley, Colorado School of Mines, 08/31/91
 	*dfdy = ((1-fracx)*(f01-f00) + fracx*(f11-f10))/dy;
 }
 
-void rayvt (float p, int nt, float dt,
+static void rayvt (float p, int nt, float dt,
 	float a1111[], float a3333[], float a1313[], float a1133[],
 	float tau[], float x[], float a[], float s[]) 
 /*****************************************************************************
@@ -1293,13 +904,13 @@ Author:  Tariq Alkhalifah, Colorado School of Mines, 94
 	gamma = f6*f6-(2.*f1*f6-(f1*f1-f3*f3)*px2)*px2;
 	det   = beta*beta-4.*alpha*gamma;
 
-	if (det<0) return;
+	if (det<0) { tau[0] = x[0] = a[0] = s[0] = 0.0; it = 1; goto extrapolate; }
 	rad = sqrt(det);
 	if(ABS(beta)>eps)   signbeta = ABS(beta)/beta;
 	else                signbeta = 1.;
 	q    = -.5*(beta+signbeta*rad);
 	pz2  = gamma/q;
-	if(pz2<0) return;
+	if(pz2<0) { tau[0] = x[0] = a[0] = s[0] = 0.0; it = 1; goto extrapolate; }
 	sp   = sqrt(px2+pz2);
 	vp   = 1/sp;
 	pz   = sqrt(pz2);
@@ -1362,10 +973,7 @@ Author:  Tariq Alkhalifah, Colorado School of Mines, 94
 		det   = beta*beta-4.*alpha*gamma;
 
 		
-		if (det<0){
-		fprintf(stderr,"det=%f\n",det);
-		return;
-		}
+		if (det<0) break;
 		rad = sqrt(det);
 		if(ABS(beta)>eps)   signbeta = ABS(beta)/beta;
 		else                signbeta = 1.;
@@ -1398,6 +1006,7 @@ Author:  Tariq Alkhalifah, Colorado School of Mines, 94
 		s[it] = sp;
 	}
 
+extrapolate:
 	/* if ray returned to surface, extrapolate with surface values */
 	for (jt=it; jt<nt; ++jt) {
 		tau[jt] = tau[jt-1];
@@ -1407,3 +1016,139 @@ Author:  Tariq Alkhalifah, Colorado School of Mines, 94
 	}
 }
 
+/* Library version of SUDMOTIVZ
+ *
+ * The main program (the parameters, the traces and their headers, the offsets and the mixes of them, the files of
+ * velocities) is left to the caller. The tables of the rays of the medium are made once, and kept in a model:
+ *
+ *	su_dmotivz_create:	the ray tables and the rms velocity from the NMO interval velocities vn[nt], the velocities v[nt]
+ *				and the etas eta[nt] (as the program makes them)
+ *	su_dmotivz_nxfft:	the number of cdps of the common-offset gather after zero padding for the Fourier transform
+ *	su_dmotivz_offset:	DMO of a common-offset gather q[nxfft + 2][nt] (flat), in place
+ *	su_dmotivz_free:	frees the model
+ *
+ * Differences from the program:
+ *  - The gather is a flat array, q[(nxfft + 2) * nt].
+ *  - The ray tables are the same when the ray cannot be traced: rayvt left the table of such a ray as it was allocated
+ *    (not set) when the determinant was negative, which the DMO then read; the rows are filled with the last values that the
+ *    ray reached (zeros if none), as when a ray turns back to the surface.
+ *  - dmomap read rcond (the condition number that the solver of the system sets) before it was set when the first iteration
+ *    had converged; it starts as 1.
+ *  - A row of the table of times that has no sample set ended the loop over the rows only after the program had
+ *    read the sample after the end of the row (the first of the next row, or past the table for the last).
+ *  - A gather of zero offset is left as it is (the program divided by the offset to find the sampling of the ray parameter).
+ *  - A gather that the stretch mute leaves nothing of gives a code (the program ended with an error).
+ */
+
+struct DmoTivz {
+	int nt, nttab, nptab;
+	float dt, dptab, fp, lp;
+	float *vrms;
+	float **x, **a, **tau, **s;
+};
+
+struct DmoTivz *su_dmotivz_create(int nt, float dt, const float *vn_in, const float *v_in, const float *eta_in, int nptab,
+	int *err)
+{
+	struct DmoTivz *M;
+	int it, ip, nttab = 2*nt-1;
+	float *vt, *vnt, *etat, *a1111, *a3333, *a1313, *a1133, sum, p, vnt2, vt2, delta;
+
+	*err = 0;
+	if (nt<2 || dt<=0.0 || nptab<2) { *err = -3; return NULL; }
+	for (it=0; it<nt; ++it) if (!(vn_in[it]>0.0) || !(v_in[it]>0.0)) { *err = -3; return NULL; }
+	M = (struct DmoTivz*)calloc(1,sizeof(struct DmoTivz));
+	vt = ealloc1float(nttab);
+	vnt = ealloc1float(nttab);
+	etat = ealloc1float(nttab);
+	a1111 = ealloc1float(nttab);
+	a3333 = ealloc1float(nttab);
+	a1313 = ealloc1float(nttab);
+	a1133 = ealloc1float(nttab);
+	M->vrms = ealloc1float(nttab);
+	memcpy(vt,v_in,sizeof(float)*nt);
+	memcpy(vnt,vn_in,sizeof(float)*nt);
+	memcpy(etat,eta_in,sizeof(float)*nt);
+
+	/* constant extrapolation of the interval values */
+	for (it=nt; it<nttab; ++it) {
+		vnt[it] = vnt[nt-1];
+		etat[it] = etat[nt-1];
+		vt[it] = vt[nt-1];
+	}
+
+	/* compute vrms */
+	M->vrms[0] = vnt[0];
+	for (it=1,sum=0.0; it<nttab; ++it) {
+		sum += vnt[it-1]*vnt[it-1];
+		M->vrms[it] = sqrt(sum/it);
+	}
+
+	/* convert eta and NMO velocity values to elastic coeffecients */
+	for (it=0; it<nttab; ++it) {
+		vnt2 = vnt[it]*vnt[it];
+		vt2 = vt[it]*vt[it];
+		a1111[it] = vnt2*(1+2*etat[it]);
+		a3333[it] = vt2;
+		a1313[it] = 0.25*vt2;
+		delta = 0.5*(vnt2/vt2-1);
+		a1133[it] = sqrt(2*delta*a3333[it]*(a3333[it]-a1313[it])+(a3333[it]-a1313[it])*(a3333[it]-a1313[it]))-a1313[it];
+	}
+
+	/* compute half-velocities */
+	for (it=0; it<nttab; ++it) {
+		a1111[it] *= 0.25;
+		a3333[it] *= 0.25;
+		a1313[it] *= 0.25;
+		a1133[it] *= 0.25;
+		vt[it] *= 0.5;
+	}
+
+	M->nt = nt; M->nttab = nttab; M->nptab = nptab; M->dt = dt;
+	M->fp = 0.0;
+	M->lp = 1.0/sqrt(a1111[0]);
+	M->dptab = M->lp/(nptab-1);
+
+	/* compute ray tables tau(p,t), x(p,t), a(p,t), s(p,t) */
+	M->tau = alloc2float(nttab,nptab);
+	M->x = alloc2float(nttab,nptab);
+	M->a = alloc2float(nttab,nptab);
+	M->s = alloc2float(nttab,nptab);
+	memset(M->tau[0],0,sizeof(float)*(size_t)nttab*nptab);
+	memset(M->x[0],0,sizeof(float)*(size_t)nttab*nptab);
+	memset(M->a[0],0,sizeof(float)*(size_t)nttab*nptab);
+	memset(M->s[0],0,sizeof(float)*(size_t)nttab*nptab);
+	for (ip=0,p=M->fp; ip<nptab; ++ip,p+=M->dptab)
+		rayvt(p,nttab,dt,a1111,a3333,a1313,a1133,M->tau[ip],M->x[ip],M->a[ip],M->s[ip]);
+	free1float(vt); free1float(vnt); free1float(etat);
+	free1float(a1111); free1float(a3333); free1float(a1313); free1float(a1133);
+	return M;
+}
+
+int su_dmotivz_nxfft(int nx, float dx, float offset)
+{
+	return npfar(nx+(int)(0.5*ABS(offset/dx)));
+}
+
+int su_dmotivz_offset(const struct DmoTivz *M, int nx, float dx, float offset, float fmax, float smute, float speed, float *q)
+{
+	int nxfft = su_dmotivz_nxfft(nx,dx,offset), i, status;
+	float **rows = (float**)ealloc1(nxfft+2,sizeof(float*));
+
+	if (dx==0.0 || fmax<=0.0 || smute<=1.0 || speed<=0.0) { free1(rows); return -3; }
+	/* a gather of zero offset is not changed by DMO (the program made a table of no rays, and divided by the offset) */
+	if (offset==0.0) { free1(rows); return 0; }
+	for (i=0; i<nxfft+2; ++i) rows[i] = q+(size_t)i*M->nt;
+	status = dmooff(M->x,M->a,M->tau,M->s,M->nttab,M->dt,0.0,M->nptab,M->dptab,M->fp,M->lp,nx,dx,offset,M->nt,M->vrms,fmax,
+		smute,speed,0,rows);
+	free1(rows);
+	return status;
+}
+
+void su_dmotivz_free(struct DmoTivz *M)
+{
+	if (M==NULL) return;
+	free1float(M->vrms);
+	free2float(M->x); free2float(M->a); free2float(M->tau); free2float(M->s);
+	free(M);
+}

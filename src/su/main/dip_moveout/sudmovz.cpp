@@ -5,13 +5,12 @@
 
 #include "su.h"
 #include "segy.h"
-#include "header.h"
-
 #define NPTAB 401
 #define NITER 10
 #define TOL 1.0e-4
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUDMOVZ - DMO for V(Z) media for common-offset gathers		",
@@ -57,319 +56,36 @@ char *sdoc[] = {
 "									",
 " Trace header fields accessed:  nt, dt, delrt, offset, cdp.		",
 NULL};
+#endif
+
 /**************** end self doc ********************************/
 
-/* Credits:
- *	CWP: Craig Artley
- *
- * Technical Reference:
- *	Artley, C., 1992,
- *	Dip-moveout processing for depth-variable velocity,
- *	M.S. Thesis, Colorado School of Mines;
- *	also published at Center for Wave Phenomena report CWP-115.
- */
-
-/* function prototypes for functions defined below */
-void dmooff (float **x, float **a, float **tau, int nttab, float dt, float ft,
+static int dmooff (float **x, float **a, float **tau, int nttab, float dt, float ft,
 	int nptab, float dptab, float fp, float lp,
 	int nx, float dx, float offset, int nt,
 	float *vrms, float fmax, float smute, float speed, int verbose,
 	float **q);
-void dmomap (float **x, float **a, float **tau, int nt, float dt, float ft,
+static void dmomap (float **x, float **a, float **tau, int nt, float dt, float ft,
 	int nptab, float dptab, int np, float dp2, float fp, float lp,
 	int itn, float tn, float h, float *vrms,
 	int verbose, float **t0table);
-void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
+static void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
 	float h, float **tntable, int *it0min, int *nt0,
 	float tmin, float fmax, float **qx);
-void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
+static void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
 	float **tntable, int *it0min, int *nt0, float fmax, complex *qq);
-float tmute(float *vrms, int nt, float dt, float ft, float h, float smute);
-void getX (float tsg, float h, float p0, float v, float *vars);
-void getFJ (float **x, float **a, float **tau,
+static float tmute(float *vrms, int nt, float dt, float ft, float h, float smute);
+static void getX (float tsg, float h, float p0, float v, float *vars);
+static void getFJ (float **x, float **a, float **tau,
 	int nt, int np, float dt, float dp, float tsg, float h, float p0,
 	float *vars, float *eqns, float **jacob);
-void intder (float **f, int nx, float dx, float fx,
+static void intder (float **f, int nx, float dx, float fx,
 	int ny, float dy, float fy, float x, float y,
 	float *fxy, float *dfdx, float *dfdy);
-void rayvt (float p, int nt, float dt,
-	float v[], float tau[], float x[], float a[]); 
+static void rayvt (float p, int nt, float dt,
+	float v[], float tau[], float x[], float a[]);
 
-segy tr,tro;
-
-int
-main(int argc, char **argv)
-{
-	int nt;		/* number of time samples per trace */
-	float dt;	/* time sampling interval */
-	float ft;	/* time of first sample */
-	int it;		/* time sample index */
-	int cdpmin;	/* minimum cdp to process */
-	int cdpmax;	/* maximum cdp to process */
-	float dx;	/* cdp sampling interval */
-	int nx;	        /* number of cdps to process */
-	int nxfft;	/* number of cdps after zero padding for fft */
-	int nxpad;	/* minimum number of cdps for zero padding */
-	int ix;		/* cdp index, starting with ix=0 */
-	int noffmix;	/* number of offsets to mix */
-	float *tdmo;	/* times at which rms velocities are specified */
-	float *vdmo;	/* rms velocities at times specified in tdmo */
-	int ntdmo;	/* number tnmo values specified */
-	int itdmo;	/* index into tnmo array */
-	int nvdmo;	/* number vnmo values specified */
-	float fmax;	/* maximum frequency */
-	float *vt;	/* uniformly sampled v(t) */
-	float *vrms;	/* uniformly sampled vrms(t) */
-	float **q;	/* traces for one offset - common-offset gather */
-	float **qmix;	/* DMO-corrected and mixed traces to be output */
-	float offset;	/* source-receiver offset of current trace */
-	float oldoffset;/* offset of previous trace */
-	int noff;	/* number of offsets processed in current mix */
-	int ntrace;	/* number of traces processed in current mix */
-	int itrace;	/* trace index */
-	int gottrace;	/* non-zero if an input trace was read */
-	int done;	/* non-zero if done */
-	int verbose;	/* =1 for diagnostic print */
-	char *vfile="";	/* name of interval velocity file */
-	FILE *hfp;	/* file pointer for temporary header file */
-	int nttab;	/* number of times in ray tables */
-	int nptab=NPTAB;/* number of ray parameters in ray tables */
-	int ip;		/* ray parameter counter */
-	float smute;	/* NMO stretch mute */
-	float t;	/* time */
-	float sum;	/* sum accumulator */
-	float lt;	/* last time */
-	float lttab;	/* last time in ray tables */
-	float p;	/* ray parameter */
-	float fp;	/* first ray parameter */
-	float lp;	/* last ray parameter */
-	float dptab;	/* ray parameter sampling interval in ray tables */
-	float speed;	/* speed knob --- twist for speed and aliasing */
-	float **x;	/* table [nptab][nttab] of horizontal distance ray */
-	float **tau;	/* table [nptab][nttab] of time depth of ray */
-	float **a;	/* table [nptab][nttab] of propagation angle of ray */
-
-	/* hook up getpar */
-	initargs(argc, argv);
-	requestdoc(1);
-
-	/* get information from the first header */
-	if (!gettr(&tr)) err("can't get first trace");
-	nt = tr.ns;
-	dt = tr.dt/1000000.0;
-	ft = tr.delrt/1000.0;
-	if (ft!=0.0) err("ft=%f --- nonzero ft not yet implemented!");
-	offset = tr.offset;
-
-	/* get parameters */
-	if (!getparint("cdpmin",&cdpmin)) err("must specify cdpmin");
-	if (!getparint("cdpmax",&cdpmax)) err("must specify cdpmax");
-	if (cdpmin>cdpmax) err("cdpmin must not be greater than cdpmax");
-	if (!getparfloat("dxcdp",&dx)) err("must specify dxcdp");
-	if (!getparint("noffmix",&noffmix)) err("must specify noffmix");
-	if (!getparfloat("fmax",&fmax)) fmax = 0.5/dt;
-	if (!getparint("verbose",&verbose)) verbose = 0;
-	if (!getparfloat("speed",&speed)) speed = 1.0;
-	if (!getparfloat("smute",&smute)) smute = 1.5;
-
-	/* allocate space for velocity arrays */
-	nttab = 2*nt-1;
-        vt = ealloc1float(nttab);
-	vrms = ealloc1float(nttab);
-
-        /* determine velocity function v(t) */
-        if (!getparstring("vfile",&vfile)) {
-                ntdmo = countparval("tdmo");
-                if (ntdmo==0) ntdmo = 1;
-                tdmo = ealloc1float(ntdmo);
-                if (!getparfloat("tdmo",tdmo)) tdmo[0] = 0.0;
-                nvdmo = countparval("vdmo");
-                if (nvdmo==0) nvdmo = 1;
-                if (nvdmo!=ntdmo) err("number of tdmo and vdmo must be equal");
-                vdmo = ealloc1float(nvdmo);
-                if (!getparfloat("vdmo",vdmo)) vdmo[0] = 1500.0;
-                for (itdmo=1; itdmo<ntdmo; ++itdmo)
-                        if (tdmo[itdmo]<=tdmo[itdmo-1])
-                                err("tdmo must increase monotonically");
-                for (it=0,t=0.0; it<nt; ++it,t+=dt)
-                        intlin(ntdmo,tdmo,vdmo,vdmo[0],vdmo[ntdmo-1],
-                                1,&t,&vt[it]);
-        } else {
-                if (fread(vt,sizeof(float),nt,fopen(vfile,"r"))!=nt)
-                        err("cannot read %d velocities from file %s",nt,vfile);
-        }
-
-        checkpars();
-
-	/* constant extrapolation of interval velocities */
-	for (it=nt; it<nttab; ++it)
-		vt[it] = vt[nt-1];
-
-        /* compute vrms */
-	vrms[0] = vt[0];
-	for (it=1,sum=0.0; it<nttab; ++it) {
-		sum += vt[it-1]*vt[it-1];
-			vrms[it] = sqrt(sum/it);
-	}
-
-        /* compute half-velocities */
-        for (it=0; it<nttab; ++it)
-                vt[it] *= 0.5;
-
-	/* compute extreme values */
-	ft = 0.0;
-	lt = ft+(nt-1)*dt;
-	lttab = ft+(nttab-1)*dt;
-	fp = 0.0;
-	lp = 1.0/vt[0];
-
-	/* compute p sampling for ray tables */
-	dptab = lp/(nptab-1);
-
-	/* allocate space for ray tables */
-	tau = ealloc2float(nttab,nptab);
-	x = ealloc2float(nttab,nptab);
-	a = ealloc2float(nttab,nptab);
-
-	/* compute ray tables tau(p,t), x(p,t), a(p,t) */
-	if (verbose) fprintf(stderr,"Computing ray tables...\n");
-	for (ip=0,p=fp; ip<nptab; ++ip,p+=dptab)
-		rayvt(p,nttab,dt,vt,tau[ip],x[ip],a[ip]);
-	if (verbose) fprintf(stderr,"Ray tables ready...\n");
-	free1float(vt);
-
-	/* determine number of cdps to process */
-	nx = cdpmax-cdpmin+1;
-	
-	/* allocate and zero common-offset gather q(t,x) */
-	nxpad = 0.5*ABS(offset/dx);
-	nxfft = npfar(nx+nxpad);
-	q = ealloc2float(nt,nxfft+2);
-	for (ix=0; ix<nxfft; ++ix)
-		for (it=0; it<nt; ++it)
-			q[ix][it] = 0.0;
-
-	/* allocate and zero offset mix accumulator qmix(t,x) */
-	qmix = ealloc2float(nt,nx);
-	for (ix=0; ix<nx; ++ix)
-		for (it=0; it<nt; ++it)
-			qmix[ix][it] = 0.0;
-		
-	/* open temporary file for headers */
-	hfp = tmpfile();
-	
-	/* initialize */
-	oldoffset = offset;
-	gottrace = 1;
-	done = 0;
-	ntrace = 0;
-	noff = 0;
-
-	/* loop over traces */
-	do {
-		/* if got a trace, determine offset */
-		if (gottrace) offset = tr.offset;
-		
-		/* if an offset is complete */
-		if ((gottrace && offset!=oldoffset) || !gottrace) {
-
-			/* do dmo for old common-offset gather */
-			dmooff(x,a,tau,nttab,dt,ft,nptab,dptab,fp,lp,
-				nx,dx,oldoffset,nt,vrms,fmax,smute,speed,
-				verbose,q);
-			
-			/* add dmo-corrected traces to mix */
-			for (ix=0; ix<nx; ++ix)
-				for (it=0; it<nt; ++it)
-					qmix[ix][it] += q[ix][it];
-			
-			/* count offsets in mix */
-			++noff;
-							
-			/* free space for old common-offset gather */
-			free2float(q);
-			
-			/* if beginning a new offset */
-			if (offset!=oldoffset) {
-				
-				/* allocate space for new offset */
-				nxpad = 0.5*ABS(offset/dx);
-				nxfft = npfar(nx+nxpad);
-				q = ealloc2float(nt,nxfft+2);
-				for (ix=0; ix<nxfft; ++ix)
-					for (it=0; it<nt; ++it)
-						q[ix][it] = 0.0;
-			}
-		}
-		
-		/* if a mix of offsets is complete */
-		if (noff==noffmix || !gottrace) {
-			
-			/* rewind trace header file */
-			efseeko(hfp,(off_t) 0,SEEK_SET);
-			
-			/* loop over all output traces */
-			for (itrace=0; itrace<ntrace; ++itrace) {
-			
-				/* read trace header and determine cdp index */
-				efread(&tro,HDRBYTES,1,hfp);
-				
-				/* get dmo-corrected data */
-				memcpy( (void *) tro.data,
-					 (const void *) qmix[tro.cdp-cdpmin],
-					 nt*sizeof(float));
-				
-				/* write output trace */
-				puttr(&tro);
-			}
-			
-			/* report */
-			if (verbose) 
-				fprintf(stderr,"\tCompleted mix of "
-					"%d offsets with %d traces\n",
-					noff,ntrace);
-			
-			/* if no more traces, break */
-			if (!gottrace) break;
-			
-			/* rewind trace header file */
-			efseeko(hfp, (off_t) 0,SEEK_SET);
-			
-			/* reset number of offsets and traces in mix */
-			noff = 0;
-			ntrace = 0;
-			
-			/* zero offset mix accumulator */
-			for (ix=0; ix<nx; ++ix)
-				for (it=0; it<nt; ++it)
-					qmix[ix][it] = 0.0;
-		}
-			
-		/* if cdp is within range to process */
-		if (tr.cdp>=cdpmin && tr.cdp<=cdpmax) {
-	
-			/* save trace header and update number of traces */
-			efwrite(&tr,HDRBYTES,1,hfp);
-			++ntrace;
-
-			/* remember offset */
-			oldoffset = offset;
-
-			/* get trace samples */
-			memcpy((void *) q[tr.cdp-cdpmin],
-				(const void *) tr.data,
-					nt*sizeof(float));
-		}
-
-		/* get next trace (if there is one) */
-		if (!gettr(&tr)) gottrace = 0;
-		
-	} while (!done);
-
-	return(CWP_Exit());
-}
-
-void dmooff (float **x, float **a, float **tau, int nttab, float dt, float ft,
+static int dmooff (float **x, float **a, float **tau, int nttab, float dt, float ft,
 	int nptab, float dptab, float fp, float lp,
 	int nx, float dx, float offset, int nt,
 	float *vrms, float fmax, float smute, float speed, int verbose,
@@ -414,7 +130,7 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 	/* compute p sampling required to avoid aliasing */
 	lt = (nt-1)*dt;
 	if (tmin>=lt)
-		err("tmin=%f >= lt=%f:  no data survive the mute!\n",tmin,lt);
+		return -4;  /* no data survive the mute */
 
 	dtn = 10.0*dt;
 	ftn = tmin;
@@ -453,6 +169,7 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 		for (itn=0; itn<ntn; ++itn)
 			if (t0table[ip][itn]>0.0) break;
 		itnmin = itn;
+		if (itnmin>=ntn) break;  /* no sample of this row is set (the program read after its end) */
 		
 		it0min[ip] = NINT(t0table[ip][itnmin]/dt);
 		if (it0min[ip]>=nt) it0min[ip] = nt-1;
@@ -499,10 +216,10 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 	free1int(it0min);
 	free1int(nt0);
 	free2float(tntable);
-
+	return 0;
 }
 
-void dmomap (float **x, float **a, float **tau, int nt, float dt, float ft,
+static void dmomap (float **x, float **a, float **tau, int nt, float dt, float ft,
 	int nptab, float dptab, int np, float dp2, float fp, float lp,
 	int itn, float tn, float h, float *vrms,
 	int verbose, float **t0table)
@@ -537,7 +254,7 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 ****************************************************************************/
 {
 	int ip,i,neqns=5,niter=NITER,iter,*ipvt;
-	float p2,vtn,tsg,p0,tautp,dtaudt,dtaudp,error,rcond,
+	float p2,vtn,tsg,p0,tautp,dtaudt,dtaudp,error,rcond=1.0,
 		lt,tol=TOL,*vars,*eqns,*work,t0,x0,**jacob;
 
 	/* compute last time in ray tables */
@@ -646,7 +363,7 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 	free1int(ipvt);
 }
 
-void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
+static void dmoapply (int nx, float dx, int nt, float dt, int np, float dp2,
 	float h, float **tntable, int *it0min, int *nt0,
 	float tmin, float fmax, float **qx)
 /*****************************************************************************
@@ -716,7 +433,7 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 	free1(qk);
 }
 
-void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
+static void jakub1k (float k, float h, int np, float dp2, int nt, float dt, float ft,
 	float **tntable, int *it0min, int *nt0, float fmax, complex *qq)
 /*****************************************************************************
 Jakubowicz's dip decomposition DMO for one wavenumber
@@ -739,7 +456,7 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 {
 	int ntfft,nw,it,iw,iwlm,iwhm,iwlp,iwhp,ip;
 	float p,ph,pl,ph2,dw,fw,wl,wh,scale;
-	complex czero=cmplx(0.0,0.0),*qn,*q0;
+	complex czero(0.0f,0.0f),*qn,*q0;
 
 	/* determine frequency sampling */
 	ntfft = npfa(nt);
@@ -796,21 +513,18 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 
 			/* Fourier transform t to w, with w centered */
 			for (it=1; it<ntfft; it+=2) {
-				qn[it].r = -qn[it].r;
-				qn[it].i = -qn[it].i;
+				qn[it] = -qn[it];
 			}
 			pfacc(1,ntfft,qn);
 
 			/* accumulate into q0 for slopes near -p */
 			for (iw=iwhm; iw<=iwlm; ++iw) {
-				q0[iw].r += qn[iw].r;
-				q0[iw].i += qn[iw].i;
+				q0[iw] += qn[iw];
 			}
 
 			/* accumulate into q0 for slopes near +p */
 			for (iw=iwlp; iw<=iwhp; ++iw) {
-				q0[iw].r += qn[iw].r;
-				q0[iw].i += qn[iw].i;
+				q0[iw] += qn[iw];
 			}
 		}
 
@@ -824,12 +538,10 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 	pfacc(-1,ntfft,q0);
 	scale = 0.5/ntfft;
 	for (it=0; it<nt; it+=2) {
-		qq[it].r = q0[it].r*scale;
-		qq[it].i = q0[it].i*scale;
+		qq[it] = q0[it]*scale;
 	}
 	for (it=1; it<nt; it+=2) {
-		qq[it].r = -q0[it].r*scale;
-		qq[it].i = -q0[it].i*scale;
+		qq[it] = -q0[it]*scale;
 	}
 
 	/* free workspace */
@@ -837,7 +549,7 @@ Author: Craig Artley, Colorado School of Mines, 08/29/91
 	free1complex(q0);	
 }
 	
-float tmute (float *vrms, int nt, float dt, float ft, float h, float smute)
+static float tmute (float *vrms, int nt, float dt, float ft, float h, float smute)
 /***************************************************************************
 Returns MUTE Time for given rms velocity function and half-offset.
 ****************************************************************************
@@ -874,7 +586,7 @@ Author: Craig Artley, Colorado School of Mines, 09/28/91
 	return ft+it*dt;
 }
 
-void getX (float tsg, float h, float p0, float v, float *vars)
+static void getX (float tsg, float h, float p0, float v, float *vars)
 /***************************************************************************
 GET trial solution X to system of equations assuming constant velocity.
 ****************************************************************************
@@ -924,7 +636,7 @@ Author: Craig Artley, Colorado School of Mines, 09/21/91
 	vars[4] = t0;
 }
 
-void getFJ (float **x, float **a, float **tau, int nt, int np,
+static void getFJ (float **x, float **a, float **tau, int nt, int np,
 	float dt, float dp, float tsg, float h, float p0,
 	float *vars, float *eqns, float **jacob)
 /***************************************************************************
@@ -1041,7 +753,7 @@ Author: Craig Artley, Colorado School of Mines, 09/21/91
 	jacob[4][4] -= 2.0*sign*dfdt;
 }
 
-void intder (float **f, int nx, float dx, float fx,
+static void intder (float **f, int nx, float dx, float fx,
 	int ny, float dy, float fy, float x, float y,
 	float *fxy, float *dfdx, float *dfdy)
 /***************************************************************************
@@ -1116,7 +828,7 @@ Author: Craig Artley, Colorado School of Mines, 08/31/91
 	*dfdy = ((1-fracx)*(f01-f00) + fracx*(f11-f10))/dy;
 }
 
-void rayvt (float p, int nt, float dt,
+static void rayvt (float p, int nt, float dt,
 	float v[], float tau[], float x[], float a[]) 
 /*****************************************************************************
 trace ray for v = v(tau), tau=ONE-way vertical time
@@ -1191,4 +903,103 @@ Modified:  Craig Artley, Colorado School of Mines, 09/25/90
 		x[jt] = x[jt-1];
 		a[jt] = a[jt-1];
 	}
+}
+
+/* Library version of SUDMOVZ
+ *
+ * The main program (the parameters, the traces and their headers, the offsets and the mixes of them, the files of
+ * velocities) is left to the caller. The tables of the rays of the velocity are made once, and kept in a model:
+ *
+ *	su_dmovz_create:	the ray tables and the rms velocity from the interval velocities vt[nt] (as the program makes them)
+ *	su_dmovz_nxfft:		the number of cdps of the common-offset gather after zero padding for the Fourier transform
+ *	su_dmovz_offset:	DMO of a common-offset gather q[nxfft + 2][nt] (flat), in place
+ *	su_dmovz_free:		frees the model
+ *
+ * Differences from the program:
+ *  - The gather is a flat array, q[(nxfft + 2) * nt].
+ *  - dmomap read rcond (the condition number that the solver of the system sets) before it was set when the first iteration
+ *    had converged; it starts as 1.
+ *  - A row of the table of times that has no sample set ended the loop over the rows only after the program had
+ *    read the sample after the end of the row (the first of the next row, or past the table for the last).
+ *  - A gather of zero offset is left as it is (the program divided by the offset to find the sampling of the ray parameter).
+ *  - A gather that the stretch mute leaves nothing of gives a code (the program ended with an error).
+ */
+
+struct DmoVz {
+	int nt, nttab, nptab;
+	float dt, dptab, fp, lp;
+	float *vrms;
+	float **x, **a, **tau;
+};
+
+struct DmoVz *su_dmovz_create(int nt, float dt, const float *vt_in, int nptab, int *err)
+{
+	struct DmoVz *M;
+	int it, ip, nttab = 2*nt-1;
+	float *vt, sum, p;
+
+	*err = 0;
+	if (nt<2 || dt<=0.0 || nptab<2) { *err = -3; return NULL; }
+	for (it=0; it<nt; ++it) if (!(vt_in[it]>0.0)) { *err = -3; return NULL; }
+	M = (struct DmoVz*)calloc(1,sizeof(struct DmoVz));
+	vt = ealloc1float(nttab);
+	M->vrms = ealloc1float(nttab);
+	memcpy(vt,vt_in,sizeof(float)*nt);
+
+	/* constant extrapolation of interval velocities */
+	for (it=nt; it<nttab; ++it)
+		vt[it] = vt[nt-1];
+
+	/* compute vrms */
+	M->vrms[0] = vt[0];
+	for (it=1,sum=0.0; it<nttab; ++it) {
+		sum += vt[it-1]*vt[it-1];
+		M->vrms[it] = sqrt(sum/it);
+	}
+
+	/* compute half-velocities */
+	for (it=0; it<nttab; ++it)
+		vt[it] *= 0.5;
+
+	M->nt = nt; M->nttab = nttab; M->nptab = nptab; M->dt = dt;
+	M->fp = 0.0;
+	M->lp = 1.0/vt[0];
+	M->dptab = M->lp/(nptab-1);
+
+	/* compute ray tables tau(p,t), x(p,t), a(p,t) */
+	M->tau = alloc2float(nttab,nptab);
+	M->x = alloc2float(nttab,nptab);
+	M->a = alloc2float(nttab,nptab);
+	for (ip=0,p=M->fp; ip<nptab; ++ip,p+=M->dptab)
+		rayvt(p,nttab,dt,vt,M->tau[ip],M->x[ip],M->a[ip]);
+	free1float(vt);
+	return M;
+}
+
+int su_dmovz_nxfft(int nx, float dx, float offset)
+{
+	return npfar(nx+(int)(0.5*ABS(offset/dx)));
+}
+
+int su_dmovz_offset(const struct DmoVz *M, int nx, float dx, float offset, float fmax, float smute, float speed, float *q)
+{
+	int nxfft = su_dmovz_nxfft(nx,dx,offset), i, status;
+	float **rows = (float**)ealloc1(nxfft+2,sizeof(float*));
+
+	if (dx==0.0 || fmax<=0.0 || smute<=1.0 || speed<=0.0) { free1(rows); return -3; }
+	/* a gather of zero offset is not changed by DMO (the program made a table of no rays, and divided by the offset) */
+	if (offset==0.0) { free1(rows); return 0; }
+	for (i=0; i<nxfft+2; ++i) rows[i] = q+(size_t)i*M->nt;
+	status = dmooff(M->x,M->a,M->tau,M->nttab,M->dt,0.0,M->nptab,M->dptab,M->fp,M->lp,nx,dx,offset,M->nt,M->vrms,fmax,smute,
+		speed,0,rows);
+	free1(rows);
+	return status;
+}
+
+void su_dmovz_free(struct DmoVz *M)
+{
+	if (M==NULL) return;
+	free1float(M->vrms);
+	free2float(M->x); free2float(M->a); free2float(M->tau);
+	free(M);
 }

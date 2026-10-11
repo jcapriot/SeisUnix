@@ -771,8 +771,8 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 			for (l=0; l<m; l++) {
 				t1r = zr[j01]+zr[j2];
 				t1i = zi[j01]+zi[j2];
-				y1r = zr[j00]-0.5*t1r;
-				y1i = zi[j00]-0.5*t1i;
+				y1r = zr[j00]-0.5f*t1r;
+				y1i = zi[j00]-0.5f*t1i;
 				y2r = c1*(zr[j01]-zr[j2]);
 				y2i = c1*(zi[j01]-zi[j2]);
 				zr[j00] = zr[j00]+t1r;
@@ -794,9 +794,9 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 		/* if factor is 4 */
 		if (ifac==4) {
 			if (mu==1)
-				c1 = 1.0;
+				c1 = 1.0f;
 			else
-				c1 = -1.0;
+				c1 = -1.0f;
 			for (l=0; l<m; l++) {
 				t1r = zr[j00]+zr[j2];
 				t1i = zi[j00]+zi[j2];
@@ -857,8 +857,8 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 				t5i = t1i+t2i;
 				t6r = c1*(t1r-t2r);
 				t6i = c1*(t1i-t2i);
-				t7r = zr[j00]-0.25*t5r;
-				t7i = zi[j00]-0.25*t5i;
+				t7r = zr[j00]-0.25f*t5r;
+				t7i = zi[j00]-0.25f*t5i;
 				y1r = t7r+t6r;
 				y1i = t7i+t6i;
 				y2r = t7r-t6r;
@@ -949,8 +949,8 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 				t5i = zi[j2]-zi[j5];
 				t6r = zr[j3]-zr[j4];
 				t6i = zi[j3]-zi[j4];
-				t7r = zr[j00]-0.5*t3r;
-				t7i = zi[j00]-0.5*t3i;
+				t7r = zr[j00]-0.5f*t3r;
+				t7i = zi[j00]-0.5f*t3i;
 				t8r = t1r-t3r;
 				t8i = t1i-t3i;
 				t9r = t2r-t3r;
@@ -998,16 +998,16 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 		/* if factor is 8 */
 		if (ifac==8) {
 			if (mu==1) {
-				c1 = 1.0;
+				c1 = 1.0f;
 				c2 = P707;
 			} else if (mu==3) {
-				c1 = -1.0;
+				c1 = -1.0f;
 				c2 = -P707;
 			} else if (mu==5) {
-				c1 = 1.0;
+				c1 = 1.0f;
 				c2 = -P707;
 			} else {
-				c1 = -1.0;
+				c1 = -1.0f;
 				c2 = P707;
 			}
 			c3 = c1*c2;
@@ -1125,24 +1125,24 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 			for (l=0; l<m; l++) {
 				t1r = zr[j3]+zr[j6];
 				t1i = zi[j3]+zi[j6];
-				t2r = zr[j00]-0.5*t1r;
-				t2i = zi[j00]-0.5*t1i;
+				t2r = zr[j00]-0.5f*t1r;
+				t2i = zi[j00]-0.5f*t1i;
 				t3r = c1*(zr[j3]-zr[j6]);
 				t3i = c1*(zi[j3]-zi[j6]);
 				t4r = zr[j00]+t1r;
 				t4i = zi[j00]+t1i;
 				t5r = zr[j4]+zr[j7];
 				t5i = zi[j4]+zi[j7];
-				t6r = zr[j01]-0.5*t5r;
-				t6i = zi[j01]-0.5*t5i;
+				t6r = zr[j01]-0.5f*t5r;
+				t6i = zi[j01]-0.5f*t5i;
 				t7r = zr[j4]-zr[j7];
 				t7i = zi[j4]-zi[j7];
 				t8r = zr[j01]+t5r;
 				t8i = zi[j01]+t5i;
 				t9r = zr[j2]+zr[j5];
 				t9i = zi[j2]+zi[j5];
-				t10r = zr[j8]-0.5*t9r;
-				t10i = zi[j8]-0.5*t9i;
+				t10r = zr[j8]-0.5f*t9r;
+				t10i = zi[j8]-0.5f*t9i;
 				t11r = zr[j2]-zr[j5];
 				t11i = zi[j2]-zi[j5];
 				t12r = zr[j8]+t9r;
@@ -1173,8 +1173,8 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 				y1i = t2i+t18i;
 				y2r = t2r+t19r;
 				y2i = t2i+t19i;
-				y3r = t4r-0.5*t13r;
-				y3i = t4i-0.5*t13i;
+				y3r = t4r-0.5f*t13r;
+				y3i = t4i-0.5f*t13i;
 				y4r = t2r-t22r;
 				y4i = t2i-t22i;
 				y5r = t3r-t23r;
@@ -1355,8 +1355,8 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 				t9i = zi[j4]-zi[j7];
 				t10r = zr[j5]-zr[j6];
 				t10i = zi[j5]-zi[j6];
-				t11r = zr[j00]-0.5*t5r;
-				t11i = zi[j00]-0.5*t5i;
+				t11r = zr[j00]-0.5f*t5r;
+				t11i = zi[j00]-0.5f*t5i;
 				t12r = t1r-t5r;
 				t12i = t1i-t5i;
 				t13r = t2r-t5r;
@@ -1611,8 +1611,8 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 				t11i = zi[j5]-zi[j8];
 				t12r = zr[j6]-zr[j7];
 				t12i = zi[j6]-zi[j7];
-				t13r = zr[j00]-0.5*t6r;
-				t13i = zi[j00]-0.5*t6i;
+				t13r = zr[j00]-0.5f*t6r;
+				t13i = zi[j00]-0.5f*t6i;
 				t14r = t1r-t6r;
 				t14i = t1i-t6i;
 				t15r = t2r-t6r;
@@ -1700,42 +1700,42 @@ Author:  Dave Hale, Colorado School of Mines, 04/27/89
 		/* if factor is 16 */
 		if (ifac==16) {
 			if (mu==1) {
-				c1 = 1.0;
+				c1 = 1.0f;
 				c2 = P923;
 				c3 = P382;
 				c4 = P707;
 			} else if (mu==3) {
-				c1 = -1.0;
+				c1 = -1.0f;
 				c2 = P382;
 				c3 = P923;
 				c4 = -P707;
 			} else if (mu==5) {
-				c1 = 1.0;
+				c1 = 1.0f;
 				c2 = -P382;
 				c3 = P923;
 				c4 = -P707;
 			} else if (mu==7) {
-				c1 = -1.0;
+				c1 = -1.0f;
 				c2 = -P923;
 				c3 = P382;
 				c4 = P707;
 			} else if (mu==9) {
-				c1 = 1.0;
+				c1 = 1.0f;
 				c2 = -P923;
 				c3 = -P382;
 				c4 = P707;
 			} else if (mu==11) {
-				c1 = -1.0;
+				c1 = -1.0f;
 				c2 = -P382;
 				c3 = -P923;
 				c4 = -P707;
 			} else if (mu==13) {
-				c1 = 1.0;
+				c1 = 1.0f;
 				c2 = P382;
 				c3 = -P923;
 				c4 = -P707;
 			} else {
-				c1 = -1.0;
+				c1 = -1.0f;
 				c2 = P923;
 				c3 = -P382;
 				c4 = P707;
@@ -1950,10 +1950,10 @@ Author:  Dave Hale, Colorado School of Mines, 06/13/89
     z = rz;
 
     /* initialize cosine-sine recurrence */
-    theta = 2.0*PI/(double)n;
+    theta = 2.0f*PI/(double)n;
     if (isign>0) theta = -theta;
-    wtemp = sin(0.5*theta);
-    wpr = -2.0*wtemp*wtemp;
+    wtemp = sin(0.5f*theta);
+    wpr = -2.0f*wtemp*wtemp;
     wpi = sin(theta);
     wr = 1.0+wpr;
     wi = wpi;
@@ -2013,22 +2013,22 @@ Author:  Dave Hale, Colorado School of Mines, 06/13/89
     /* copy input to output while scaling */
     z = (float*)cz;
     for (i=0; i<n; i++)
-        z[i] = 0.5*rz[i];
+        z[i] = 0.5f*rz[i];
 
     /* do complex to complex transform */
     pfacc(isign,n/2,cz);
 
     /* fix dc and nyquist */
-    z[n] = 2.0*(z[0]-z[1]);
-    z[0] = 2.0*(z[0]+z[1]);
+    z[n] = 2.0f*(z[0]-z[1]);
+    z[0] = 2.0f*(z[0]+z[1]);
     z[n+1] = 0.0;
     z[1] = 0.0;
 
     /* initialize cosine-sine recurrence */
-    theta = 2.0*PI/(double)n;
+    theta = 2.0f*PI/(double)n;
     if (isign<0) theta = -theta;
-    wtemp = sin(0.5*theta);
-    wpr = -2.0*wtemp*wtemp;
+    wtemp = sin(0.5f*theta);
+    wpr = -2.0f*wtemp*wtemp;
     wpi = sin(theta);
     wr = 1.0+wpr;
     wi = wpi;
@@ -2187,8 +2187,8 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                 for (jt=0; jt<nt; jt++) {
                     t1r = zr[j01]+zr[j2];
                     t1i = zi[j01]+zi[j2];
-                    y1r = zr[j00]-0.5*t1r;
-                    y1i = zi[j00]-0.5*t1i;
+                    y1r = zr[j00]-0.5f*t1r;
+                    y1i = zi[j00]-0.5f*t1i;
                     y2r = c1*(zr[j01]-zr[j2]);
                     y2i = c1*(zi[j01]-zi[j2]);
                     zr[j00] = zr[j00]+t1r;
@@ -2214,9 +2214,9 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
         /* if factor is 4 */
         if (ifac==4) {
             if (mu==1)
-                c1 = 1.0;
+                c1 = 1.0f;
             else
-                c1 = -1.0;
+                c1 = -1.0f;
             for (l=0; l<m; l++) {
                 j00 = i0;
                 j01 = i1;
@@ -2293,8 +2293,8 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                     t5i = t1i+t2i;
                     t6r = c1*(t1r-t2r);
                     t6i = c1*(t1i-t2i);
-                    t7r = zr[j00]-0.25*t5r;
-                    t7i = zi[j00]-0.25*t5i;
+                    t7r = zr[j00]-0.25f*t5r;
+                    t7i = zi[j00]-0.25f*t5i;
                     y1r = t7r+t6r;
                     y1i = t7i+t6i;
                     y2r = t7r-t6r;
@@ -2399,8 +2399,8 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                     t5i = zi[j2]-zi[j5];
                     t6r = zr[j3]-zr[j4];
                     t6i = zi[j3]-zi[j4];
-                    t7r = zr[j00]-0.5*t3r;
-                    t7i = zi[j00]-0.5*t3i;
+                    t7r = zr[j00]-0.5f*t3r;
+                    t7i = zi[j00]-0.5f*t3i;
                     t8r = t1r-t3r;
                     t8i = t1i-t3i;
                     t9r = t2r-t3r;
@@ -2456,16 +2456,16 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
         /* if factor is 8 */
         if (ifac==8) {
             if (mu==1) {
-                c1 = 1.0;
+                c1 = 1.0f;
                 c2 = P707;
             } else if (mu==3) {
-                c1 = -1.0;
+                c1 = -1.0f;
                 c2 = -P707;
             } else if (mu==5) {
-                c1 = 1.0;
+                c1 = 1.0f;
                 c2 = -P707;
             } else {
-                c1 = -1.0;
+                c1 = -1.0f;
                 c2 = P707;
             }
             c3 = c1*c2;
@@ -2611,24 +2611,24 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                 for (jt=0; jt<nt; jt++) {
                     t1r = zr[j3]+zr[j6];
                     t1i = zi[j3]+zi[j6];
-                    t2r = zr[j00]-0.5*t1r;
-                    t2i = zi[j00]-0.5*t1i;
+                    t2r = zr[j00]-0.5f*t1r;
+                    t2i = zi[j00]-0.5f*t1i;
                     t3r = c1*(zr[j3]-zr[j6]);
                     t3i = c1*(zi[j3]-zi[j6]);
                     t4r = zr[j00]+t1r;
                     t4i = zi[j00]+t1i;
                     t5r = zr[j4]+zr[j7];
                     t5i = zi[j4]+zi[j7];
-                    t6r = zr[j01]-0.5*t5r;
-                    t6i = zi[j01]-0.5*t5i;
+                    t6r = zr[j01]-0.5f*t5r;
+                    t6i = zi[j01]-0.5f*t5i;
                     t7r = zr[j4]-zr[j7];
                     t7i = zi[j4]-zi[j7];
                     t8r = zr[j01]+t5r;
                     t8i = zi[j01]+t5i;
                     t9r = zr[j2]+zr[j5];
                     t9i = zi[j2]+zi[j5];
-                    t10r = zr[j8]-0.5*t9r;
-                    t10i = zi[j8]-0.5*t9i;
+                    t10r = zr[j8]-0.5f*t9r;
+                    t10i = zi[j8]-0.5f*t9i;
                     t11r = zr[j2]-zr[j5];
                     t11i = zi[j2]-zi[j5];
                     t12r = zr[j8]+t9r;
@@ -2659,8 +2659,8 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                     y1i = t2i+t18i;
                     y2r = t2r+t19r;
                     y2i = t2i+t19i;
-                    y3r = t4r-0.5*t13r;
-                    y3i = t4i-0.5*t13i;
+                    y3r = t4r-0.5f*t13r;
+                    y3i = t4i-0.5f*t13i;
                     y4r = t2r-t22r;
                     y4i = t2i-t22i;
                     y5r = t3r-t23r;
@@ -2863,8 +2863,8 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                     t9i = zi[j4]-zi[j7];
                     t10r = zr[j5]-zr[j6];
                     t10i = zi[j5]-zi[j6];
-                    t11r = zr[j00]-0.5*t5r;
-                    t11i = zi[j00]-0.5*t5i;
+                    t11r = zr[j00]-0.5f*t5r;
+                    t11i = zi[j00]-0.5f*t5i;
                     t12r = t1r-t5r;
                     t12i = t1i-t5i;
                     t13r = t2r-t5r;
@@ -3145,8 +3145,8 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
                     t11i = zi[j5]-zi[j8];
                     t12r = zr[j6]-zr[j7];
                     t12i = zi[j6]-zi[j7];
-                    t13r = zr[j00]-0.5*t6r;
-                    t13i = zi[j00]-0.5*t6i;
+                    t13r = zr[j00]-0.5f*t6r;
+                    t13i = zi[j00]-0.5f*t6i;
                     t14r = t1r-t6r;
                     t14i = t1i-t6i;
                     t15r = t2r-t6r;
@@ -3248,42 +3248,42 @@ Author:  Dave Hale, Colorado School of Mines, 06/15/89
         /* if factor is 16 */
         if (ifac==16) {
             if (mu==1) {
-                c1 = 1.0;
+                c1 = 1.0f;
                 c2 = P923;
                 c3 = P382;
                 c4 = P707;
             } else if (mu==3) {
-                c1 = -1.0;
+                c1 = -1.0f;
                 c2 = P382;
                 c3 = P923;
                 c4 = -P707;
             } else if (mu==5) {
-                c1 = 1.0;
+                c1 = 1.0f;
                 c2 = -P382;
                 c3 = P923;
                 c4 = -P707;
             } else if (mu==7) {
-                c1 = -1.0;
+                c1 = -1.0f;
                 c2 = -P923;
                 c3 = P382;
                 c4 = P707;
             } else if (mu==9) {
-                c1 = 1.0;
+                c1 = 1.0f;
                 c2 = -P923;
                 c3 = -P382;
                 c4 = P707;
             } else if (mu==11) {
-                c1 = -1.0;
+                c1 = -1.0f;
                 c2 = -P382;
                 c3 = -P923;
                 c4 = -P707;
             } else if (mu==13) {
-                c1 = 1.0;
+                c1 = 1.0f;
                 c2 = P382;
                 c3 = -P923;
                 c4 = -P707;
             } else {
-                c1 = -1.0;
+                c1 = -1.0f;
                 c2 = P923;
                 c3 = -P382;
                 c4 = P707;
@@ -3653,10 +3653,10 @@ Modified:  Dave Hale, Colorado School of Mines, 11/26/89
     }
 
     /* initialize cosine-sine recurrence */
-    theta = 2.0*PI/(double)n;
+    theta = 2.0f*PI/(double)n;
     if (isign>0) theta = -theta;
-    wtemp = sin(0.5*theta);
-    wpr = -2.0*wtemp*wtemp;
+    wtemp = sin(0.5f*theta);
+    wpr = -2.0f*wtemp*wtemp;
     wpi = sin(theta);
     wr = 1.0+wpr;
     wi = wpi;
@@ -3756,7 +3756,7 @@ Author:  Dave Hale, Colorado School of Mines, 06/13/89
     z = (float*)cz;
     for (i2=0,j=0; i2<n2; i2++)
         for (i1=0; i1<n1; i1++,j++)
-            z[j] = 0.5*rz[j];
+            z[j] = 0.5f*rz[j];
 
     /* if transforming dimension 1 */
     if (idim==1) {
@@ -3805,17 +3805,17 @@ Author:  Dave Hale, Colorado School of Mines, 06/13/89
 
     /* fix dc and nyquist for each transform */
     for (it=0,j=0,k=n*itmul; it<nt; it++,j+=itinc,k+=itinc) {
-        z[k] = 2.0*(z[j]-z[j+1]);
-        z[j] = 2.0*(z[j]+z[j+1]);
+        z[k] = 2.0f*(z[j]-z[j+1]);
+        z[j] = 2.0f*(z[j]+z[j+1]);
         z[k+1] = 0.0;
         z[j+1] = 0.0;
     }
 
     /* initialize cosine-sine recurrence */
-    theta = 2.0*PI/(double)n;
+    theta = 2.0f*PI/(double)n;
     if (isign<0) theta = -theta;
-    wtemp = sin(0.5*theta);
-    wpr = -2.0*wtemp*wtemp;
+    wtemp = sin(0.5f*theta);
+    wpr = -2.0f*wtemp*wtemp;
     wpi = sin(theta);
     wr = 1.0+wpr;
     wi = wpi;

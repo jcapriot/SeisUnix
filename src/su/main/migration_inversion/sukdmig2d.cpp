@@ -175,7 +175,7 @@ static void timeb(int nr,int nz,float dr,float dz,float fz,float a,
 				t[ir][iz] = rou/v0;
 				p[ir][iz] = r/(rou*v0);
 				cs0[ir][iz] = z/rou;
-				ang[ir][iz] = asin(r/rou);
+				ang[ir][iz] = asin(MIN(r/rou,1.0f)); /* (rounding can put it past 1: NaN on some machines) */
 			}
 	} else {
 		oa = 1.0/a; 	zc = v0*oa;
@@ -193,7 +193,7 @@ static void timeb(int nr,int nz,float dr,float dz,float fz,float a,
 					rou = sqrt(zc*zc+rc*rc);
 					t[ir][iz] = log((v*(rou+rc))
 						/(v0*(rou+rc-r)))*oa;
-					p[ir][iz] = sqrt(rou*rou-rc*rc)
+					p[ir][iz] = sqrt(MAX(rou*rou-rc*rc,0.0f))
 						/(rou*v0);
 					temp = v*p[ir][iz];
 					if(temp>1.0) temp = 1.0;

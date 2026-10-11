@@ -73,6 +73,9 @@ NULL};
  *  - The low-pass filters are made once for the cut frequencies (the program made them again for each trace).
  *  - On the left of the midpoint the program used 'fphi=++fplo', which moved the low cut filter along with the high one;
  *    it is fplo and fplo+1 on both sides, as it is on the right.
+ *  - The square roots of the obliquity factor and the argument of the arccosine are limited to their mathematical range
+ *    (rounding made them NaN on some machines, depending on how the multiplications are fused), and the filter index is
+ *    limited to nc before it is made an int (a very small slowness overflowed it).
  *  - The checks of the parameters return a code.
  */
 
@@ -225,8 +228,8 @@ int su_ktmig2d(int ntr, int nt, float dt, float dx, float h, float angmax, int n
 					if(t>=tmax) break;
 					geoms=sqrt(1/(t*v));
 					obliq=sqrt(.5*(1 + (t0*t0/(4*ts*tr))
-						- (1/(ts*tr))*sqrt(ts*ts - t0*t0/4)*sqrt(tr*tr - t0*t0/4)));
-					ang=180.0*fabs(acos(t0/t))/PI;
+						- (1/(ts*tr))*sqrt(MAX(ts*ts - t0*t0/4,0.0f))*sqrt(MAX(tr*tr - t0*t0/4,0.0f))));
+					ang=180.0*fabs(acos(MIN(t0/t,1.0f)))/PI;
 					if(ang<=angmax) angtaper=1.0;
 					if(ang>angmax) angtaper=cos((ang-angmax)*PI/20);
 
@@ -234,7 +237,7 @@ int su_ktmig2d(int ntr, int nt, float dt, float dx, float h, float angmax, int n
 					/* the low-pass filtered trace for antialiasing */
 					pmin=1/(2*dx*fnyq);
 					p=fabs((x+h)/(pow(v,2)*ts) + (x-h)/(pow(v,2)*tr));
-					if(p>0){fplo=(int)floor(nc*pmin/p);}
+					if(p>0){float r=nc*pmin/p; fplo = r>=(float)nc ? nc : (int)floor(r);} /* (not a float past the int range) */
 					if(p==0){fplo=nc;}
 					ref=fmod(nc*pmin,p);
 					wlo=1-ref;

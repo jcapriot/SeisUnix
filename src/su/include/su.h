@@ -123,6 +123,11 @@ void su_radon_inverse(int np, int ntfft, int nx, const float *ptau, const float 
 void su_radon_xinterp(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc,
 	int lent, int lenx, int xopt, float dt, float *out);
 
+// statics
+void su_resstat(int nt, int ntraces, const float *data_in, const int *icmp, const int *irec, const int *ishot,
+	int ncmp, int nrec, int nshot, int ntpick, int niter, int mode, float perc, int sub, float *tsstat,
+	float *trstat);
+
 // decon_shaping
 int su_fxdecon(int nsp, int ntrc, const float *tdatain, float *tdataout, float dt, float taper, float fmin,
 	float fmax, float twlen, int ntrw, int ntrf);

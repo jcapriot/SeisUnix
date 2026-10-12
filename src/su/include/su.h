@@ -123,6 +123,12 @@ void su_radon_inverse(int np, int ntfft, int nx, const float *ptau, const float 
 void su_radon_xinterp(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc,
 	int lent, int lenx, int xopt, float dt, float *out);
 
+// interp_extrap
+int su_interp_traces(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc, int lent,
+	int lenx, int xopt, float dt, int iopt, int deriv, int linear, float *out);
+void su_ocext_offset(float offset, float offextr, float fmax, float sdmo, int nx, float dx, int nt, float dt, float ft,
+	const float *vrms_in, float *ptx);
+
 // statics
 void su_resstat(int nt, int ntraces, const float *data_in, const int *icmp, const int *irec, const int *ishot,
 	int ncmp, int nrec, int nshot, int ntpick, int niter, int mode, float perc, int sub, float *tsstat,

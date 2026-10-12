@@ -177,6 +177,15 @@ void su_velan_semblance(int nt, int ntout, int dtratio, int nsmooth, float pwr, 
 	const float *nnz, float *sem);
 void su_relan_accumulate(int nz, float dz, float fz, float offset, int nr, float dr, float fr, float smute,
 	const float *data, float *num, float *den, float *nnz);
+void su_tivel_table(float a, float b, float e, float d, float maxangle, int nangle, int normalize, float *p, float *v,
+	float *dv, float *d2v, float *vnmo);
+float su_tivel_vnmoweak(float a, float b, float e, float d, float p);
+void su_vel2df_accumulate(int nt, float dt, float ft, float offset, float tn_zero, int nv, float dv, float fv, int nvh,
+	float dvh, float fvh, int nsmooth, const float *data, float *num, float *den, float *nnz);
+void su_relanan_accumulate(int nz, float dz, float fz, float half_offset, float Z, int nr1, float dr1, float fr1,
+	int nr2, float dr2, float fr2, int nsmooth, const float *data, float *num, float *den, float *nnz);
+void su_velan_cc(int nt, float dt, float ft, int nx, const float *offsets, const float *data, int nv, float dv, float fv,
+	float smute, int dtratio, int nsmooth, int normalize, int selective, float tau, float pwr, float *sem);
 
 // synthetics
 int su_goupillaudpo_tmax(int n, int l, int k);

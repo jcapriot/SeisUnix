@@ -6,6 +6,7 @@
 #include "su.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = { 
 "									",
 "  SUTIVEL -  SU Transversely Isotropic velocity table builder		",
@@ -48,164 +49,18 @@ char *sdoc[] = {
 " line 3-n: one value per line						",
 "									",
 NULL};
+#endif
 
 /*
  * Author: (visitor to CSM form Mobil) John E. Anderson, Spring 1994
  */
 /**************** end self doc ********************************/
 
-void vget( float a, float b, float e, float d, float theta, float *vel);
-float vnmoweakTI( float a, float b, float e, float d, float p);
-float DweakTI( float a, float b, float e, float d, float p);
+static void vget( float a, float b, float e, float d, float theta, float *vel);
+static float vnmoweakTI( float a, float b, float e, float d, float p);
+static float DweakTI( float a, float b, float e, float d, float p);
 
-int main (int argc, char **argv)
-{
-	float a,b,e,d,maxangle,dangle,angle,theta,p,v,vnmo;
-	float dv,d2v,pmax,dp,test;
-	float vel[6];
-	int nangle,iangle,verbose,np,ip,option,normalize;
-	float *pin;
-	float *vin;
-	float *pout;
-	float *vout;
-
-	initargs(argc,argv);
-	requestdoc(1);
-
-	if (!getparfloat("a",&a)) a = 2500.;
-	if (!getparfloat("b",&b)) b = 1250.;
-	if (!getparfloat("e",&e)) e = .20;
-	if (!getparfloat("d",&d)) d = .10;
-	if (!getparfloat("maxangle",&maxangle)) maxangle=90.;
-	if (!getparint("nangle",&nangle)) nangle = 9001;
-	if (!getparint("np",&np)) np=8001;
-	if (!getparint("verbose",&verbose)) verbose=0;
-	if (!getparint("option",&option)) option=1;
-	if (!getparint("normalize",&normalize)) normalize=0;
-	fprintf(stderr,"normalize=%d\n",normalize);
-
-        checkpars();
-	pin = (float *)malloc(nangle*sizeof(float));
-	vin = (float *)malloc(nangle*sizeof(float));
-	pout = (float *)malloc(np*sizeof(float));
-	vout = (float *)malloc(np*sizeof(float));
-
-	if(option==14) {
-		pmax=1./(a*sqrt(1+2*e));
-		dp=pmax/(np-1);
-		for(ip=0;ip<np;ip++) {
-			vnmo=vnmoweakTI(a,b,e,d,ip*dp);
-			if(vnmo<0.) {
-				pmax=(ip-1)*dp;
-				goto newmax;
-			}
-		}
-newmax:
-		dp=pmax/(np-1);
-		fprintf(stdout,"%d\n",np);
-		fprintf(stdout,"%e\n",dp);
-	   	for(ip=0;ip<np;ip++) {
-			vnmo=vnmoweakTI(a,b,e,d,ip*dp);
-			fprintf(stdout,"%e\n",vnmo);
-		}
-		return(CWP_Exit());
-	}
-
-	if(nangle<2) nangle=2;
-	dangle = maxangle/(nangle-1);
-	if(verbose) {
-		fprintf(stdout," alpha = a = %f\n",a);
-		fprintf(stdout," beta = b = %f\n",b);
-		fprintf(stdout," epsilon = e = %f\n",e);
-		fprintf(stdout," delta = d = %f\n",d);
-		fprintf(stdout," a*sqrt(1+2*d) = %f\n",a*sqrt(1+2*d));
-		fprintf(stdout," a*sqrt(1+2*e) = %f\n",a*sqrt(1+2*e));
-	}
-
-	if(option==2 || option==5 || option==8 || option==11 || option==13 ) {
-		if(verbose) fprintf(stdout," The number of angles =");
-		fprintf(stdout,"%d\n",nangle);
-		if(verbose) fprintf(stdout," The angle increment in degrees =");
-		fprintf(stdout,"%e\n",dangle);
-		if(verbose)
-		fprintf(stdout,
-			" Following are velocity values for constant increments in angle\n");
-		}
-	if(option==3 || option==6 || option==9 || option==12 ) {
-		if(verbose) fprintf(stdout," The number of angles =");
-		fprintf(stdout,"%d\n",nangle);
-		if(verbose) fprintf(stdout," The angle increment in radians =");
-		fprintf(stdout,"%e\n",dangle*PI/180.);
-		if(verbose)
-		fprintf(stdout,
-			" Following are velocity values for constant increments in angle\n");
-		}
-
-	for(iangle=0;iangle<nangle;iangle++) {
-
-		angle=iangle*dangle;
-		theta=angle*PI/180.;
-
-		vget(a,b,e,d,theta,vel);
-		if(normalize) {
-			vel[0] /= sqrt(1 + 2*e*sin(theta)*sin(theta));
-			vel[3] *= cos(theta);
-			}
-		v=vel[0];
-		dv=vel[1];
-		d2v=vel[2];
-		vnmo=vel[3];
-		p=vel[4];
-
-		pin[iangle]=p;
-		vin[iangle]=vnmo;
-		if(option==4) vin[iangle]=v;
-		if(option==7) vin[iangle]=dv;
-		if(option==10) vin[iangle]=d2v; 
-		if(option==2 || option==3) fprintf(stdout,"%e\n",vnmo);
-		if(option==5 || option==6) fprintf(stdout,"%e\n",v);
-		if(option==8 || option==9) fprintf(stdout,"%e\n",dv);
-		if(option==11 || option==12) fprintf(stdout,"%e\n",d2v);
-		if(option==13) {
-			test=p*p+1./(vnmo*vnmo)-1./(vin[0]*vin[0]);
-			fprintf(stdout,"%e\n",test);
-			}
-		if(verbose) {
-			fprintf(stdout," angle (in degrees) = %6.2f",angle);
-			fprintf(stdout," vphase = %9.2f",v);
-			fprintf(stdout," vnmo = %15.6e",vnmo);
-			fprintf(stdout," p = %15.6e\n",p);
-			fprintf(stdout,"	  dv/dtheta = %15.6e",dv);
-			fprintf(stdout," d2v/dtheta2 = %15.6e\n",d2v);
-			}
-		}
-	if(option ==1 || option==4) {
-	   pmax=pin[0];
-	   for(iangle=0;iangle<nangle;iangle++) {
-		pmax=MAX(pmax,pin[iangle]);
-	   }
-	   dp=pmax/(np-4);
-	   for(ip=0;ip<np;ip++)
-		pout[ip]=ip*dp;
-	   intlin(nangle,pin,vin,vin[0],vin[nangle-1],np,pout,vout);
-	   if(verbose) fprintf(stdout," np = ");
-	   fprintf(stdout,"%d\n",np);
-	   if(verbose) fprintf(stdout," dp = ");
-	   fprintf(stdout,"%e\n",dp);
-	   if(verbose) fprintf(stdout,
-		" Following are velocity values for constant increments in p\n");
-	   for(ip=0;ip<np;ip++) {
-		fprintf(stdout,"%e\n",vout[ip]);
-		}
-	}
-	free(pin);
-	free(vin);
-	free(pout);
-	free(vout);
-	return(CWP_Exit());
-}
-
-void vget( float a, float b, float e, float d, float theta, float *vel)
+static void vget( float a, float b, float e, float d, float theta, float *vel)
 /*
 
 This routine returns phase and NMO velocity information given
@@ -262,7 +117,7 @@ vel[5] = NMO velocity using weak anisotropy assumption
 	vel[4]=p;
 	return;
 }
-float DweakTI( float a, float b, float e, float d, float p)
+static float DweakTI( float a, float b, float e, float d, float p)
 /*
 	returns D(p) for the weak anisotropy approximation
 
@@ -287,7 +142,7 @@ p      = slowness = sin(theta)/v
 	return (D);
 }
 
-float vnmoweakTI( float a, float b, float e, float d, float p)
+static float vnmoweakTI( float a, float b, float e, float d, float p)
 /*
 	returns vnmo(p) for the weak anisotropy approximation
 	or a value of -1 for the evanescent region
@@ -317,3 +172,40 @@ p      = slowness = sin(theta)/v
 	return (vnmo);
 }
 
+/* The values of the program for the angles from 0 to maxangle (degrees), nangle of them:
+ *
+ * p[nangle]	the ray parameter sin(theta) / vphase
+ * v, dv, d2v	the phase velocity and its first and second derivatives with respect to theta (radians)
+ * vnmo		the NMO velocity
+ *
+ * normalize: scale vnmo by the cosine and vphase by 1 / sqrt(1 + 2 e sin^2(theta)) (the program does that to the
+ * velocity but not to its derivatives).
+ */
+void su_tivel_table(float a, float b, float e, float d, float maxangle, int nangle, int normalize, float *p, float *v,
+	float *dv, float *d2v, float *vnmo)
+{
+	int iangle;
+	float vel[6], dangle, theta;
+
+	if (nangle < 2) nangle = 2;
+	dangle = maxangle/(nangle-1);
+	for (iangle=0; iangle<nangle; iangle++) {
+		theta = iangle*dangle*PI/180.;
+		vget(a,b,e,d,theta,vel);
+		if (normalize) {
+			vel[0] /= sqrt(1 + 2*e*sin(theta)*sin(theta));
+			vel[3] *= cos(theta);
+		}
+		v[iangle] = vel[0];
+		dv[iangle] = vel[1];
+		d2v[iangle] = vel[2];
+		vnmo[iangle] = vel[3];
+		p[iangle] = vel[4];
+	}
+}
+
+/* The NMO velocity of the weak anisotropy approximation at the ray parameter p, or -1 in the evanescent region */
+float su_tivel_vnmoweak(float a, float b, float e, float d, float p)
+{
+	return vnmoweakTI(a, b, e, d, p);
+}

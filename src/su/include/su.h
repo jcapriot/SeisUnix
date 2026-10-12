@@ -123,6 +123,14 @@ void su_radon_inverse(int np, int ntfft, int nx, const float *ptau, const float 
 void su_radon_xinterp(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc,
 	int lent, int lenx, int xopt, float dt, float *out);
 
+// multicomponent
+void su_polar_station(int nt, int iwl, int iwin, float rlq, int rl, int theta, int phi, int tau, int ellip, int pln,
+	int f1, int l1, int amp, int dir, float fangle, const float *data, float *out);
+void su_eipofi_station(int nt, int iwl, float pwr, int cubic, float *data, float *polar);
+float su_alford_angle(const float *S11, const float *S12, const float *S21, const float *S22, float dt, int itmin,
+	int itmax, float ang_inc, int taper, float *quality, float *inputquality, float *lag, float *xcorr);
+void su_alford_rotate(float *S11, float *S12, float *S21, float *S22, float theta, int nt, int itmin, int taper);
+
 // interp_extrap
 int su_interp_traces(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc, int lent,
 	int lenx, int xopt, float dt, int iopt, int deriv, int linear, float *out);

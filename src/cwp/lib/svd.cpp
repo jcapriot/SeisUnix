@@ -364,7 +364,7 @@ Credits: Nils Maercklin, GeoForschungsZentrum (GFZ) Potsdam, Germany, 2001.
 
 		for (i=0;i<n-1;i++) {
 			    p=w[k=i];
-                for (j=i+1;j<=n;j++)
+                for (j=i+1;j<n;j++)   /* (j<=n read w[n], past the singular values) */
                         if (w[j] >= p) p=w[k=j];
                 if (k != i) {
                         w[k]=w[i];

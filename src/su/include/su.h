@@ -113,6 +113,20 @@ void su_kolmogoroff_exp(int n, float rmax, float *cx);
 void su_tvband_filter(const float *f, int nfft, int nfreq, float dt, float scale, float *filter);
 void su_tvband_blend(int i0, int i1, const float *first, const float *second, float *out);
 
+// transforms: suradon
+float su_radon_gofx(int igopt, float offset, float intercept_off, float refdepth);
+void su_radon_taupmute(int ip, int ipa, int ipb, int nt, int ltap, float *rt);
+int su_radon_forward(int nx, int nt, const float *data, const float *g, float dt, int ntfft, int np, float pmin,
+	float dp, const float *mutetime, int nk, float f1, float f2, float prewhite, float *ptau);
+void su_radon_inverse(int np, int ntfft, int nx, const float *ptau, const float *g, float dt, float pmin, float dp,
+	int ip1, float f1, float f2, float *out);
+void su_radon_xinterp(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc,
+	int lent, int lenx, int xopt, float dt, float *out);
+
+// decon_shaping
+int su_fxdecon(int nsp, int ntrc, const float *tdatain, float *tdataout, float dt, float taper, float fmin,
+	float fmax, float twlen, int ntrw, int ntrf);
+
 // amplitudes
 void su_centsamp(float *rt, float *ct, float *mt, const float *time, int nt, float dt, int nvals_min);
 float su_dipdivcor_scale(void);
@@ -142,6 +156,8 @@ void su_ttoz_table(int nt, float dt, float ft, const float *v, int nz, float dz,
 void su_ztot_table(int nz, float dz, float fz, const float *v, int nt, float dt, float ft, float *zt, float *t);
 void su_nmo_tables(int nt, float dt, float ft, float offset, const float *ovvt, float smute, int upward,
 	int invert, int sscale, float *ttn, float *atn, float *tnt, float *at, int *itmute_out);
+int su_nmo_a_tables(int nt, float dt, float ft, float offset, const float *ovvt, const float *oa1t, const float *oa2t,
+	float smute, int upward, int invert, int sscale, float *ttn, float *atn, float *tnt, float *at, int *itmute_out);
 void su_nmo(float *data, int nt, float dt, float ft, int itmute, int lmute, int sscale, int invert,
 	const float *ttn, const float *atn, const float *tnt, const float *at, float *q);
 void su_taupnmo_tables(int nt, float dt, float ft, float p, const float *vvt, float smute, float *ttn, float *atn,

@@ -3,6 +3,7 @@ su_stretching_srcs = files(
     'suttoz.cpp',
     'sulog.cpp',
     'sunmo.cpp',
+    'sunmo_a.cpp',
     'sutaupnmo.cpp',
 )
 

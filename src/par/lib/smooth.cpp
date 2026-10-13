@@ -553,7 +553,7 @@ Gabriel Alvarez (1995).
 		float scale=0.0;	/* scale for triangular window */
 		
 		for (i= -nl; i<0; i++) filter[i+nl]=1+(float)i/nl;
-		for (i=1; i<nr; i++) filter[i+nl]=1-(float)i/nr;
+		for (i=1; i<=nr; i++) filter[i+nl]=1-(float)i/nr;   /* (i<nr left the last point, which is 0, unset) */
 		filter[nl]=1.0;
 	
 		/* normalize */

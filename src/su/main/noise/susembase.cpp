@@ -7,13 +7,14 @@
 #include <string.h>
 
 #include "su.h"
+#include <vector>
 #include "segy.h"
-#include "headcase.h"
 
 segy tr;
 segy trd;
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "                                                                            ",
 " SUSEMBASE - Semblance Based Structure-Oriented Interpolate and Smooth.     ",
@@ -231,6 +232,7 @@ char *sdoc[] = {
 " ------------------------------------------------------------------------   ", 
 "                                                                            ",
 NULL};
+#endif
 
 /* Credits:                                                                  */
 /* Author: Andre Latour, Feb 2023                                            */ 
@@ -239,657 +241,12 @@ NULL};
 /*                                                                           */
 /**************** end self doc ***********************************************/
 
-void scanit (segy **atrace, int *aloc, int numrolling, double scanloc, 
-            double locminscan, double locmaxscan, float smin, float sstep, int jsmax, 
-            float *adip, float *apow, float *asem, float *awrk, float *awrq, 
-            int *arng, int **ifori, float **afori, int lendip, int *numout) ;
-
-void wsmooth (float *val, float *wgt, int len, int minsd, int maxsd, float *sval) ;
-
-int main(int argc, char **argv) {
-
-  cwp_String lockey=NULL;
-  int lockase=-1;
-
-  cwp_String groupkey=NULL;
-  int groupkase=-1;
-  int usegroup=0;
-  double thisgroup=-1.e30;
-  int newgroup=0;
-
-  segy **rolltrace=NULL; 
-  segy *onetrace=NULL; 
-  int    *rollloc=NULL;
-  int    *rolldun=NULL;
-  float  **rolldip=NULL;
-  float  **jsumdat=NULL;
-  float  *onedip=NULL;
-  float  *onepow=NULL;
-  float  *onepw2=NULL;
-  float  *onetmp=NULL;
-  float  *onetm2=NULL;
-  float  *onesem=NULL;
-  float  *onesm2=NULL;
-  float  *onetim=NULL;
-  float  *oneand=NULL;
-  float  *dipwrk=NULL;
-  float  *dipwrq=NULL;
-  int    *locit=NULL;
-  int    *arng=NULL;
-  int   **ifori=NULL;
-  float **afori=NULL;
-
-  int lendip=0;
-  int nproct=0;
-  int mproct=0;
-  int numout=0;
-  int icycle=1;
-  int iroll=1;
-  int dipuse=1;
-  int i=0;
-  int j=0;
-  int k=0;
-  int klow=0;
-  double diffk=1.e30;
-  int jsum=0;
-  double outputloc = 0.0;
-  double outputinc = 1.0;
-  double outputcni = 1.0;
-  double outputalign = 0.0;
-  double outputshift = 0.0;
-  double locminscan = -3.0;
-  double locmaxscan = 3.0;
-  double locminsum  = -3.0;
-  double locmaxsum  = 3.0;
-  double locprev    = 0.0;
-  int    locdups    = 0;
-  int numrolling = 5;                                                                    
-  int iend=0;
-  int maxstoredloc=0;
-  float dt=0.;
-  float sstep=1.0;
-  float smin=-8.;
-  float smax=8.;
-  float jsmax=0;
-  float dipext=12.;
-  int   minsd=-1;
-  int   maxsd=1;
-
-  float dadext=12.;
-  int   mindad=-1;
-  int   maxdad=1;
-
-  cwp_String sumopt=NULL;
-  int isumopt=3;
-  int ilinear=0;
-  int   jnear=-1;
-  double diffj=1.e30;
-  double diffj2=1.e30;
-  int jsumn=0;
-  int jsumn2=0;
-  double centloc=0.0;
-  int jfirst=0;
-  int jlast=0;
-  float dadscale=1.0;
-  float ratio=0.0;
-  float dadnoise=0.0;
-
-  cwp_String dname=NULL; 
-
-  int indip = 0;
-  FILE *fpindip=NULL;      
-  int ksum=0;
-
-  int outdip = 0;
-  FILE *fpoutdip=NULL;      
-  int outpow = 0;
-  FILE *fpoutpow=NULL;      
-  int outsem = 0;
-  FILE *fpoutsem=NULL;      
-
-  int bypass=0;
-  int iput=1;
-
-/* Initialize */
-
-  initargs(argc, argv);
-  requestdoc(1);
-
-  if(countparval("lockey") > 0) {
-    getparstring("lockey", &lockey);
-  }
-  else {
-    lockey = ealloc1(3,1);
-    strcpy(lockey,"cdp");
-  }
-  lockase = GetCase(lockey);
-  if(lockase<1) err("**** Error: Specified lockey name %s is not recognized.",lockey);
-
-  if(countparval("groupkey") > 0) {
-    getparstring("groupkey", &groupkey);
-    groupkase = GetCase(groupkey);
-    if(groupkase<1) err("**** Error: Specified groupkey name %s is not recognized.",groupkey);
-    usegroup = 1;
-  }
-
-  if(!getpardouble("locmaxscan", &locmaxscan)) locmaxscan = 3.0;
-  if(locmaxscan<0.0) err("error: locmaxscan must be greater than or equal to 0.");
-  locminscan = 0.0 - locmaxscan;
-
-  if(locmaxscan==0.0) {
-    if(countparval("scanstep") > 0 || countparval("scanmax") > 0 || countparval("scanmin") > 0 ||
-       countparval("dipext") > 0 || countparval("locmaxsum") < 1 ) {
-       err("error: locmaxscan=0 does not allow parameters scanstep, scanmax, scanmin, dipext, and REQUIRES locmaxsum");
-    }
-  }
-
-  if(!getpardouble("locmaxsum", &locmaxsum)) locmaxsum = locmaxscan;
-  if(locmaxsum<=0.0) err("error: locmaxsum must be greater than 0.");
-  locminsum = 0.0 - locmaxsum;
- 
-  if(!getparint("dipuse", &dipuse)) dipuse = 1;
-  if(dipuse<0 || dipuse>1) err("error: dipuse parameter is out-of-range.");
- 
-  if(!getparint("bypass", &bypass)) bypass = 0;
-  if(bypass<-1 || bypass>1) err("error: bypass parameter is out-of-range.");
- 
-  if(!getparfloat("dipext", &dipext)) dipext = 12.0;
-  if(dipext<0.0) err("error: dipext must be equal to or greater than 0.0");
-
-  if(!getparfloat("scanstep", &sstep)) sstep = 1.0;
-  if(sstep<0.0) err("error: scanstep must be equal to or greater than 0.0");
-
-  if(!getparfloat("scanmax", &smax)) smax = 12.0;
-
-  if(!getparfloat("scanmin", &smin)) smin = 0.0 - smax;
-  if(smax<smin) err("error: scanmax must be equal to or greater than scanmin");
-
-/* The +5 is because ranges are inclusive, and for some float point tolerance. */
-  if(!getparint("numrolling", &numrolling)) numrolling = locmaxscan-locminscan + locmaxsum-locminsum + 5; 
-  if(numrolling<5) err("error: numrolling must be greater than 5");
-
-  if(!getpardouble("outputinc", &outputinc)) outputinc = 1.0;
-  if(outputinc<=0.0) err("error: outputinc must be greater than 0.0");
-  if(outputinc<1.) outputcni = outputinc;
-  else outputcni = 1.;
-
-  if(!getpardouble("outputalign", &outputalign)) outputalign = 0.0;
-  if(outputalign<0.0) err("error: outputalign must be equal to or greater than 0.0");
-  outputalign = fmod(outputalign,outputinc);
- 
-  if(!getpardouble("outputshift", &outputshift)) outputshift = 0.0;
-
-  isumopt = 3;
-  ilinear = 0;
-  if(countparval("sumopt") > 0) {
-    isumopt = 0;
-    getparstring("sumopt", &sumopt);
-    if(strcmp(sumopt,"one") == 0) isumopt = 1;
-    if(strcmp(sumopt,"two") == 0) isumopt = 2;
-    if(strcmp(sumopt,"twolinear") == 0) {
-      isumopt = 2;
-      ilinear = 1;
-    }
-    if(strcmp(sumopt,"stack") == 0) isumopt = 3;
-    if(strcmp(sumopt,"sum") == 0) isumopt = 4;
-    if(strcmp(sumopt,"dadstack") == 0) isumopt = 5;
-    if(strcmp(sumopt,"dadsum") == 0) isumopt = 6;
-    if(isumopt<1) err("**** Error: Specified sumopt=%s option not recognized.",sumopt);
-  }
-
-  if(isumopt<5 && (countparval("dadscale") > 0 || countparval("dadext") > 0 ||
-    countparval("dadnoise") > 0)) {
-    err("error: only sumopt=dadstack or dadsum allows specifying parameters dadscale, dadext, and dadnoise");
-  }
-
-  if(!getparfloat("dadscale", &dadscale)) dadscale = 1.0;
-
-  if(!getparfloat("dadext", &dadext)) dadext = 12.0;
-  if(dadext<0.0) err("error: dadext must be equal to or greater than 0.0");
-
-  if(!getparfloat("dadnoise", &dadnoise)) dadnoise = 0.0;
-  if(dadnoise<0.0) err("error: dadnoise must be equal to or greater than 0.0");
-
-  if(countparval("outdip") > 0) {
-    getparstring("outdip", &dname);
-    fpoutdip = efopen(dname, "w");
-    if(fpoutdip==NULL) err("error: outdip file did not open correctly.");
-    outdip = 1;
-  }
-
-  if(countparval("outpow") > 0) {
-    getparstring("outpow", &dname);
-    fpoutpow = efopen(dname, "w");
-    if(fpoutpow==NULL) err("error: outpow file did not open correctly.");
-    outpow = 1;
-  }
-
-  if(countparval("outsem") > 0) {
-    getparstring("outsem", &dname);
-    fpoutsem = efopen(dname, "w");
-    if(fpoutsem==NULL) err("error: outsem file did not open correctly.");
-    outsem = 1;
-  }
-
-/* Do this last to retain dname in case of error print */
-
-  if(countparval("indip") > 0) { 
-    if(countparval("scanstep") > 0 || countparval("scanmax") > 0 || countparval("scanmin") > 0 ||
-       countparval("dipext") > 0 || countparval("locmaxscan") > 0 ) {
-      err("error: indip file does not allow parameters scanstep, scanmax, scanmin, dipext, and locmaxscan");
-    }
-    getparstring("indip", &dname); 
-    fpindip = efopen(dname, "r");
-    if(fpindip==NULL) err("error: indip file did not open correctly.");
-    indip = 1;
-  }
-
-/* -------------------------------------------------------------------------- */
-
-  rollloc   = (int *)ealloc1(sizeof(int),numrolling);
-  rolldun   = (int *)ealloc1(sizeof(int),numrolling);
-  rolltrace = (segy **)ealloc1(sizeof(segy*),numrolling);
-  onetrace  = (segy *)ealloc1(sizeof(segy),sizeof(char));
-  rolldip   = (float **)ealloc1(sizeof(float*),numrolling);
-  jsumdat   = (float **)ealloc1(sizeof(float*),numrolling);
-  locit     = (int *)ealloc1(sizeof(int),numrolling);
-
-  for (i=0; i<numrolling; i++) {
-    rollloc[i]  = 0;
-    rolldun[i]  = 0;
-    rolltrace[i] = (segy *)ealloc1(sizeof(segy),sizeof(char));
-  }
-
-  arng = ealloc1int(numrolling);
-  ifori = (int **)ealloc1(sizeof(int*),numrolling);
-  afori = (float **)ealloc1(sizeof(float*),numrolling);
-
-  checkpars(); 
-
-/* ---Start processing traces.--------------------------------    */
-
-  icycle = 1;
-  outputloc = 0.0;
-  iend   = 0;
-
-/* loop over traces   */ 
-
-  while(icycle==1) {
-    if(gettr(&tr)) {
-
-/* To get started, pretend that numgather locations were already stored but   */
-/* were lower than the scan range for the first input location.               */
-
-      if(nproct==0) {
-        iroll  = 0;                                      
-        dt     = ((double) tr.dt)/1000.0;
-        sstep  = sstep / dt;
-        smin   = smin  / dt;
-        smax   = smax  / dt;
-        maxsd  = (dipext+0.01) / dt;
-        minsd  = 0 - maxsd;
-        maxdad = (dadext+0.01) / dt;
-        mindad = 0 - maxdad;
-        jsmax  = 1 + (smax-smin)/sstep;
-        dipwrk = ealloc1float(jsmax);
-        dipwrq = ealloc1float(jsmax);
-        lendip = tr.ns;
-        onedip = ealloc1float(lendip);
-        onepow = ealloc1float(lendip);
-        onepw2 = ealloc1float(lendip);
-        onetmp = ealloc1float(lendip);
-        onetm2 = ealloc1float(lendip);
-        onesem = ealloc1float(lendip);
-        onesm2 = ealloc1float(lendip);
-        onetim = ealloc1float(lendip);
-        oneand = ealloc1float(lendip);
-        for (i=0; i<numrolling; i++) {
-          rolldip[i] = ealloc1float(lendip);
-          jsumdat[i] = ealloc1float(lendip);
-          ifori[i] = ealloc1int(jsmax);
-          afori[i] = ealloc1float(jsmax);
-/* Initialize location values to definitly out-of-range */
-          rollloc[i] = fromhead(tr,lockase) + 3.0*(locminscan + locminsum) - i - 5;
-        }
-
-        maxstoredloc = rollloc[0];
-        outputloc = fromhead(tr,lockase) * outputinc + outputalign + locminscan + locminsum -1.0; 
-        locprev = fromhead(tr,lockase) - 1.;
-      }
-      nproct++;
-
-
-      if(usegroup>0) {
-        newgroup = 0;
-        if(thisgroup != fromhead(tr,groupkase)) {
-          thisgroup = fromhead(tr,groupkase);
-          locprev = fromhead(tr,lockase) -1.;
-          newgroup = 1;
-          iend = 2*(locmaxscan + locmaxsum) + 2;
-        }
-      }
-
-      if(fromhead(tr,lockase) <= locprev) {
-        if(fromhead(tr,lockase) == locprev) locdups++;
-        else err("input lockey %g is less than previous trace %g",fromhead(tr,lockase),locprev);
-      }
-
-      locprev = fromhead(tr,lockase);
-
-    }
-    else { /* no more traces to input */
-      icycle = 0;
-      iend = 2*(locmaxscan + locmaxsum) + 2;
-    }
-
-/* Note there might still be no traces output by scanit for outputloc since   */ 
-/* stored locations might be, for example: 5,12,30 while the outputloc is 18. */ 
-
-    while(outputloc < maxstoredloc - locmaxscan - locmaxsum + iend) {
-
-      if(dipuse < 1) {  /* compute or input the dip at the output location ?  */
-        if(indip<1) {  /* compute the dip ? */
-          scanit (rolltrace,rollloc,numrolling,outputloc,
-                  locminscan,locmaxscan,smin,sstep,jsmax,
-                  onedip,onepw2,onesm2,dipwrk,dipwrq,
-                  arng,ifori,afori,lendip,&numout);
-
-/* Smooth the dip values in time (weighted by the average power along the     */
-/* semblance-chozen dip). To call this smoothing is misleading since weights  */ 
-/* actually cause dip values of strong horizons to expand up and down in time.*/
-/* The expansion is the primary desire, not the smoothing.                    */
-
-          wsmooth (onedip,onepw2,lendip,minsd,maxsd,onetim);
-          for(i=0; i<lendip; i++) onedip[i] = onetim[i]; 
-
-        } /* end of   if(indip<1) { */
-
-        else { /* input dips? */
-          ksum = 0; /* need to anticipate whether an output will be created */
-          for (j=0; j<numrolling; j++) { 
-            if(rollloc[j] >= outputloc+locminsum && rollloc[j] <= outputloc+locmaxsum) { 
-              ksum = 1;
-              break;
-            }
-          }
-          if(ksum>0) { /* Note error-check uses outputcni, not outputinc. */
-            if(!fgettr(fpindip,&trd))  
-              err("next output location needs a trace from dipfile: %s   but get failed (near location=%g)",
-                 dname,outputloc); 
-            if(fabs((outputloc - outputalign) / outputcni + outputshift - fromhead(trd,lockase)) > 1.e-9) 
-              err("lockey value for dipfile input trace and output location are not the same %g %g",
-                   (outputloc - outputalign) / outputcni + outputshift,fromhead(trd,lockase)); 
-            for (i=0; i<lendip; i++) onedip[i] = trd.data[i] / dt;
-          }
-        }
-
-      } /* end of   if(dipuse < 1) { */
-
-      jsum = 0;
-      jnear = -1;
-      diffj = 1.e30;
-      diffj2 = 1.e30;
-      centloc = 0.0;
-      klow=-1;
-      diffk = 1.e30;
-      for (j=0; j<numrolling; j++) {
-
-        if(rollloc[j] >= outputloc+locminsum && rollloc[j] <= outputloc+locmaxsum) { 
-
-          if(dipuse > 0) { /* use the dip at each contributing trace ? */ 
-            if(rolldun[j] < 1) { 
-              scanit (rolltrace,rollloc,numrolling,(double)rollloc[j],
-                      locminscan,locmaxscan,smin,sstep,jsmax,
-                      onedip,onepow,onesem,dipwrk,dipwrq,
-                      arng,ifori,afori,lendip,&numout);
-
-              wsmooth (onedip,onepow,lendip,minsd,maxsd,rolldip[j]);
-
-              rolldun[j] = 1;
-
-              if(outdip>0 || outpow>0 || outsem>0) {
-                memcpy(onetrace,rolltrace[j],sizeof(segy));
-                if(outdip>0) {
-                  for (i=0; i<lendip; i++) onetrace->data[i] = rolldip[j][i] * dt;
-                  fputtr(fpoutdip,onetrace); 
-                }
-                if(outpow>0) {
-                  for (i=0; i<lendip; i++) onetrace->data[i] = onepow[i];
-                  fputtr(fpoutpow,onetrace); 
-                }
-                if(outsem>0) {
-                  for (i=0; i<lendip; i++) onetrace->data[i] = onesem[i];
-                  fputtr(fpoutsem,onetrace); 
-                }
-              }
-
-            } /* end of  if(rolldun[j] < 1) { */
-            for (i=0; i<lendip; i++) onetim[i] = (float) i + rolldip[j][i] * (rollloc[j] - outputloc);
-
-          } 
-          else { /* use the dip at the output location ? */
-            for (i=0; i<lendip; i++) onetim[i] = (float) i + onedip[i] * (rollloc[j] - outputloc);
-          }
-
-/* Shift sample values by the time computed from dips and location difference.*/
-
-          ints8r(lendip, 1.0, 0.0, rolltrace[j]->data, 0.0, 0.0, lendip, onetim, jsumdat[jsum]);
-
-/* Keep track of 2 nearest traces (used later for some options).              */
-
-          if(fabs((double)rollloc[j] - outputloc) < diffj) {
-            diffj2 = diffj;
-            jsumn2 = jsumn;
-            jnear = j;
-            jsumn = jsum;
-            diffj = fabs((double)rollloc[j] - outputloc);
-          }
-          else if(fabs((double)rollloc[j] - outputloc) < diffj2) {
-            diffj2 = fabs((double)rollloc[j] - outputloc);
-            jsumn2 = jsum;
-          }
-
-          if(rollloc[j]<diffk) {
-            diffk = rollloc[j];
-            klow = jsum;
-          }
-
-          centloc += rollloc[j];
-          locit[jsum] = rollloc[j];
-          jsum++;
-
-        } /* end of  if(rollloc[j] >= outputloc+locminsum && .... */
-
-      } /* end of  for (j=0; j<numrolling; j++) { */
-
-      if(jsum>0) {
-        memcpy(onetrace,rolltrace[jnear],sizeof(segy)); /* Note outputcni next*/
-        tohead(onetrace, lockase, (outputloc - outputalign) / outputcni + outputshift);
-
-        iput = 1;
-/* Just COPY the INPUT trace if it is at the output location exactly?         */ 
-        if(bypass>0 && diffj<1.e-9) { 
-          diffj = 1.e30;   /* does nothing. I just do not like empty bodies.  */
-        }
-/* Only PROCESS and output if an input exists at the output location exactly? */ 
-        else if(bypass<0 && diffj>1.e-9) { 
-          iput = 0;
-        }
-/* Otherwise, continue with the isumopt options.                              */ 
-        else if(isumopt==1 || jsum==1) {
-          for (i=0; i<lendip; i++) onetrace->data[i] = jsumdat[jsumn][i];
-        } 
-        else if(isumopt==2 || jsum==2) {
-          if(ilinear==0 || fabs(outputloc-locit[jsumn])==fabs(outputloc-locit[jsumn2])) {
-            for (i=0; i<lendip; i++) onetrace->data[i] = 0.5 * (jsumdat[jsumn][i] + jsumdat[jsumn2][i]);
-          }
-          else if(outputloc==locit[jsumn]) {
-            for (i=0; i<lendip; i++) onetrace->data[i] = jsumdat[jsumn][i];
-          }
-          else if(outputloc==locit[jsumn2]) {
-            for (i=0; i<lendip; i++) onetrace->data[i] = jsumdat[jsumn2][i];
-          }
-          else { /* note: both on 1 side is treated same as being on opposite */
-            ratio = fabs(outputloc-locit[jsumn]) /* (both==0 checked at top) */ 
-                 / (fabs(outputloc-locit[jsumn])+fabs(outputloc-locit[jsumn2]));
-            for (i=0; i<lendip; i++) onetrace->data[i] = (1.-ratio) * jsumdat[jsumn][i] + ratio*jsumdat[jsumn2][i];
-          }
-        }
-        else if(isumopt==3) { /* stack */
-          for (i=0; i<lendip; i++) {
-            onetrace->data[i] = 0.;
-            for (j=0; j<jsum; j++) onetrace->data[i] += jsumdat[j][i];
-            onetrace->data[i] /= jsum;
-          }
-        }
-        else if(isumopt==4) { /* sum */
-          for (i=0; i<lendip; i++) {
-            onetrace->data[i] = 0.;
-            for (j=0; j<jsum; j++) onetrace->data[i] += jsumdat[j][i];
-          }
-        }
-
-        else { /* if (isumopt>4) then  dad or dadsum */
-/*                                                                            */
-/* So, what is going on here with this fault option?                          */
-/* Consider a horizon of about amplitude 9 that ENDS.                         */
-/* It looks kind of like this: 9 9 9 9 9 0 0 0 0 0 (assuming noise of 0).     */
-/* The first loop below is computing relative location of average amplitude   */
-/* in the summing window. Let us say the summing window length is 5.          */
-/* So, as we roll along, we see windows of 9 9 9 9 9 which have an average    */
-/* relative location of 0. When we get to the 9 9 9 9 0 it has a relative     */
-/* average location of -0.5 which implies that we want to sum the values just */
-/* of the first 4 locations. On the other hand, where a horizon STARTS it     */
-/* looks like 0 0 0 0 9 and we ALSO want to sum just the first 4 locations.   */
-/* (Fiddling around to get that symmetry is what is happening after wsmooth). */
-/*                                                                            */
-          centloc /= jsum;
-          for (i=0; i<lendip; i++) {
-            oneand[i] = 0.0;
-            onetmp[i] = 1.e-30;
-            for (j=0; j<jsum; j++) {         
-              k = (j+klow) % jsum; /* known increasing order in rolling buffer*/
-              oneand[i] += fabs(jsumdat[k][i]) * (float)(locit[k] - centloc);             
-              onetmp[i] += fabs(jsumdat[k][i]);             
-            }
-            if(onetmp[i]/jsum > dadnoise) {
-              oneand[i] = oneand[i] / onetmp[i];
-            }
-            else {
-              oneand[i] = 0.0;
-              onetmp[i] = 1.e-30;
-            }
-          }
-
-/* Smooth the relative locations in time (weight by the sum of abs amplitude).*/
-/* To call this smoothing is misleading since the weight actually causes the  */
-/* relative location of faults in strong horizons to expand up and down in    */
-/* time. The expansion is the primary desire, not the smoothing.              */
-
-          wsmooth (oneand,onetmp,lendip,mindad,maxdad,onetm2);
-
-          for (i=0; i<lendip; i++) {
-
-/* Conveniently double and shift the smoothed relative locations.             */
-
-            onetm2[i] =  2. * onetm2[i] * dadscale + (locmaxsum-locminsum);         
-
-/* Reset some relative locations so 9 9 9 9 0 is treated same as 0 0 0 0 9    */
-
-            if(onetm2[i]>locmaxsum-locminsum+0.1) onetm2[i] = onetm2[i] - (locmaxsum-locminsum) - 1.0;
-
-/* So now sum-up either FROM the lower end, or TO the higher end.             */
-
-            if(onetm2[i]>(locmaxsum-locminsum)/2. - 0.5) {
-              jfirst = 0;
-              jlast  = (int)(1.5+onetm2[i]);
-              if(jlast>jsum) jlast=jsum;
-            }
-            else {
-              jfirst = (int)(1.5+onetm2[i]);
-              jlast  = jsum;
-              if(jfirst<0) jfirst=0;
-            }
-            onetrace->data[i] = 0.0;
-            for (j=jfirst; j<jlast; j++) {
-              k = (j+klow) % jsum; 
-              onetrace->data[i] += jsumdat[k][i];           
-            }
-            if(isumopt==5 && jlast-jfirst>1) onetrace->data[i] /= (jlast-jfirst);           
-          }
-
-        } /* end of  else if(isumopt>4) */
-
-        if(iput>0) {
-          puttr(onetrace); 
-          mproct++;
-
-          if(dipuse<1) {
-            if(outdip>0) {
-              for (i=0; i<lendip; i++) onetrace->data[i] = onedip[i] * dt; 
-              fputtr(fpoutdip,onetrace); 
-            }
-            if(outpow>0) {
-              for (i=0; i<lendip; i++) onetrace->data[i] = onepw2[i]; 
-              fputtr(fpoutpow,onetrace); 
-            }
-            if(outsem>0) {
-              for (i=0; i<lendip; i++) onetrace->data[i] = onesm2[i]; 
-              fputtr(fpoutsem,onetrace); 
-            }
-          } 
-        }  /* end of  if(iput>0)   */
-
-      } /* end of   if(jsum>0) { */
-
-      outputloc += outputinc; /* note use of the actual increment here */
-
-    } /* end of  while(outputloc < maxstore */
-
-    if(newgroup>0) { /* Reset location values to out-of-range, and so on.     */ 
-      for (i=0; i<numrolling; i++) { 
-        rollloc[i] = fromhead(tr,lockase) + 3.0*(locminscan + locminsum) - i - 5;
-      }   
-      outputloc = fromhead(tr,lockase) * outputinc + outputalign + locminscan + locminsum -1.0; 
-      iroll = 0;
-      iend = 0;
-    }
-
-/* After (trying to) scan the outputloc, use the rolling buffers to store    */
-/* input traces and values of next location. Remember that the trace already */
-/* read-into tr is the first trace to store for THIS input location.         */
-
-    iroll++;
-    if(iroll==numrolling) iroll = 0;
-    rollloc[iroll] = fromhead(tr,lockase);
-    rolldun[iroll] = 0;
-    memcpy(rolltrace[iroll],&tr,sizeof(segy));
-    maxstoredloc = fromhead(tr,lockase);
-
-    if(indip>0 && dipuse>0 && icycle>0) { 
-      if(!fgettr(fpindip,&trd)) 
-        err("next input seismic trace needs a trace from indip file: %s   but get failed (near location=%d)",
-          dname,rollloc[iroll]); 
-      if((double)rollloc[iroll] != fromhead(trd,lockase)) 
-        err("lockey value for dipfile trace %g   and input seismic trace %d are not the same ",
-          fromhead(trd,lockase),rollloc[iroll]); 
-      for (i=0; i<lendip; i++) rolldip[iroll][i] = trd.data[i];
-    }
-
-  } /* end of  while(icycle==1) {  */
-
-  if(indip>0) efclose(fpindip);
-  if(outdip>0) efclose(fpoutdip);
- 
-  warn("Number of traces input=%d.  Number output=%d.",nproct,mproct);
-  if(locdups>0) {
-    if(usegroup<1) warn("There were %d input traces with duplicate lockey values.",locdups);
-    else warn("There were %d input traces with duplicate lockey values (within their groups).",locdups);
-  }
-
-  return 0;
-
-}
+/* The scanning and the smoothing of the dips of susembase (and susemgroup, which has them as well), as library functions
+ * of arrays. The programs keep their traces in a rolling buffer and their locations in the headers: these are the
+ * functions of the dips (scanit and wsmooth of the programs), the rest is done with the traces in memory.
+ *
+ * scanit had its working buffers passed by the caller, for the numrolling traces; they are made here.
+ */
 
 /* Semblance Scanner                                                          */
 /*                                                                            */
@@ -909,7 +266,7 @@ int main(int argc, char **argv) {
 /*                                                                            */
 /*                                                                            */
 /*                                                                            */
-/* atrace     = The input traces.                                             */
+/* data       = The input traces, [numrolling][lendip].                        */
 /* aloc       = Location value for each input trace.                          */
 /* numrolling = Number of traces in atrace and locations in aloc.             */
 /* scanloc    = The location value where the scan takes place.                */
@@ -922,11 +279,6 @@ int main(int argc, char **argv) {
 /* adip       = Output apparant dip (in samples per 1 location difference).   */
 /* apow       = Output power along the chosen dip.                            */
 /* asem       = Output semblance of the chosen dip.                           */
-/* awrk       = Work buffer.                                                  */
-/* awrq       = Work buffer.                                                  */
-/* arng       = Work buffer (size: numrolling).                               */
-/* ifori      = Work buffer (size: numrolling by jsmax)                       */
-/* afori      = Work buffer (size: numrolling by jsmax)                       */
 /*                                                                            */
 /* lendip     = Length of traces and adip,apow,asem,awrk,awrq.                */
 /* numout     = Number of traces in scanloc+locminscan to scanloc+locminscan. */
@@ -934,10 +286,10 @@ int main(int argc, char **argv) {
 /*              1 returns all adip=0 and asem=1 and apow=trace amp squared    */
 
 
-void scanit (segy **atrace, int *aloc, int numrolling, double scanloc, 
+void su_sem_scan(const float *data, const int *aloc, int numrolling, double scanloc,
             double locminscan, double locmaxscan, float smin, float sstep, int jsmax,
-            float *adip, float *apow, float *asem, float *awrk, float *awrq, 
-            int *arng, int **ifori, float **afori, int lendip, int *numout) {
+            float *adip, float *apow, float *asem, int lendip, int *numout)
+{
 
   int i=0;
   int j=0;
@@ -947,6 +299,9 @@ void scanit (segy **atrace, int *aloc, int numrolling, double scanloc,
   float aval=0.;
   float sval=0.;
   int numinrange=0;
+  std::vector<float> awrk(jsmax), awrq(jsmax);
+  std::vector<int> arng(numrolling), ifori((size_t) numrolling*jsmax);
+  std::vector<float> afori((size_t) numrolling*jsmax);
 
   float thesem=0.;
   int thej=0; 
@@ -976,7 +331,7 @@ void scanit (segy **atrace, int *aloc, int numrolling, double scanloc,
 
   if(numinrange<2) {
     for (n=0; n<lendip; n++) {
-      apow[n] = atrace[arng[0]]->data[n] * atrace[arng[0]]->data[n];
+      apow[n] = data[(size_t) arng[0]*lendip + (n)] * data[(size_t) arng[0]*lendip + (n)];
       asem[n] = 1.;
     }
     return; 
@@ -995,8 +350,8 @@ void scanit (segy **atrace, int *aloc, int numrolling, double scanloc,
       m = ((int) (sval*(aloc[arng[i]]-scanloc)));
       if(sval*(aloc[arng[i]]-scanloc) > 0.) m++;
       alin = m - (sval*(aloc[arng[i]]-scanloc));
-      ifori[i][j] = m;
-      afori[i][j] = alin;
+      ifori[(size_t) i*jsmax + j] = m;
+      afori[(size_t) i*jsmax + j] = alin;
     }
   }
 
@@ -1005,10 +360,10 @@ void scanit (segy **atrace, int *aloc, int numrolling, double scanloc,
       awrk[j] = 0.;                                                                
       awrq[j] = 1.e-30;  /* prevents divide by 0 when all samples = 0.0       */
       for (i=0; i<numinrange; i++) {
-        m = ifori[i][j];
+        m = ifori[(size_t) i*jsmax + j];
         if(n+m > 0 && n+m < lendip) { /* totals near top,bottom != numinrange */
-          alin = afori[i][j];        
-          aval = alin * atrace[arng[i]]->data[n+m-1] + (1.-alin) * atrace[arng[i]]->data[n+m];
+          alin = afori[(size_t) i*jsmax + j];        
+          aval = alin * data[(size_t) arng[i]*lendip + (n+m-1)] + (1.-alin) * data[(size_t) arng[i]*lendip + (n+m)];
           awrk[j] += aval;
           awrq[j] += aval*aval;
         }
@@ -1058,6 +413,7 @@ void scanit (segy **atrace, int *aloc, int numrolling, double scanloc,
   return;
 }
 
+
 /* Weighted smoothing                                                         */
 /*                                                                            */
 /* val = input values                                                         */
@@ -1074,12 +430,18 @@ void scanit (segy **atrace, int *aloc, int numrolling, double scanloc,
 /*    which would be faster for big minsd,maxsd. But do not expect that here. */
 /*    (And the compiler-optimizer will unroll the inner loop).                */
 
-void wsmooth (float *val, float *wgt, int len, int minsd, int maxsd, float *sval) {
+void su_sem_wsmooth (const float *val, const float *wgt, int len, int minsd, int maxsd, float *sval) {
 
   int i=0;
   int k=0;
   float twgt=0.;
   float tval=0.;
+
+/* A trace shorter than the smoother has no interior to smooth (the program reads outside of its arrays). */
+  if(len-maxsd <= 0-minsd) {
+    for(i=0; i<len; i++) sval[i] = val[i];
+    return;
+  }
 
   for(i=0-minsd; i<len-maxsd; i++) { 
     twgt = 1.e-30;

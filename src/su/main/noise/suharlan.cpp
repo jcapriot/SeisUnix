@@ -4,13 +4,13 @@
 /* SUHARLAN: $Revision: 1.11 $ ; $Date: 2015/08/07 22:21:43 $	*/
 
 #include "su.h"
+#include <vector>
 #include "segy.h"
 #include "header.h"
 #include "taup.h"
-#include <time.h>
-#include <signal.h>
 
 /**************************** self documentation *****************************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUHARLAN - signal-noise separation by the invertible linear		",
@@ -101,6 +101,7 @@ char *sdoc[] = {
 " program suradon.c has more documentation on the transform paramters.	",
 "									",
 NULL};
+#endif
 
 /*
  * Credits:
@@ -126,295 +127,54 @@ NULL};
  */
 /************************** end self doc *************************************/
 
-/* Prototypes of functions used internally */
-void separate_signal_noise(int verbose, int rgt, int sts, int norm, int anenv,
-	int scl, int plot, int seed, int sditer, int niter, int nintlh,
+
+typedef struct { int ifill; float rmag; float x[4]; float f[4]; } GoldenState;
+
+static void separate_signal_noise(int rgt, int sts, int norm, int anenv,
+	int scl, int seed, int sditer, int niter, int nintlh,
 	float dt, int nt, int nx, int gopt, float prewhite, int ninterp,
 	float offref, float depthref, float interoff, float pmin1, float pmax1,
 	float pmin2, float pmax2, int np, float dx, float c, float rel1,
 	float rel2, float r1, float r2,float fx, float pmula, float pmulb,
 	float **in_traces, float **signal, float **noise);
-
-void extract_signal (int verbose, int norm, int anenv, int sts, int plot,
+static void extract_signal (int norm, int anenv, int sts,
 	int sditer, int nintlh, float c, float r, int nx, int nt, float r1,
 	float r2, float **traces, float **rand_traces);
-
-void expected_value(int nintlh, int nx, int nt, int rindex, float *pspn,
+static void expected_value (int nintlh, int nx, int nt, int rindex, float *pspn,
 	float *pn, float *ps, float *xamps, float **traces, float *Esd);
-
-void compute_reliability(int norm, int nx, int nt, int nintlh, int rindex,
+static void compute_reliability (int norm, int nx, int nt, int nintlh, int rindex,
 	float c, float *ps, float *pn, float *pspn, float **traces,
 	float *reliability);
-
-void zero_noisy_samples(int anenv, int sts, int nx, int nt, float r1,
-	float r2, float r, int nintlh, float *amps, float **traces,
+static void zero_noisy_samples (int anenv, int sts, int nx, int nt, float r1,
+	float r2, float r, int nintlh, float *amps, float **traces, 
 	float **anenv_traces, float *rel);
-
-void compute_histogram_stuff(int verbose, int nx, int nt, int nintlh,
+static void compute_histogram_stuff (int nx, int nt, int nintlh,
 	float **traces, float **rand_traces, int *rindex, float *amps,
 	float *xamps);
-
-void make_histogram(int nintlh, int nt, int nx, float **traces, float *amps, 
+static void make_histogram (int nintlh, int nt, int nx, float **traces, float *amps, 
 	float *pdf);
-
-void compute_analytic_envelopes(int sgn, int nx, int nt, float **traces, 
+static void compute_analytic_envelopes (int sgn, int nx, int nt, float **traces, 
 	float **analytic_envelopes);
-
-void scale_traces(int scl, int nx, int nt, float **in_traces, 
+static void scale_traces (int scl, int nx, int nt, float **in_traces, 
 	float **out_traces);
-
-void scale_one_trace(int ns, float *in_trace, float *out_trace);
-
-void matrix_transpose(int n1, int n2, float **matrix, float **tr_matrix);
-
-float dot_product(int ns, float *vector1, float *vector2);
-
-void compute_max_min_sum(int nx, int nt, float *min, float *max, float *sum,
+static void scale_one_trace (int ns, float *in_trace, float *out_trace);
+static void matrix_transpose (int n1, int n2, float **matrix, float **tr_matrix);
+static float dot_product (int ns, float *vector1, float *vector2);
+static void compute_max_min_sum (int nx, int nt, float *min, float *max, float *sum,
 	float **data);
-
-void plot_one_d(int npoints, float *xamps, float *data, char *plotname);
-
-void plot_two_d(int npoints, float *data, char *plotname);
-
-void conv1(int nx, int fx, float *x, int ny, int fy, float *y, int nz,
+static void conv1 (int nx, int fx, float *x, int ny, int fy, float *y, int nz,
 	int fz, float *z, int flag, float perc);
-
-void deconvolve_histograms(int nsamples, int mean_index, int niter,
+static void deconvolve_histograms (int nsamples, int mean_index, int niter,
 	float *pd, float *pn, float *ps);
-
-void gradient(int ns, int si, float rmax, float *pd, float *pn,
+static void gradient (int ns, int si, float rmax, float *pd, float *pn,
 	float *ps, float *grad);
-
-void cross_entropy(int ns, int si, float rmax, float *pd, float *pn,
+static void cross_entropy (int ns, int si, float rmax, float *pd, float *pn,
 	float *ps, float *fvalue);
+static float divide(float rmax, float a, float b);
+static void golden_search (GoldenState *gs, float fvalue, int *iter, float *xvalue, float *alpha);
 
-float divide(float rmax, float a, float b);
-
-void golden_search(float fvalue, int *iter, float *xvalue, float *alpha);
-
-static void closefiles(void);
-
-/* Globals (so can trap signal) defining temporary disk files */
-char tracefile[BUFSIZ];	/* filename for the file of traces	*/
-char headerfile[BUFSIZ];/* filename for the file of headers	*/
-FILE *tracefp;		/* fp for trace storage file		*/
-FILE *headerfp;		/* fp for header storage file		*/
-
-
-segy tro1,tro2,tro3;
-
-int
-main(int argc, char **argv)
-{
-	int ix, it;		/* loop counters */
-	int anenv;		/* =1 for analytic envelopes */
-	int scl;		/* =1 to apply trace scaling */
-	int plot;		/* flag for producing plots */
-	int seed;		/* seed for random number generator */
-	int verbose;		/* flag to print processing information */
-	int rgt;		/* random number generator type */
-	int sts;		/* vertical and horizontal smoothing */
-	int sditer;		/* # of steepest descent iterations for ps */
-	int nintlh;		/* number of intervals per local histogram */
-	int norm;		/* option to normalize reliability indicator */
-	float c;		/* maximum error allowed for reliability */
-	float rel1;		/* minimum allowed reliability (first pass) */
-	float rel2;		/* minimum allowed reliability (second pass) */
-	int nt;			/* number of time samples */
-	int niter;		/* number of iterations */
-	int ntr;		/* number of traces */
-	float dx;		/* horizontal sampling interval */
-	float fx;		/* offset of first trace */
-	float dt;		/* time sampling interval (ms) */
-	float r1;		/* vertical smoothing factor for dlsq method */
-	float r2;		/*horizontal smoothing factor for dlsq method*/
-	int ninterp;		/* traces to interpolate for tau-p transform*/
-	int gopt;		/* options for offset function g(x) in taup */
-	float offref;		/* offset reference for tau-p transform */
-	float pmin1;		/* min moveout in ms at ref offset for fwd tr*/
-	float pmax1;		/* max moveout in ms at ref offset for fwd tr*/
-	float pmin2;		/* min moveout in ms at ref offset for inv tr*/
-	float pmax2;		/* max moveout in ms at ref offset for inv tr*/
-	float prewhite;		/* prewhitening factor for tau-p transform */
-	float depthref;		/* reference depth if gopt=2 */
-	float pmula;		/* maximum slope to keep in the data */
-	float pmulb;		/* minimum slope rejected from the data */
-	float interoff;		/* intercept offset for tau-p times */
-	int np;			/* number of slopes (traces) in Tau-p domain */
-	float **traces; 	/* Array for input traces */
-	float **out_signal;	/* Array of extracted signal */
-	float **out_noise; 	/* Array of extracted noise */
-	char *signalfile="";	/* file name for output signal */
-	char *noisefile="";	/* file name for output noise */
-	FILE *signal_file;	/* File pointer to output signal */
-	FILE *noise_file;	/* File pointer to output noise */
-	char *tmpdir;		/* directory path for tmp files	*/
-	cwp_Bool istmpdir=cwp_false;/* true for user-given path */
-	
-	/* hook up getpar to handle the parameters */
-	initargs(argc,argv);
-	requestdoc(1);
-
-	/* get info from first trace */
-	if (!gettr(&tro1))  err("can't get first trace");
-	nt = tro1.ns;
-	dt = (float) tro1.dt/1000000.0;
-
-/* get general flags and set their defaults */
-	if (!getparint("anenv",&anenv))			anenv	= 1;
-	if (!getparint("scl",&scl))			scl	= 0;
-	if (!getparint("plot",&plot))			plot	= 3;
-	if (!getparint("norm",&norm))			norm	= 1;
-	if (!getparint("verbose",&verbose))		verbose	= 1;
-	if (!getparint("rgt",&rgt))			rgt	= 2;
-	if (!getparint("sts",&sts))			sts	= 1;
-	if (!getparint("gopt",&gopt))			gopt	= 1;
-
-	/* get general parameters and set their defaults */
-	if (!getparfloat("dx",&dx)) 			dx	= 20.0;
-	if (!getparfloat("fx",&fx)) 			fx	= 0.0;
-	if (!getparint("nintlh",&nintlh))		nintlh	= 50;
-	if (!getparint("sditer",&sditer))		sditer	= 5;
-	if (!getparfloat("c",&c)) 			c	= 0.05;
-	if (!getparfloat("rel1",&rel1)) 		rel1	= 0.5;
-	if (!getparfloat("rel2",&rel2)) 		rel2	= 0.75;
-	if (!getparint("niter",&niter))			niter	= 1;
-	if (!getparfloat("dt",&dt))			dt	= 0.004;
-
-	/* get smoothing parameters and set their defaults */
-	if (!getparfloat("r1",&r1))			r1	= 10.;
-	if (!getparfloat("r2",&r2))			r2	= 2.;
-
-	/* get suradon taup parameters and set their defaults */
-	if (!getparfloat("pmin1",&pmin1))		pmin1	= -400.0;
-	if (!getparfloat("pmax1",&pmax1))		pmax1	= 400.0;
-	if (!getparfloat("pmin2",&pmin2))		pmin2	= pmin1;
-	if (!getparfloat("pmax2",&pmax2))		pmax2	= pmax1;
-	if (!getparint("np",&np)) 			np	= 100;
-	if (!getparfloat("prewhite",&prewhite))		prewhite= 0.01;
-	if (!getparfloat("offref",&offref))		offref	= 2000.;
-	if (!getparfloat("interoff",&interoff))		interoff= 0.;
-	if (!getparfloat("depthref",&depthref))		depthref= 0.;
-	if (!getparfloat("pmula",&pmula))		pmula	= pmax1;
-	if (!getparfloat("pmulb",&pmulb))		pmulb	= pmax1;
-		if (!getparint("ninterp",&ninterp))	ninterp	= 0;
-
-	/* get names of output files */
-	if (!getparstring("signal",&signalfile))    signalfile="out_signal";
-	if (!getparstring("noise",&noisefile))	    noisefile="out_noise";
-
-	/* get random generator seed */
-	if (!getparint("seed", &seed)) { /* if not supplied, use clock */
-		if (-1 == (seed = (unsigned int) time((time_t *) NULL))) {
-			seed=1;
-			warn("time() failed to set seed, setting it to one");
-		}
-	}
-
-	/* Look for user-supplied tmpdir */
-	if (!getparstring("tmpdir",&tmpdir) &&
-	    !(tmpdir = getenv("CWP_TMPDIR"))) tmpdir="";
-	if (!STREQ(tmpdir, "") && access(tmpdir, WRITE_OK))
-		err("you can't write in %s (or it doesn't exist)", tmpdir);
-
-	/* Store traces in tmpfile while getting a count */
-	if (STREQ(tmpdir,"")) {
-		tracefp = etmpfile();
-		headerfp = etmpfile();
-		if (verbose) warn("using tmpfile() call");
-	} else { /* user-supplied tmpdir */
-		char directory[BUFSIZ];
-		strcpy(directory, tmpdir);
-		strcpy(tracefile, temporary_filename(directory));
-		strcpy(headerfile, temporary_filename(directory));
-		/* Trap signals so can remove temp files */
-		signal(SIGINT,  (void (*) (int)) closefiles);
-		signal(SIGQUIT, (void (*) (int)) closefiles);
-		signal(SIGHUP,  (void (*) (int)) closefiles);
-		signal(SIGTERM, (void (*) (int)) closefiles);
-		tracefp = efopen(tracefile, "w+");
-		headerfp = efopen(headerfile, "w+");
-      		istmpdir=cwp_true;		
-		if (verbose) warn("putting temporary files in %s", directory);
-	}
-
-	ntr = 0;
-	do {
-		++ntr;
-		fwrite(&tro1, 1, HDRBYTES, headerfp);
-		fwrite(tro1.data, FSIZE, nt, tracefp);
-	} while (gettr(&tro1));
-
-	/* allocate space */
-	traces = alloc2float(nt,ntr);
-	out_signal = alloc2float(nt,ntr);
-	out_noise = alloc2float(nt,ntr);
-	
-	/* load traces into an array and close temp file */
-	rewind(tracefp);
-	for (ix=0; ix<ntr; ix++)
-		fread (traces[ix], FSIZE, nt, tracefp);
-	efclose (tracefp);
-
-	/* separate bed reflections from diffractions and noise */
-	separate_signal_noise (verbose, rgt, sts, norm, anenv, scl, plot, seed,
-		sditer, niter, nintlh, dt, nt, ntr, gopt, prewhite, ninterp,
-		offref, depthref, interoff, pmin1, pmax1, pmin2, pmax2, np,
-		dx, c, rel1, rel2, r1, r2, fx, pmula, pmulb, traces,
-		out_signal, out_noise);
-
-	/* write extracted reflections */
-	if (*signalfile !='\0') {
-		if ((signal_file=fopen(signalfile,"w"))==NULL)
-			err("cannot open signal file=%s\n",signalfile);
-		erewind(headerfp);
-		{	int itr;
-			for (itr=0; itr<ntr; itr++) {
-				fread(&tro1, 1, HDRBYTES, headerfp);
-				for (it=0; it<nt; it++)
-					tro1.data[it]=out_signal[itr][it];
-				fputtr(signal_file, &tro1);
-			}
-			efclose (signal_file);
-		}
-	}
-
-	/* write extracted diffractions */
-	if (*noisefile!='\0') {
-		if ((noise_file=efopen(noisefile,"w"))==NULL)
-			err("cannot open noise file=%s\n",noisefile);
-		erewind(headerfp);
-		{	int itr;
-			for (itr=0; itr<ntr; itr++) {
-				efread(&tro2, 1, HDRBYTES, headerfp);
-				for (it=0; it<nt; it++)
-					tro2.data[it]=out_noise[itr][it];
-				fputtr(noise_file, &tro2);
-			}
-			efclose (noise_file);
-		}
-	}
-
-	/* free workspace */
-	free2float(out_signal);
-	free2float(out_noise);
-	free2float(traces);
-	efclose(headerfp);
-	if (istmpdir) eremove(headerfile);
-	if (istmpdir) eremove(tracefile);
-
-	return(CWP_Exit());
-}
-
-/******************************************************************************
-
-	Subroutine to separate (extract) focused energy (signal)
-	from unfocused energy (noise), after applying an invertible
-			linear transformation.
-
-******************************************************************************/
-void separate_signal_noise(int verbose, int rgt, int sts, int norm, int anenv,
-	int scl, int plot, int seed, int sditer, int niter, int nintlh,
+static void separate_signal_noise(int rgt, int sts, int norm, int anenv,
+	int scl, int seed, int sditer, int niter, int nintlh,
 	float dt, int nt, int nx, int gopt, float prewhite, int ninterp,
 	float offref, float depthref, float interoff, float pmin1, float pmax1,
 	float pmin2, float pmax2, int np, float dx, float c, float rel1,
@@ -497,15 +257,14 @@ iteration to compute the data histogram.
 	float **traces_taup;		/* array to store tau_p traces */
 	float **temp_traces_taup;
 	float **noise_taup;
-	char *plotname="";
+	su_rng rng;
 
-	if (plot<0||plot>3) err ("plot flag has to be 0<=plot<=3");
 	
 	/* number of required dips to avoid aliasing in tau-p domain */
 	dp=(pmax1-pmin1)/(np-1);
 
 	/* if requested, print processing information */
-	if (verbose==1) warn("nx=%d nt=%d\n",nx,nt);
+
 
 	/* allocate working space */
 	temp_traces_taup=alloc2float(nt,np);
@@ -519,12 +278,7 @@ iteration to compute the data histogram.
 		traces_taup);
 
 	/* if requested, plot input data and its taup transform */
-	if (plot==2||plot==3) { 
-		plotname="input";
-		plot_two_d (nx*nt, in_traces[0], plotname);
-		plotname="input_taup";
-		plot_two_d (nx*nt, traces_taup[0], plotname);
-	}
+
 
 	/* save input traces */
 	for (ix=0; ix<nx; ix++) 
@@ -542,14 +296,14 @@ iteration to compute the data histogram.
 	for (iter=0; iter<niter; iter++) {
 
 		/* compute seed for random generator */
-		if (rgt==1) sranuni(seed);	
-		else if (rgt==2) srannor(seed);
+		if (rgt==1) su_rng_seed_uniform(&rng,seed);
+		else if (rgt==2) su_rng_seed_normal(&rng,seed);
 
 			/* compute array of noise (randomly reversed) traces */
 			for (ix=0; ix<nx; ix++) {
 			
-			if (rgt==1) rand=2.0*franuni()-1.0;
-			else if (rgt==2) rand=frannor();
+			if (rgt==1) rand=2.0*su_rng_uniform(&rng)-1.0;
+			else if (rgt==2) rand=su_rng_normal(&rng);
 			
 				if (rand < 0.0) {	
 					for (it=0; it<nt; it++) 
@@ -565,19 +319,12 @@ iteration to compute the data histogram.
 			noise, noise_taup);
 
 		/* if requested, plot RRT and their tau-p transform */
-		if (plot==2||plot==3) {		
-			if (iter==0) plotname="rand1";
-			else if (iter==1) plotname="rand2";
-			plot_two_d (nx*nt, noise[0], plotname);
-			if (iter==0) plotname="rtaup1";
-			else if (iter==1) plotname="rtaup2";
-			plot_two_d (nx*nt, noise_taup[0], plotname);
-		}
+
 
 		/* extract signal from diffractions and noise in taup domain */
 		if (iter==0) rel=rel1;
 		else if (iter==1) rel=rel2;
-		extract_signal (verbose, norm, anenv, sts, plot, sditer, 
+		extract_signal (norm, anenv, sts, sditer, 
 			nintlh, c, rel, np, nt, r1, r2, traces_taup,
 			noise_taup);
 
@@ -587,25 +334,14 @@ iteration to compute the data histogram.
 			signal);
 
 		/* if requested, output plot of extracted signal ad its taup*/
-		if (plot==2||plot==3) { 
-			if (iter==0) plotname="signal1";
-			else if (iter==1) plotname="signal2";
-			plot_two_d (nx*nt, signal[0], plotname);
-			if (iter==0) plotname="staup1";
-			else if (iter==1) plotname="staup2";
-			plot_two_d (nx*nt, traces_taup[0], plotname);
-		}
+
 
 		/* if requested, scale filtered traces with respect to input */
 		if (scl !=0) {
 			scale_traces (scl, nx, nt, in_traces, signal); 
 
 			/* if requested, output plot of scaled signal */
-			if (plot==2) {
-				if (iter==0) plotname="s1scaled";
-				else if (iter==1) plotname="s2scaled";
-				plot_two_d (nx*nt, signal[0], plotname);
-			}
+
 		}
 	
 		/* subtract signal from data to estimate noise */
@@ -624,11 +360,7 @@ iteration to compute the data histogram.
 		}
 
 		/* if requested, output plot of extracted noise */
-		if (plot==2||plot==3) {  
-			if (iter==0) plotname="noise1";
-			else if (iter==1) plotname="noise2";
-			plot_two_d (nx*nt, noise[0], plotname);
-		}
+
 	}
 
 	/* clean up */
@@ -643,7 +375,7 @@ iteration to compute the data histogram.
 				and noise
 
 ******************************************************************************/
-void extract_signal (int verbose, int norm, int anenv, int sts, int plot,
+static void extract_signal (int norm, int anenv, int sts,
 	int sditer, int nintlh, float c, float r, int nx, int nt, float r1,
 	float r2, float **traces, float **rand_traces)
 /******************************************************************************
@@ -691,14 +423,9 @@ rand_traces	2-D array[nx][nt] of tau-p transformed extracted noise traces
 	float *xamps;		/* 1-d array of reference amplitudes */
 	float *amps;		/* 1-d array of amplitudes in histograms */
 	float *pspn;		/* 1-d array of ps*pn */
-	char *plotname="";	/* pointer to name of output plot files */
-	static int count;
 
 	/* if requested, print processing information */
-	if (verbose==1) {
-	    warn("PARAMETERS: c=%g rel=%g r1=%g r2=%g\n",c,r,r1,r2); 
-	    warn("FLAGS: anenv=%d plot=%d sts=%d\n",anenv,plot,sts);
-	}
+
 
 	/* allocate space */
 	pd = alloc1float(nintlh);
@@ -716,7 +443,7 @@ rand_traces	2-D array[nx][nt] of tau-p transformed extracted noise traces
 		compute_analytic_envelopes (anenv,nx,nt,traces,anenv_traces); 
 
 	/* compute histogram parameters */
-	compute_histogram_stuff (verbose, nx, nt, nintlh, traces, rand_traces,
+	compute_histogram_stuff (nx, nt, nintlh, traces, rand_traces,
 		&rindex, amps, xamps);
 
 	/* compute pd(x) and pn(x) via local histograms */
@@ -745,45 +472,10 @@ rand_traces	2-D array[nx][nt] of tau-p transformed extracted noise traces
 		traces, anenv_traces, reliability);
 
 	/* check constraint of unit area for histograms */
-	if (verbose==1) {
-		spd=spn=sps=spspn=0.0;
-		for (ix=0;ix<nintlh;ix++) {
-			spd +=pd[ix];
-			spn +=pn[ix];
-			sps +=ps[ix];
-			spspn +=pspn[ix];
-		}
 	
-		if (verbose) {
-			warn("Area under the curve for pd=%g\n",spd);
-			warn("Area under the curve for pn=%g\n",spn);
-			warn("Area under the curve for ps=%g\n",sps);
-			warn("Area under the curve for ps*pn=%g\n",spspn);
-		}
-	}	
 
 	/* if requested, output plots of histograms, Esd and reliabilities */
-	count++;
-	if (plot==1||plot==3) {
-		if (count==1) plotname="pd1";
-		else if (count==2) plotname="pd2";
-		plot_one_d (nintlh, xamps, pd, plotname);
-		if (count==1) plotname="pn1";
-		else if (count==2) plotname="pn2";
-		plot_one_d (nintlh, xamps, pn, plotname);
-		if (count==1) plotname="ps1";
-		else if (count==2) plotname="ps2";
-		plot_one_d (nintlh, xamps, ps, plotname);
-		if (count==1) plotname="pspn1";
-		else if (count==2) plotname="pspn2";
-		plot_one_d (nintlh, xamps, pspn, plotname);
-		if (count==1) plotname="Esd1";
-		else if (count==2) plotname="Esd2";
-		plot_one_d (nintlh, xamps, Esd, plotname);
-		if (count==1) plotname="rel1";
-		else if (count==2) plotname="rel2";
-		plot_one_d (nintlh, xamps, reliability, plotname);
-	}
+
 
 	/* free allocated space */
 	free2float(anenv_traces);
@@ -802,7 +494,7 @@ rand_traces	2-D array[nx][nt] of tau-p transformed extracted noise traces
 	Subroutine to compute an array of expected values E(s|d)
 
 ******************************************************************************/
-void expected_value (int nintlh, int nx, int nt, int rindex, float *pspn,
+static void expected_value (int nintlh, int nx, int nt, int rindex, float *pspn,
 	float *pn, float *ps, float *xamps, float **traces, float *Esd)
 /******************************************************************************
 Input:
@@ -861,7 +553,7 @@ linear interpolation for all other amplitudes.
 	Compute reliability via bounded convolution
 
 ******************************************************************************/
-void compute_reliability (int norm, int nx, int nt, int nintlh, int rindex,
+static void compute_reliability (int norm, int nx, int nt, int nintlh, int rindex,
 	float c, float *ps, float *pn, float *pspn, float **traces,
 	float *reliability)
 /******************************************************************************
@@ -929,7 +621,7 @@ to which it belongs)
 	Subroutine to zero out noisy samples based on their Esd value
 
 ******************************************************************************/
-void zero_noisy_samples (int anenv, int sts, int nx, int nt, float r1,
+static void zero_noisy_samples (int anenv, int sts, int nx, int nt, float r1,
 	float r2, float r, int nintlh, float *amps, float **traces, 
 	float **anenv_traces, float *rel)
 /******************************************************************************
@@ -993,7 +685,7 @@ traces		2-D array[nx][nt] of extracted (focused) signal
 			amplitudes for histograms
 
 ******************************************************************************/
-void compute_histogram_stuff (int verbose, int nx, int nt, int nintlh,
+static void compute_histogram_stuff (int nx, int nt, int nintlh,
 	float **traces, float **rand_traces, int *rindex, float *amps,
 	float *xamps)
 /******************************************************************************
@@ -1045,10 +737,7 @@ xamps		1-D array[nintlh] of bin centers in histograms
 	xindex (nintlh, amps, sum1/(nt*nx), rindex);
 
 	/* if requested, print processin information */
-	if (verbose==1) {
-		warn("for histograms: min=%g max=%g",min,max);
-		warn("first bin=%g binwidth=%g\n",fint,del_int);
-	}
+
 }
 
 
@@ -1057,7 +746,7 @@ xamps		1-D array[nintlh] of bin centers in histograms
 	Subroutine to compute one-dimensional histograms
 
 ******************************************************************************/
-void make_histogram (int nintlh, int nt, int nx, float **traces, float *amps, 
+static void make_histogram (int nintlh, int nt, int nx, float **traces, float *amps, 
 	float *pdf)
 /******************************************************************************
 Input:
@@ -1099,7 +788,7 @@ pdf		1-D array[nintlh] of computed  probabilty density function
 				array of traces
 
 ******************************************************************************/
-void compute_analytic_envelopes (int sgn, int nx, int nt, float **traces, 
+static void compute_analytic_envelopes (int sgn, int nx, int nt, float **traces, 
 	float **analytic_envelopes)
 /******************************************************************************
 Input:
@@ -1161,7 +850,7 @@ analytic_envelopes	2-D array[nx][nt] of computed analytic envelops
 			of the input traces
 
 ******************************************************************************/
-void scale_traces (int scl, int nx, int nt, float **in_traces, 
+static void scale_traces (int scl, int nx, int nt, float **in_traces, 
 	float **out_traces)
 /******************************************************************************
 Input parameters:
@@ -1221,7 +910,7 @@ out_traces	set of scaled traces
 	Subroutine to scale one trace to the same amplitude level of another
 
 ******************************************************************************/
-void scale_one_trace (int ns, float *in_trace, float *out_trace)
+static void scale_one_trace (int ns, float *in_trace, float *out_trace)
 /******************************************************************************
 Input parameters:
 ns		number of samples in trace to scale 
@@ -1260,7 +949,7 @@ out_trace	scaled trace
 		Subroutine to transpose a matrix
 
 ******************************************************************************/
-void matrix_transpose (int n1, int n2, float **matrix, float **tr_matrix)
+static void matrix_transpose (int n1, int n2, float **matrix, float **tr_matrix)
 /******************************************************************************
 Input:
 n1		number of number of columns in input matrix
@@ -1283,7 +972,7 @@ tr_matrix	2-D array[n2][n1] of transposed matrix
 		compute the dot product of two time series
 
 ******************************************************************************/
-float dot_product (int ns, float *vector1, float *vector2)
+static float dot_product (int ns, float *vector1, float *vector2)
 /******************************************************************************
 Input:
 ns		number of samples in vectors
@@ -1310,7 +999,7 @@ Output:
 			samples in a 2-D array
 
 ******************************************************************************/
-void compute_max_min_sum (int nx, int nt, float *min, float *max, float *sum,
+static void compute_max_min_sum (int nx, int nt, float *min, float *max, float *sum,
 	float **data)
 /******************************************************************************
 Input:
@@ -1349,61 +1038,11 @@ Output:
 
 /******************************************************************************
 
-		Output data for a one dimensional plot
-
-******************************************************************************/
-void plot_one_d (int npoints, float *xamps, float *data, char *plotname)
-/******************************************************************************
-Input Parameters:
-npoints		number of opints to plot
-xamps		1-D array [npoints] of abscissa values
-data		1-D array [npoints] of ordinate values
-plotname	character array of plot name
-
-Output:
-		Binary file called plotname
-******************************************************************************/
-{
-	FILE *out;		/* file pointer to output data */
-
-	out=fopen(plotname,"w");
-	fwrite (xamps, sizeof(float), npoints, out);
-	fclose(out);
-	out=fopen(plotname,"a");
-	fwrite (data, sizeof(float), npoints, out);
-	fclose(out);
-}
-
-/******************************************************************************
-
-		Subroutine to output a two-dimensional plot
-
-******************************************************************************/
-void plot_two_d (int npoints, float *data, char *plotname)
-/******************************************************************************
-Input Parameters:
-npoints		number of points in output plot
-data		1-D array [npoints] of data to plot
-plotname	character array of plotname
-
-Output:
-		file called plotname ready to plot 
-******************************************************************************/
-{
-	FILE *out;
-
-	out=fopen(plotname,"w"); 
-	fwrite (data, sizeof(float), npoints, out);
-	fclose(out);
-}
-
-/******************************************************************************
-
 	Subroutine to compute convolution, correlation or bounded
 		convolution of two input 1-D arrays
 
 ******************************************************************************/
-void conv1 (int nx, int fx, float *x, int ny, int fy, float *y, int nz,
+static void conv1 (int nx, int fx, float *x, int ny, int fy, float *y, int nz,
 	int fz, float *z, int flag, float perc)
 /******************************************************************************
 Input:
@@ -1481,7 +1120,7 @@ by Dr. Bill Harlan, 1984.
 				unit area
 
 ******************************************************************************/
-void deconvolve_histograms (int nsamples, int mean_index, int niter,
+static void deconvolve_histograms (int nsamples, int mean_index, int niter,
 	float *pd, float *pn, float *ps)
 /******************************************************************************
 Input:
@@ -1521,6 +1160,12 @@ Translated to C by Gabriel Alvarez (1995) from a FORTRAN IV version
 	float sum;
 	float *psp=NULL;	/* array of trial perturbed ps */
 	float *grad=NULL;	/* array of computed gradient */
+	GoldenState gs;
+
+	gs.ifill = 0;
+	gs.rmag = 1.0;
+	memset((void *) gs.x,0,sizeof(gs.x));
+	memset((void *) gs.f,0,sizeof(gs.f));
 
 	/* allocate working space */
 	psp = alloc1float(nsamples);
@@ -1546,7 +1191,7 @@ Translated to C by Gabriel Alvarez (1995) from a FORTRAN IV version
 		/* do golden search to come up with optimum alpha value */
 		idiv=1;
 		while (idiv > 0 /*TRUE*/) {
-			golden_search (fvalue, &idiv, &xgold, &agold);
+			golden_search (&gs, fvalue, &idiv, &xgold, &agold);
 
 			/* update xvalue and alpha */
 			xvalue = xgold*scale;
@@ -1601,7 +1246,7 @@ Translated to C by Gabriel Alvarez (1995) from a FORTRAN IV version
 				functions
 
 ******************************************************************************/
-void gradient (int ns, int si, float rmax, float *pd, float *pn,
+static void gradient (int ns, int si, float rmax, float *pd, float *pn,
 	float *ps, float *grad)
 /******************************************************************************
 Input parameters:
@@ -1651,7 +1296,7 @@ Translated to C by Gabriel Alvarez (1995) from a Fortran IV  version
 	Subroutine to compute cross-entropy estimator 
 
 ******************************************************************************/
-void cross_entropy (int ns, int si, float rmax, float *pd, float *pn,
+static void cross_entropy (int ns, int si, float rmax, float *pd, float *pn,
 	float *ps, float *fvalue)
 /******************************************************************************
 Input parameters:
@@ -1703,7 +1348,7 @@ Translated to C by Gabriel Alvarez (1995) from a Fortran IV  version
 	Subroutine to compute a=b/c  with a given clip value
 
 ******************************************************************************/
-float divide(float rmax, float a, float b) 
+static float divide(float rmax, float a, float b) 
 /******************************************************************************
 Input:
 rmax		clip value
@@ -1760,7 +1405,8 @@ Translated to C by Gabriel Alvarez (1995) from a Fortran IV  version
 		for a functional value in the interval [0,1] 
 	
 ******************************************************************************/
-void golden_search (float fvalue, int *iter, float *xvalue, float *alpha)
+
+static void golden_search (GoldenState *gs, float fvalue, int *iter, float *xvalue, float *alpha)
 /******************************************************************************
 Input:
 iter		index of iteration
@@ -1782,12 +1428,12 @@ Translated to C by Gabriel Alvarez (1995) from a Fortran IV  version
 ******************************************************************************/
 {
 	int j;				/* loop counter */
-	static int ifill=0;		/* auxiliary function index */
+	int ifill=gs->ifill;		/* auxiliary function index */
 	int im;				/* auxiliary index */
 	float fm;			/* auxiliary variable */
-	static float rmag=1.0;		/* golden ratio */
-	static float x[4];		/* array to store searching points */
-	static float f[4];		/* array to store function values */
+	float rmag=gs->rmag;		/* golden ratio */
+	float *x=gs->x;		/* array to store searching points */
+	float *f=gs->f;		/* array to store function values */
 
 	/* test condition for iteration index */
 	if (*iter<1) *iter=1;			/* this should never happen */
@@ -1844,14 +1490,38 @@ Translated to C by Gabriel Alvarez (1995) from a Fortran IV  version
 	/* output values */
 	*xvalue = x[ifill];
 	*iter=*iter+1;
+	gs->ifill = ifill;
+	gs->rmag = rmag;
 }
 
-/* for graceful interrupt termination */
-static void closefiles(void)
+
+
+/* The signal-noise separation of the program on traces in memory.
+ *
+ * rgt, sts, norm, anenv, scl, sditer, niter, nintlh	flags and iterations of the program
+ * seed			seed of the random number generator (that of SU's srannor() or sranuni(), rgt = 2 or 1)
+ * dt, nt, nx		sample interval, samples and traces
+ * gopt, prewhite, ninterp, offref, depthref, interoff, pmin1, pmax1, pmin2, pmax2, np, dx, fx, pmula, pmulb
+ *			the parameters of the tau-p transform
+ * c, rel1, rel2, r1, r2	the extraction and smoothing parameters
+ * in_traces[nx][nt]	the traces
+ * signal[nx][nt], noise[nx][nt]	the extracted signal and noise (output)
+ *
+ * The plots, the verbose printing and the files of the program are not part of this. Returns 0.
+ */
+int su_harlan(int rgt, int sts, int norm, int anenv, int scl, int seed, int sditer, int niter, int nintlh, float dt,
+	int nt, int nx, int gopt, float prewhite, int ninterp, float offref, float depthref, float interoff, float pmin1,
+	float pmax1, float pmin2, float pmax2, int np, float dx, float c, float rel1, float rel2, float r1, float r2,
+	float fx, float pmula, float pmulb, const float *in_traces, float *signal, float *noise)
 {
-	efclose(headerfp);
-	efclose(tracefp);
-	eremove(headerfile);
-	eremove(tracefile);
-	exit(EXIT_FAILURE);
+	int ix;
+	std::vector<float*> in(nx), sg(nx), nz(nx);
+	for (ix=0; ix<nx; ix++) {
+		in[ix] = (float *) (in_traces + (size_t) ix*nt);
+		sg[ix] = signal + (size_t) ix*nt;
+		nz[ix] = noise + (size_t) ix*nt;
+	}
+	separate_signal_noise(rgt,sts,norm,anenv,scl,seed,sditer,niter,nintlh,dt,nt,nx,gopt,prewhite,ninterp,offref,
+		depthref,interoff,pmin1,pmax1,pmin2,pmax2,np,dx,c,rel1,rel2,r1,r2,fx,pmula,pmulb,in.data(),sg.data(),nz.data());
+	return 0;
 }

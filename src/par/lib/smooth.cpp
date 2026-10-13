@@ -367,10 +367,7 @@ Adapted by Gabriel Alvarez (1995) from the program smooth2.c written by
 		else esterr[it] = sqrt(err0/rms);
 	}
 
-	/* output error data */
-	out1=fopen("error","w");
-	fwrite(esterr,sizeof(float),nt,out1);
-	fclose(out1);
+	/* (the RMS error of the smoothing was written to a file called error in the working directory: it is not written here) */
 
 	/* free allocated space */
 	free2float(input);

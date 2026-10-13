@@ -941,8 +941,10 @@ Credits:
 	nmax = MAX(nxinterp, np);
 	nmax = MAX(nmax, ntfft+4);
 
+	/* (the progress message is not printed: this is a library function)
 	fprintf(stderr,"computing forward radon transform: pmin=%g pmax=%g"
 		" dp=%g np=%d\n",pmin,pmax,dp,np);
+	*/
 
 	/* allocate 1-D VND arrays */
 	offset =(float *)VNDemalloc(nx*sizeof(float),"fwdslant_taup:offset");
@@ -1171,8 +1173,10 @@ Credits:
 	nmax = MAX(nx,np);
 	nmax = MAX(nmax,ntfft+4);
 
+	/* (the progress message is not printed: this is a library function)
 	fprintf(stderr, "computing inverse radon transform: pmin=%g pmax=%g"
 		" dp=%g np=%d\n",pmin,pmax,dp,np);
+	*/
 
 	/* allocate 1-D arrays */
 	offset  = (float *)VNDemalloc(nx*sizeof(float),"invslant:offset");

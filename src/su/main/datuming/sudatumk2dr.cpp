@@ -4,10 +4,13 @@
 /* SUDATUMK2DR: $Revision: 1.9 $ ; $Date: 2021/04/15 00:44:23 $	*/
 
 #include "su.h"
+#include <complex>
+#include <vector>
 #include "segy.h"
 #include "header.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 " 									",
 "SUDATUMK2DR - Kirchhoff datuming of receivers for 2D prestack data	",
@@ -77,6 +80,7 @@ char *sdoc[] = {
 "    fields tr.sx and tr.gx. Offset is computed automatically.		",
 "									",
 NULL};
+#endif
 /*
  * Author:  Trino Salinas, 05/01/96,  Colorado School of Mines
  *
@@ -126,522 +130,7 @@ typedef struct SurfaceStruct {
         SurfaceSegment *ss;   /* array[ns] of surface segments */
 } Surface;
 
-/* Prototype */
-  void resit(int nx,float fx,float dx,int nz,int nr,float dr,float **tb,
-	     float **t,float x0);
-  void interpx(int nxt,float fxt,float dxt,int nx,float fx,float dx,int nzt,
-	     float **tt,float **t);
-  void sum2(int nx,int nz,float a1,float a2,float **t1,float **t2,float **t);
-  void timeb(int nr,int nz,float dr,float dz,float fz,float sz,float a,
-	     float v0, float **t,float **p,float **sig,float **ang);
-  void dat2d(float *trace,int nt,float ft,float dt,float sx,float gx,
-	     float **dat,float aperx,int nx,float fx,float dx,float nz,
-  	     float fz,float dz,int mtmax,float xm,float fmax,
-             int nxi,float fxi,float dxi,float angmax,float **tb,float **pb,
-             float **angb,int nr,float **tsum,int nzt,
-             float fzt,float dzt,int nxt,float fxt,float dxt,int antiali,
-             int sgn,float **szif,float nangl,float **sigb, int verbose);
-  void decodeSurfaces(int sgn, int *nrPtr, int **nxzPtr, float ***xPtr,
-	     float ***zPtr);
-  int decodeSurface(char *string, int sgn, int *nxzPtr, float **xPtr,
-	     float **zPtr);
-  void makesurf(float dsmax, int nr, int *nu, float **xu, float **zu,
-             Surface **r);
-  void zcoorSurfaces(float fx,float dx,int nx,float fxs,float dxs,int nxs,
-             Surface *srf,float **szif,float *sz,float *nangl);
-
-/* segy trace */
-segy tr, tro;
-
-int
-main (int argc, char **argv)
-{
-	int nt;
-
-	int nzt;
-	int nxt;
-
-	int nzo;
-	int nxso;
-	int nxgo;
-
-	int ns;
-	int nr;
-
-	int is;
-	int io;
-	int ixo;
-	int it;
-
-	int antiali;
-
-	int ntr;
-	int jtr;
-	int ktr;
-	int mtr;
-
-        int mtmax;
-	int sgn;
-
-	int nsrf;
-	int *nxzsrf;
-
-	int nxi;
-	int *ng;
-
-	off_t nseek;
-
-	float ft;
-	float fzt;
-	float fxt;
-	float fzo;
-	float fxso;
-	float fxgo;
-
-	float fs;
-
-	float dt;
-	float dzt;
-
-	float dxt;
-	float dzo;
-	float dxso;
-	float dxgo;
-
-	float ds;
-	float ext;
-	float ezt;
-
-	float ezo;
-	float exso;
-	float exgo;
-
-	float es;
-	float s;
-	float scal;
-
-	float fxin;
-
-	float **xsrf;
-	float **zsrf;
-
-	float v00;
-	float v0;
-
-	float dvz;
-	float fmax;
-	float angmax;
-	float offmax;
-	float rmax;
-	float aperx;
-	float sx;
-	float gx;
-	float nanglg;
-	float dxi;
-	float fxi;
-	float ***dats,***ttab,***tb,***pb,***angb,**tsum,**tt,**szif,
-                *nangl,*sz,**tbg,**pbg,**angbg,***sigb,**sigbg;
-        Surface *srf;
-	
-	char  *infile="stdin",*outfile="stdout",*ttfile,*jpfile;
-	FILE  *infp,*outfp,*ttfp,*jpfp,*hdrfp;
-
-	int verbose=0;		/* verbose flag =1, show more info */
-
-	/* hook up getpar to handle the parameters */
-	initargs(argc, argv);
-	requestdoc(1);
-
-	/* open input and output files	*/
-	if( !getparstring("infile",&infile)) {
-		infp = stdin;
-	} else  
-		if ((infp=fopen(infile,"r"))==NULL)
-			err("cannot open infile=%s\n",infile);
-	if( !getparstring("outfile",&outfile)) {
-		outfp = stdout;
-	} else  {
-		outfp = fopen(outfile,"w");
-	}
-
-	efseeko(infp,(off_t) 0,SEEK_CUR);
-	efseek(outfp,(off_t) 0 ,SEEK_CUR);
-	if( !getparstring("ttfile",&ttfile))
-		err("must specify ttfile!\n");
-	if ((ttfp=fopen(ttfile,"r"))==NULL)
-		err("cannot open ttfile=%s\n",ttfile);
-	if( !getparstring("jpfile",&jpfile)) {
-		jpfp = stderr;
-	} else  
-		jpfp = fopen(jpfile,"w");
-
-	/* get information from the first header */
-	if (!fgettr(infp,&tr)) err("can't get first trace");
-	nt = tr.ns;
-	if (!getparfloat("dt",&dt)) dt = tr.dt/1000000.0; 
-	if (dt<0.0000001) err("dt must be positive!\n");
-	if (!getparfloat("ft",&ft)) ft = (float)tr.delrt/1000.; 
-	
-	/* get traveltime table parameters	*/
-	if (!getparint("nxt",&nxt)) err("must specify nxt!\n");
-	if (!getparfloat("fxt",&fxt)) err("must specify fxt!\n");
-	if (!getparfloat("dxt",&dxt)) err("must specify dxt!\n");
-	if (!getparint("nzt",&nzt)) err("must specify nzt!\n");
-	if (!getparfloat("fzt",&fzt)) err("must specify fzt!\n");
-	if (!getparfloat("dzt",&dzt)) err("must specify dzt!\n");
-	if (!getparint("ns",&ns)) err("must specify ns!\n");
-	if (!getparfloat("fs",&fs)) err("must specify fs!\n");
-	if (!getparfloat("ds",&ds)) err("must specify ds!\n");
-	ext = fxt+(nxt-1)*dxt;
-	ezt = fzt+(nzt-1)*dzt;
-	es = fs+(ns-1)*ds;
-
-        if (!getparint("nxi",&nxi)) err("must specify nxi!\n");
-        if (!getparfloat("fxi",&fxi)) err("must specify fxi!\n");
-        if (!getparfloat("dxi",&dxi)) err("must specify dxi!\n");
-        if (!getparint("sgn",&sgn)) err("must specify sgn!\n");
-
-	/* optional parameters	*/
-	if (!getparint("nxso",&nxso)) nxso = (nxt-1)*2+1;
-	if (!getparfloat("fxso",&fxso)) fxso = fxt;
-	if (!getparfloat("dxso",&dxso)) dxso = dxt*0.5;
-        if (!getparint("nxgo",&nxgo)) nxgo = (nxt-1)*2+1;
-        if (!getparfloat("fxgo",&fxgo)) fxgo = fxt;
-        if (!getparfloat("dxgo",&dxgo)) dxgo = dxt*0.5;
-        if (!getparint("antiali",&antiali)) antiali=1;
-	if (!getparint("nzo",&nzo)) nzo = (nzt-1)*5+1;
-	if (!getparfloat("fzo",&fzo)) fzo = fzt;
-	if (!getparfloat("dzo",&dzo)) dzo = dzt*0.2;
-
-	if (!getparint("verbose",&verbose))	verbose=0;
-
-	fzo = fzo*sgn;
-	dzo = dzo*sgn;
-
-	exso = fxso+(nxso-1)*dxso;
-	exgo = fxgo+(nxgo-1)*dxgo;
-	ezo = fzo+(nzo-1)*dzo;
-	if(fxt>fxso||fxt>fxgo||ext<exso||ext<exgo||fzt>fzo||ezt<ezo) 
-		err(" migration output range is out of traveltime table!\n");
-
-	if (!getparfloat("v0",&v0)) v0 = 1500;
-	if (!getparfloat("dvz",&dvz)) dvz = 0;
-	if (!getparfloat("angmax",&angmax)) angmax = 60.;
-	if  (angmax<0.00001) err("angmax must be positive!\n");
-	if (!getparfloat("aperx",&aperx)) aperx = 0.5*nxt*dxt;
-	if (!getparfloat("offmax",&offmax)) offmax = 99999;
-	if (!getparfloat("fmax",&fmax)) fmax = 0.25/dt;
-
-	if (!getparint("ntr",&ntr))	ntr = 100000;
-	if (!getparint("mtr",&mtr))	mtr = 100;
-        checkpars();
-        decodeSurfaces(sgn,&nsrf,&nxzsrf,&xsrf,&zsrf);
-        makesurf(0.025*dxgo,nsrf,nxzsrf,xsrf,zsrf,&srf);
-
-	fprintf(jpfp,"\n");
-	fprintf(jpfp," Datuming parameters\n");
-	fprintf(jpfp," ================\n");
-	fprintf(jpfp," infile=%s \n",infile);
-	fprintf(jpfp," outfile=%s \n",outfile);
-	fprintf(jpfp," ttfile=%s \n",ttfile);
-	fprintf(jpfp," \n");
-
-        fprintf(jpfp," nzt=%d fzt=%g dzt=%g\n",nzt,fzt,dzt);
-	fprintf(jpfp," nxt=%d fxt=%g dxt=%g\n",nxt,fxt,dxt);
- 	fprintf(jpfp," ns=%d fs=%g ds=%g\n",ns,fs,ds);
-	fprintf(jpfp," \n");
-        fprintf(jpfp," nxi=%d fxi=%g dxi=%g sgn=%d\n",nxi,fxi,dxi,sgn);
-        fprintf(jpfp," \n");
-	fprintf(jpfp," nzo=%d fzo=%g dzo=%g\n",nzo,fzo,dzo);
-	fprintf(jpfp," nxso=%d fxso=%g dxso=%g\n",nxso,fxso,dxso);
-        fprintf(jpfp," nxgo=%d fxgo=%g dxgo=%g\n",nxgo,fxgo,dxgo);
-	fprintf(jpfp," \n");
-
-        /* compute Z coordinate for the surfaces  */
-        szif = ealloc2float(2,nxi);
-        sz = ealloc1float(ns);
-        nangl = ealloc1float(nxi);
-        zcoorSurfaces(fxi,dxi,nxi,fs,ds,ns,srf,szif,sz,nangl);
-
-	/* compute reference traveltime and slowness  */
-	rmax = MAX(es-fxt,ext-fs);
-	rmax = MIN(rmax,0.5*offmax+aperx);
-	nr = 2+(int)(rmax/dxgo);
-        tb = ealloc3float(nzt,nr,ns);
-        pb = ealloc3float(nzt,nr,ns);
-        sigb = ealloc3float(nzt,nr,ns);
-        angb = ealloc3float(nzt,nr,ns);
-        for (is=0;is<ns;is++){
-            v00 = v0 + sz[is]*dvz;
-            timeb(nr,nzt,dxgo,dzt,fzt,sz[is],dvz,v00,tb[is],pb[is],sigb[is],
-                angb[is]);
-        }
-
-	fprintf(jpfp," nt=%d ft=%g dt=%g \n",nt,ft,dt);
- 	fprintf(jpfp," fmax=%g\n",fmax);
-	fprintf(jpfp," v0=%g dvz=%g \n",v0,dvz);
- 	fprintf(jpfp," aperx=%g offmax=%g angmax=%g\n",aperx,offmax,angmax);
- 	fprintf(jpfp," ntr=%d mtr=%d \n",ntr,mtr);
-	fprintf(jpfp," ================\n");
-	fflush(jpfp);
-
-	/* allocate space */
-	dats = ealloc3float(nt,nxgo,nxso);
-	ng = ealloc1int(nxso);
-	ttab = ealloc3float(nzt,nxt,ns);
-	tt = alloc2float(nzt,nxt);
-	tsum = alloc2float(nzt,nxt);
-        tbg = alloc2float(nzt,nr);
-        pbg = alloc2float(nzt,nr);
-        sigbg = alloc2float(nzt,nr);
-        angbg = alloc2float(nzt,nr);
-
-        memset((void *) dats[0][0],0,nxso*nxgo*nt*sizeof(float));
-
- 	fprintf(jpfp," input traveltime tables \n");
-                       
-	/* compute traveltime residual	*/
-	for(is=0; is<ns; ++is){
-		nseek = (off_t) nxt*nzt*is;
-		efseeko(ttfp,nseek*((off_t) sizeof(float)),SEEK_SET);
-		fread(ttab[is][0],sizeof(float),nxt*nzt,ttfp);
-		s = fs+is*ds;
-		resit(nxt,fxt,dxt,nzt,nr,dxgo,tb[is],ttab[is],s);
-	}
-
-	fprintf(jpfp," start receiver datuming ... \n");
-	fprintf(jpfp," \n");
-	fflush(jpfp);
-	
-        mtmax = 2*dxgo*sin(angmax*PI/180.)/(v0*dt);
-        if(mtmax<1) mtmax = 1;
-
-	jtr = 1;
-	s = fxso;
-	ktr = 0;
-	fxin = fxgo;
-	for(is=0; is<nxso; ++is)
-		ng[is]=0;
-
-	/* Store headers in tmpfile while getting a count */
-	hdrfp = etmpfile(); 
-
-	do {
-
-	    float as,res;
-	    int is;
-	    sx = tr.sx;
-	    gx = tr.gx;
-
-	    if(sx!=s) {
-		s = sx;
-                if(gx>fxgo) fxin = gx;
-	    }
-	
-	    io = (int)((sx-fxso)/dxso);
-
-	    if(MIN(sx,gx)>=fs && MAX(sx,gx)<=es && 
-	       MAX(gx-sx,sx-gx)<=ABS(offmax) ){
-
-
-                /* Number of traces in receiver's gathers  */
-                ng[io]++;
-
-                efwrite(&tr, 1, HDRBYTES, hdrfp);
-
-		/*  Down or up ward continuation of the receivers  */
-	    	as = (gx-fs)/ds;
-	    	is = (int)as; 
-
-		if(is==ns-1) is=ns-2;
-		res = as-is;
-		if(res<=0.01) res = 0.0;
-		if(res>=0.99) res = 1.0;
-		sum2(nxt,nzt,1-res,res,ttab[is],ttab[is+1],tsum);
-                sum2(nr,nzt,1-res,res,pb[is],pb[is+1],pbg);
-                sum2(nr,nzt,1-res,res,tb[is],tb[is+1],tbg);
-                sum2(nr,nzt,1-res,res,sigb[is],sigb[is+1],sigbg);
-                sum2(nr,nzt,1-res,res,angb[is],angb[is+1],angbg);
-
-                as = (gx-fxi)/dxi;
-                is = (int)as;
-                if(is==nxi-1) is=nxi-2;
-                res = as-is;
-                if(res<=0.01) res = 0.0;
-                if(res>=0.99) res = 1.0;
-                nanglg = (1-res)*nangl[is] + res*nangl[is+1];
-
-		dat2d(tr.data,nt,ft,dt,sx,gx,dats[io],aperx,nxgo,fxin,
-		      dxgo,nzo,fzo,dzo,mtmax,gx,fmax,nxi,fxi,dxi,angmax,tbg,
-                      pbg,angbg,nr,tsum,nzt,fzt,dzt,nxt,fxt,dxt,
-                      antiali,sgn,szif,nanglg,sigbg,verbose);
-
-	        ++ktr;
-	        if((jtr-1)%mtr ==0 ){
-			fprintf(jpfp," Datumed receiver %d\n",jtr);
-			fflush(jpfp);
-	    	}
-
-	    }
-	    ++jtr;
-	} while (fgettr(infp,&tr) && jtr<=ntr);
-
-	fprintf(jpfp," Datumed %d receivers in total\n",ktr);
-
-	/* Seg-Y header					*/
-
-	rewind(hdrfp);
-
-	scal = 1/sqrt(2*PI)*dxgo;
-	for(io=0; io<nxso; io++)  {
-		for(ixo=0; ixo<ng[io]; ixo++) {
-
-			efread(&tro, 1, HDRBYTES, hdrfp);
-			memcpy((void *) tro.data,
-			   (const void *) dats[io][ixo], nt*sizeof(float));
-
-			for(it=0; it<nt; it++)
-			   tro.data[it] *=scal;
-
-			/* write out */
-			fputtr(outfp,&tro); 
-
-		}
-	}
-
-	fprintf(jpfp," \n");
-	fprintf(jpfp," output done\n");
-	fflush(jpfp);
-
-	efclose(jpfp);
-	efclose(outfp);
-	efclose(hdrfp);
-
-	free1int(ng);	    
-	free2float(tsum);
-	free2float(tt);
-        free2float(tbg);
-        free2float(pbg);
-        free2float(sigbg);
-        free2float(angbg);
-        free3float(pb);
-        free3float(tb);
-        free3float(sigb);
-        free3float(angb);
-	free3float(ttab);
-	free3float(dats);
-	return(CWP_Exit());
-}
-
-/**********************************************************************
-        Subroutines adapted from Dave Hale's modeling library
-
-        decodeReflectors
-        decodeReflector
-        makeref                 Autor: Dave Hale, CSM, 09/17/91
-**********************************************************************/
-
-void decodeSurfaces(int sgn, int *nrPtr, int **nxzPtr, float ***xPtr,
-		    float ***zPtr)
-/*************************************************************************
-decodeSurfaces - parse surfaces parameter string
-**************************************************************************
-Input :
-sgn		Sign of the datuming process
-
-Output:
-nrPtr           pointer to nr an int specifying number of surfaces = 2
-nxzPtr          pointer to nxz specifying number of (x,z) pairs defining the
-                surfaces
-xPtr            pointer to array[x][nr] of x values for each surface
-zPtr            array[z][nr] of z values for each surface
-**************************************************************************/
-{
-        int nr,*nxz,ir;
-        float **x,**z;
-        char t[4096],*s;
-
-        /* count surfaces */
-        nr = countparname("surf");
-        if (nr==0) nr = 1;
-
-        /* allocate space */
-        nxz = ealloc1(nr,sizeof(int));
-        x = ealloc1(nr,sizeof(float*));
-        z = ealloc1(nr,sizeof(float*));
-
-        /* get surfaces */
-        for (ir=0; ir<nr; ++ir) {
-                if (!getnparstring(ir+1,"surf",&s)) s = "0,0;99999,0";
-                strcpy(t,s);
-                if (!decodeSurface(t,sgn,&nxz[ir],&x[ir],&z[ir]))
-                        err("Surface number %d specified "
-                                "incorrectly!\n",ir+1);
-        }
-
-        /* set output parameters before returning */
-        *nrPtr = nr;
-        *nxzPtr = nxz;
-        *xPtr = x;
-        *zPtr = z;
-}
-
-/* parse one surface specification; return 1 if valid, 0 otherwise */
-
-int decodeSurface (char *string, int sgn, int *nxzPtr, float **xPtr,
-		   float **zPtr)
-/**************************************************************************
-decodeSurface - parse one surface specification
-***************************************************************************
-Input:
-string          string representing surface
-sgn		Sign of the datuming process
-
-Output:
-nxzPtr          pointer to number of x,z pairs
-xPtr            array of x values for one surface
-zPtr            array of z values for one surface
-**************************************************************************/
-{
-        int nxz,ixz;
-        float *x,*z;
-        char *s,*t;
-
-        s = string;
-        s = strtok(s,",;\0");
-        /* count x and z values, while splitting string into tokens */
-        for (t=s,nxz=0; t!=NULL; ++nxz)
-                t = strtok(NULL,",;\0");
-
-        /* total number of values must be even */
-        if (nxz%2) return 0;
-
-        /* number of (x,z) pairs */
-        nxz /= 2;
-
-        /* 2 or more (x,z) pairs are required */
-        if (nxz<2) return 0;
-
-        /* allocate space */
-        x = ealloc1(nxz,sizeof(float));
-        z = ealloc1(nxz,sizeof(float));
-
-        /* convert (x,z) values */
-        for (ixz=0; ixz<nxz; ++ixz) {
-                x[ixz] = atof(s);
-                s += strlen(s)+1;
-                z[ixz] = atof(s)*sgn;
-                s += strlen(s)+1;
-        }
-
-        /* set output parameters before returning */
-        *nxzPtr = nxz;
-        *xPtr = x;
-        *zPtr = z;
-        return 1;
-}
-
-void makesurf(float dsmax,int nr,int *nu,float **xu,float **zu,
+static void makesurf(float dsmax,int nr,int *nu,float **xu,float **zu,
         Surface **r)
 /*****************************************************************************
 Make piecewise cubic surfaces
@@ -668,7 +157,7 @@ they are only used to construct the surfaces.
         Surface *rr;
 
         /* allocate space for surfaces */
-        *r = rr = ealloc1(nr,sizeof(Surface));
+        *r = rr = (Surface *) ealloc1(nr,sizeof(Surface));
 
         /* loop over surfaces */
         for (ir=0; ir<nr; ++ir) {
@@ -707,7 +196,7 @@ they are only used to construct the surfaces.
                 yxtoxy(nuu,duu,0.0,s,ns,ds,fs,0.0,(float)(nu[ir]-1),us);
 
                 /* compute surface segments uniformly sampled in s */
-                ss = ealloc1(ns,sizeof(SurfaceSegment));
+                ss = (SurfaceSegment *) ealloc1(ns,sizeof(SurfaceSegment));
                 for (is=0; is<ns; ++is) {
                         intcub(0,nu[ir],u,xud,1,&us[is],&rsx);
                         intcub(0,nu[ir],u,zud,1,&us[is],&rsz);
@@ -732,18 +221,18 @@ they are only used to construct the surfaces.
                 free1float((float*)zud);
 
                 /* free space replaced by surface segments */
-                free1(xu[ir]);
-                free1(zu[ir]);
+                
+                
         }
 
         /* free space replaced by surface segments */
-        free1(nu);
-        free1(xu);
-        free1(zu);
+        
+        
+        
 }
 
 /* Estimation of the Z coordinate of the surfaces  */
-  void zcoorSurfaces(float fx,float dx,int nx,float fxs,float dxs,int nxs,
+static void zcoorSurfaces(float fx,float dx,int nx,float fxs,float dxs,int nxs,
         Surface *srf,float **szif,float *sz,float *nangl)
 /*****************************************************************************
 From the cubic spline calculation, the Z coor. of the surface are estimated
@@ -834,7 +323,7 @@ nangl           array of angles that the normal form with the vertical
 }
 
 /* residual traveltime calculation based  on reference   time	*/
-  void resit(int nx,float fx,float dx,int nz,int nr,float dr,
+static void resit(int nx,float fx,float dx,int nz,int nr,float dr,
 		float **tb,float **t,float x0)
 {
 	int ix,iz,jr;
@@ -855,7 +344,7 @@ nangl           array of angles that the normal form with the vertical
 /* lateral interpolation	*/
 
 /* sum of two tables	*/
-  void sum2(int nx,int nz,float a1,float a2,float **t1,float **t2,float **t)
+static void sum2(int nx,int nz,float a1,float a2,float **t1,float **t2,float **t)
 {
 	int ix,iz;
 
@@ -865,7 +354,7 @@ nangl           array of angles that the normal form with the vertical
 }
  
 /* compute  reference traveltime and slowness	*/
-      void timeb(int nr,int nz,float dr,float dz,float fz,float z0,float a,
+static void timeb(int nr,int nz,float dr,float dz,float fz,float z0,float a,
 	float v0,float **t,float **p,float **sig,float **ang)
 {
 	int  ir,iz;
@@ -910,17 +399,94 @@ nangl           array of angles that the normal form with the vertical
 	}
 }
 
-void filt(float *trace,int nt,float dt,float fmax,int m,float *trf,
-	     int sgn);
+/* Low-pass filter, integration and phase shift of a trace (the filtering of the program, with the tables of the
+   frequency domain made at each call instead of the first one only).
+   trace[nt]	the trace, replaced by the filtered and phase-shifted one
+   m		the half-length of the triangle filters
+   trf[nt+2*m]	the filtered, integrated and phase-shifted trace, with m samples of the end before and after
+   Returns 1 if the padded length is too long. */
+static int filt(float *trace,int nt,float dt,float fmax,int m,float *trf,int sgn)
+{
+	int  it,iw,itemp,itaper,nw,nwf,nfft;
+	float temp, ftaper, const2, dw;
 
-  void dat2d(float *trace,int nt,float ft,float dt,float sx,float gx,
+	fmax *= 2.0*PI;
+	ftaper = 0.1*fmax;
+	const2 = 0.5*sqrt(2.0);
+
+	/* Set up FFT parameters */
+	nfft = npfaro(2*(nt+2*m), 4*(nt+2*m));
+	if (nfft >= SU_NFLTS || nfft >= 720720) return 1;
+
+	nw = nfft/2 + 1;
+	dw = 2.0*PI/(nfft*dt);
+
+	itaper = 0.5+ftaper/dw;
+	std::vector<float> taper(2*itaper+1);
+	for(iw=-itaper; iw<=itaper; ++iw){
+		temp = (float)iw/(1.0+itaper);
+		taper[iw+itaper] = (1-temp)*(1-temp)*(temp+2)/4;
+	}
+
+	nwf = 0.5+fmax/dw;
+	if(nwf>nw-itaper-1) nwf = nw-itaper-1;
+	if(nwf<0) nwf = 0;
+	std::vector<float> amp(nwf+itaper+1), ampi(nwf+itaper+1);
+	amp[0] = ampi[0] = 0.;
+	for(iw=1; iw<=nwf+itaper; ++iw){
+		amp[iw] = sqrt(dw*iw)/nfft;
+		ampi[iw] = 0.5/(1-cos(iw*dw*dt));
+	}
+
+	std::vector<float> rt(nfft);
+	std::vector<std::complex<float> > ct(nw);
+
+	memcpy(rt.data(), trace, nt*FSIZE);
+	memset((void *) (rt.data() + nt), 0, (nfft-nt)*FSIZE);
+	pfarc(1, nfft, rt.data(), ct.data());
+
+	for(iw=nwf-itaper;iw<=nwf+itaper;++iw){
+		if(iw<0 || iw>=nw) continue;
+		itemp = iw-(nwf-itaper);
+		ct[iw] = taper[itemp]*ct[iw];
+	}
+	for(iw=nwf+itaper+1;iw<nw;++iw) ct[iw] = 0.;
+
+	for(iw=0; iw<=nwf+itaper && iw<nw; ++iw){
+		/* phase shifts PI/4 - Half derivative	*/
+		float r = ct[iw].real(), i = ct[iw].imag();
+		temp = (r-sgn*i)*amp[iw]*const2;
+		ct[iw] = std::complex<float>(temp, (sgn*r + i)*amp[iw]*const2);
+	}
+
+	pfacr(-1, nfft, ct.data(), rt.data());
+
+	/* Load traces back in */
+	for (it=0; it<nt; ++it) trace[it] = rt[it];
+
+	/* Integrate traces   */
+	for(iw=0; iw<=nwf+itaper && iw<nw; ++iw) ct[iw] *= ampi[iw];
+	pfacr(-1, nfft, ct.data(), rt.data());
+	for (it=0; it<m; ++it)  trf[it] = rt[nfft-m+it];
+	for (it=0; it<nt+m; ++it)  trf[it+m] = rt[it];
+	return 0;
+}
+/* the rows of a flat array */
+static void rows_of(const float *base, int nrow, int len, std::vector<float*> &rows)
+{
+	int i;
+	rows.resize(nrow);
+	for (i=0; i<nrow; i++) rows[i] = (float *) (base + (size_t) i*len);
+}
+
+static int dat2d(float *trace,int nt,float ft,float dt,float sx,float gx,
 	     float **dat,float aperx,int nx,float fx,float dx,
   	     float nz,float fz,float dz,int mtmax,float xm,
 	     float fmax,int nxi,float fxi,float dxi,float angmax,
 	     float **tb,float **pb,float **angb,int nr,float **tsum,
              int nzt,float fzt,float dzt,int nxt,float fxt,float dxt,
              int antiali,int sgn,float **szif,float nangl,
-             float **sigb,int verbose)
+             float **sigb)
 /*****************************************************************************
 Datum one trace 
 ******************************************************************************
@@ -960,6 +526,7 @@ dat		Redatumed section
 	      ang,ax,ax0,pmin,odt=1.0/dt,pd,az,sz,sz0,
               at,td,res,temp,sig,sigma;
 	float **tmt,**ampt,**ampti,*tm,*amp,*ampi,*tzt,*trf,*zpt;
+	int status = 0;
 
 	tmt = alloc2float(nzt,nxt);
 	ampt = alloc2float(nzt,nxt);
@@ -970,13 +537,21 @@ dat		Redatumed section
 	ampi = alloc1float(nzt);
 	zpt = alloc1float(nxt);
 	trf = alloc1float(nt+2*mtmax);
+	memset((void *) tmt[0],0,nxt*nzt*sizeof(float));
+	memset((void *) ampt[0],0,nxt*nzt*sizeof(float));
+	memset((void *) ampti[0],0,nxt*nzt*sizeof(float));
+	memset((void *) tm,0,nzt*sizeof(float));
+	memset((void *) tzt,0,nzt*sizeof(float));
+	memset((void *) amp,0,nzt*sizeof(float));
+	memset((void *) ampi,0,nzt*sizeof(float));
+	memset((void *) zpt,0,nxt*sizeof(float));
 
 	z0 = (fz-fzt)/dzt + 0.0*sx + 0.0*gx;
 	rdz = dz/dzt;
 	pmin = 1.0/(2.0*dx*fmax);
 	fxf = fxi + (nxi-2)*dxi;
 	
-	filt(trace,nt,dt,fmax,mtmax,trf,sgn);
+	if (filt(trace,nt,dt,fmax,mtmax,trf,sgn)) { status = 6; goto done; }
 
 	rxz = (angmax==90)?0.0:1.0/tan(angmax*PI/180.);
 	nxtf = (xm-aperx-fxt)/dxt;
@@ -1051,7 +626,7 @@ dat		Redatumed section
 	am0 = 1.0-am;
 	if(mr<0) mr = 0;
 	if(mr+nxe>=nxi-1) 
-		err("Topography definition is out of range!\n");
+		{ status = 1; goto done; }
 	
 	/* interpolate amplitudes and filter length along lateral	*/
 	for(ix=nxf; ix<=nxe; ++ix){
@@ -1072,6 +647,8 @@ dat		Redatumed section
 		ax0 = 1.0-ax;
 		if(jx>nxte-1) jx = nxte-1;
 		if(jx<nxtf) jx = nxtf;
+		if(jx>nxt-2) jx = nxt-2;
+		if(jx<0) jx = 0;
 
 		ar = (xm>=x)?(xm-x)/dx:(x-xm)/dx;
 		jr = (int)ar;
@@ -1093,11 +670,11 @@ dat		Redatumed section
                 if(nzp>nz) nzp = nz;
 
                 iz = (ABS(am0*szif[ix+mr][1]+am*szif[ix+mr+1][1])-fz)/dz;
-                if(iz>=nz)
-                        err("Datuming surface is out of output range!\n");
+                if(iz>=nz || iz<0) { status = 2; goto done; }
                 az = z0+iz*rdz;
                 jz = (int)az;
                 if(jz>=nzt-1) jz = nzt-2;
+                if(jz<0) jz = 0;
                 sz = az-jz;
                 sz0 = 1.0-sz;
                 td = sz0*tzt[jz]+sz*tzt[jz+1];
@@ -1111,7 +688,7 @@ dat		Redatumed section
                         res = ABS(at-jt);
                         res0 = 1.0-res;
                         for (it=0; it<nt; it++){
-                          if(it+jt >= mtmax && jt < nt-it+mtmax-sgn){
+                          if(it+jt >= mtmax+(sgn<0?1:0) && jt < nt-it+mtmax-sgn){
                              temp = (res0*(-trf[it+jt-mt]+2.0*trf[it+jt]
                                  -trf[it+jt+mt])+res*(-trf[it+jt-mt+sgn]
                                  +2.0*trf[it+jt+sgn]-trf[it+jt+mt+sgn]))*ampd;
@@ -1127,7 +704,7 @@ dat		Redatumed section
                         res = ABS(at-jt);
                         res0 = 1.0-res;
                         for (it=0; it<nt; it++){
-                          if(it+jt >= 0 && jt < nt-it-sgn){
+                          if(it+jt >= (sgn<0?1:0) && jt < nt-it-sgn){
                             temp=(res0*trace[it+jt]+res*trace[it+jt+sgn])*ampd;
                             dat[ix][it] += temp;
                           }
@@ -1137,6 +714,7 @@ dat		Redatumed section
 
 	}
 
+done:
 	free2float(ampt);
 	free2float(ampti);
 	free2float(tmt);
@@ -1146,97 +724,155 @@ dat		Redatumed section
 	free1float(tm);
 	free1float(tzt);
 	free1float(trf);
+	return status;
 }
 
-void filt(float *trace,int nt,float dt,float fmax,int m,
-	  float *trf,int sgn)
-/*******************************************************************
-  Low-pass filter, integration and phase shift for input data	 
-  input: 
-    trace(nt)	single seismic trace
-    fmax	high cut frequency
-    sgn		Sign of the Datuming process
-  output:
-    trace(nt) 	filtered and phase-shifted seismic trace 
-    tracei(nt) 	filtered, integrated and phase-shifted seismic trace 
-********************************************************************/
+
+/* The surfaces of the program: the depths of the recording surface (column 0) and of the datum (column 1) at the nxi
+ * locations fxi + ix * dxi, those of the recording surface at the ns sources of the traveltime tables, and the angle that
+ * its normal makes with the vertical at the locations, by the cubic splines of the surfaces.
+ *
+ * nu0, x0, z0		the (x,z) points of the recording surface, and nu1, x1, z1 those of the datum (>= 2 points, increasing x;
+ *			the z values are those given: the caller applies the sign of the datuming)
+ * dsmax		longest segment of the splines (0.025 * the output receiver (or source) interval, in the programs)
+ * nxi, fxi, dxi	the locations of the output, nxi >= 3
+ * ns, fs, ds		the sources of the tables, ns >= 3
+ * szif[nxi][2], sz[ns], nangl[nxi]	the results
+ *
+ * Returns 0, 1 if a location is not within the surface (the program leaves it uninitialised), 2 if nxi or ns is too small,
+ * or 3 if a surface has less than 2 points.
+ */
+int su_datumk2d_geometry(int nu0, const float *x0, const float *z0, int nu1, const float *x1, const float *z1,
+	float dsmax, int nxi, float fxi, float dxi, int ns, float fs, float ds, float *szif, float *sz, float *nangl)
 {
-	static int nfft=0, itaper, nw, nwf;
-	static float *taper, *amp, *ampi, dw;
-	int  it,iw,itemp;
-	float temp, ftaper, const2, *rt;
-	complex *ct;
+	int ix, is, status = 0;
+	int nu[2];
+	float *xu[2], *zu[2];
+	Surface *srf = NULL;
+	float **sziff;
+	if (nxi<3 || ns<3) return 2;
+	if (nu0<2 || nu1<2) return 3;
+	nu[0] = nu0; nu[1] = nu1;
+	xu[0] = (float *) ealloc1(nu0,sizeof(float)); zu[0] = (float *) ealloc1(nu0,sizeof(float));
+	xu[1] = (float *) ealloc1(nu1,sizeof(float)); zu[1] = (float *) ealloc1(nu1,sizeof(float));
+	memcpy(xu[0], x0, nu0*sizeof(float)); memcpy(zu[0], z0, nu0*sizeof(float));
+	memcpy(xu[1], x1, nu1*sizeof(float)); memcpy(zu[1], z1, nu1*sizeof(float));
+	makesurf(dsmax,2,nu,xu,zu,&srf);
+	sziff = alloc2float(2,nxi);
+	for (ix=0; ix<nxi; ix++) sziff[ix][0] = sziff[ix][1] = nangl[ix] = NAN;
+	for (is=0; is<ns; is++) sz[is] = NAN;
+	zcoorSurfaces(fxi,dxi,nxi,fs,ds,ns,srf,sziff,sz,nangl);
+	for (ix=0; ix<nxi; ix++) {
+		szif[2*ix] = sziff[ix][0];
+		szif[2*ix+1] = sziff[ix][1];
+		if (!(szif[2*ix]==szif[2*ix]) || !(szif[2*ix+1]==szif[2*ix+1]) || !(nangl[ix]==nangl[ix])) status = 1;
+	}
+	for (is=0; is<ns; is++) if (!(sz[is]==sz[is])) status = 1;
+	free2float(sziff);
+	for (is=0; is<2; is++) { free1(xu[is]); free1(zu[is]); free1(srf[is].ss); }
+	free1(srf);
+	return status;
+}
 
-	fmax *= 2.0*PI;
-	ftaper = 0.1*fmax;
-	const2 = 0.5*sqrt(2.0);
+/* The reference traveltimes of the program, and the traveltime tables less them.
+ *
+ * ns, nr		number of sources of the tables and of lateral samples of the reference quantities
+ * nzt, dr, dzt, fzt	depth samples and sampling intervals (dr is the lateral one), first depth of the tables
+ * v0, dvz		the reference velocity at the surface and its vertical gradient
+ * sz[ns]		the depth of the recording surface at the sources
+ * nxt, fxt, dxt	lateral samples of the tables
+ * fs, ds		first source and its interval
+ * tb, pb, sigb, angb[ns][nr][nzt]	the reference traveltime, lateral slowness, sigma and emergence angle (output)
+ * ttab[ns][nxt][nzt]	the traveltime tables, which have the reference traveltime subtracted
+ */
+void su_datumk2d_tables(int ns, int nr, int nzt, float dr, float dzt, float fzt, float v0, float dvz, const float *sz,
+	int nxt, float fxt, float dxt, float fs, float ds, float *tb, float *pb, float *sigb, float *angb, float *ttab)
+{
+	int is;
+	std::vector<float*> trow, prow, srow, arow, ttrow;
+	for (is=0; is<ns; is++) {
+		float v00 = v0 + sz[is]*dvz;
+		rows_of(tb + (size_t) is*nr*nzt, nr, nzt, trow);
+		rows_of(pb + (size_t) is*nr*nzt, nr, nzt, prow);
+		rows_of(sigb + (size_t) is*nr*nzt, nr, nzt, srow);
+		rows_of(angb + (size_t) is*nr*nzt, nr, nzt, arow);
+		timeb(nr,nzt,dr,dzt,fzt,sz[is],dvz,v00,trow.data(),prow.data(),srow.data(),arow.data());
+		rows_of(ttab + (size_t) is*nxt*nzt, nxt, nzt, ttrow);
+		resit(nxt,fxt,dxt,nzt,nr,dr,trow.data(),ttrow.data(),fs+is*ds);
+	}
+}
 
-	if(nfft==0) {
-        	/* Set up FFT parameters */
-        	nfft = npfaro(2*(nt+2*m), 4*(nt+2*m));
-        	if (nfft >= SU_NFLTS || nfft >= 720720)
-                	err("Padded nt=%d -- too big", nfft);
+/* The datuming of one trace into an output gather, the loop body of the programs (for the receivers of a shot gather
+ * xm is the receiver's x, for the sources of a receiver gather the source's x).
+ *
+ * trace[nt]		the input trace
+ * dat[nx][nt]		the output traces, to which the contribution is added
+ * aperx		lateral aperture
+ * nx, fx, dx		the output positions
+ * nz, fz, dz		depth samples of the output (fz and dz have the sign of the datuming: fzo * sgn, dzo * sgn)
+ * mtmax		half length of the triangle filter of the anti-aliasing
+ * xm			the x of the trace, which selects the tables
+ * fmax, angmax		high cut (Hz), and largest angle (degrees)
+ * nxi, fxi, dxi, szif	the surfaces as given by su_datumk2d_geometry, and nangl its normal angles
+ * ns, fs, ds		sources of the tables
+ * nr, tb, pb, angb, sigb[ns][nr][nzt], ttab[ns][nxt][nzt]	as made by su_datumk2d_tables
+ * antiali, sgn		anti-aliasing flag, and the sign of the datuming (down 1, up -1)
+ *
+ * Returns 0; 1 if the surfaces do not cover the output positions, 2 if the datum is out of the output range, 6 if the
+ * trace is too long. Differences from the program, which are its bugs: indices that read outside of the tables (the
+ * source of the tables, the lateral position in the tables, the time sample for the upward datuming) are kept inside.
+ */
+int su_datumk2d_trace(const float *trace, int nt, float ft, float dt, float *dat, float aperx, int nx, float fx, float dx,
+	int nz, float fz, float dz, int mtmax, float xm, float fmax, int nxi, float fxi, float dxi, float angmax,
+	int ns, float fs, float ds, int nr, const float *tb, const float *pb, const float *angb, const float *sigb,
+	const float *ttab, int nzt, float fzt, float dzt, int nxt, float fxt, float dxt, int antiali, int sgn,
+	const float *szif, const float *nangl)
+{
+	int is, status;
+	float as, res, nanglg;
+	std::vector<float> tsum((size_t) nxt*nzt), tbg((size_t) nr*nzt), pbg((size_t) nr*nzt), sigbg((size_t) nr*nzt),
+		angbg((size_t) nr*nzt), tr(trace, trace+nt);
+	std::vector<float*> tsumr, tbr, pbr, sigr, angr, datr, szr;
 
-        	nw = nfft/2 + 1;
-		dw = 2.0*PI/(nfft*dt);
-
-		itaper = 0.5+ftaper/dw;
-		taper = ealloc1float(2*itaper+1);
-		for(iw=-itaper; iw<=itaper; ++iw){
-			temp = (float)iw/(1.0+itaper); 
-			taper[iw+itaper] = (1-temp)*(1-temp)*(temp+2)/4;
+	/* interpolate the tables to the location of the trace */
+	as = (xm-fs)/ds;
+	is = (int)as;
+	if (is>ns-2) is = ns-2;
+	if (is<0) is = 0;
+	res = as-is;
+	if (res<=0.01) res = 0.0;
+	if (res>=0.99) res = 1.0;
+	{
+		size_t i, n = (size_t) nxt*nzt, m = (size_t) nr*nzt;
+		const float *t1 = ttab + (size_t) is*n;
+		for (i=0; i<n; i++) tsum[i] = (1-res)*t1[i] + res*t1[i+n];
+		for (i=0; i<m; i++) {
+			size_t k = (size_t) is*m + i;
+			pbg[i] = (1-res)*pb[k] + res*pb[k+m];
+			tbg[i] = (1-res)*tb[k] + res*tb[k+m];
+			sigbg[i] = (1-res)*sigb[k] + res*sigb[k+m];
+			angbg[i] = (1-res)*angb[k] + res*angb[k+m];
 		}
-
-		nwf = 0.5+fmax/dw;
-		if(nwf>nw-itaper-1) nwf = nw-itaper-1;
-		amp = ealloc1float(nwf+itaper+1);
-		ampi = ealloc1float(nwf+itaper+1);
-		amp[0] = ampi[0] = 0.;
-		for(iw=1; iw<=nwf+itaper; ++iw){
-			amp[iw] = sqrt(dw*iw)/nfft;
-			ampi[iw] = 0.5/(1-cos(iw*dw*dt));
-		}
 	}
+	as = (xm-fxi)/dxi;
+	is = (int)as;
+	if (is>nxi-2) is = nxi-2;
+	if (is<0) is = 0;
+	res = as-is;
+	if (res<=0.01) res = 0.0;
+	if (res>=0.99) res = 1.0;
+	nanglg = (1-res)*nangl[is] + res*nangl[is+1];
 
-        /* Allocate fft arrays */
-        rt   = ealloc1float(nfft);
-        ct   = ealloc1complex(nw);
+	rows_of(tsum.data(), nxt, nzt, tsumr);
+	rows_of(tbg.data(), nr, nzt, tbr);
+	rows_of(pbg.data(), nr, nzt, pbr);
+	rows_of(sigbg.data(), nr, nzt, sigr);
+	rows_of(angbg.data(), nr, nzt, angr);
+	rows_of(dat, nx, nt, datr);
+	rows_of(szif, nxi, 2, szr);
 
-        memcpy(rt, trace, nt*FSIZE);
-        memset((void *) (rt + nt), 0, (nfft-nt)*FSIZE); 
-        pfarc(1, nfft, rt, ct);
-
-	for(iw=nwf-itaper;iw<=nwf+itaper;++iw){
-		itemp = iw-(nwf-itaper);
-		ct[iw].r = taper[itemp]*ct[iw].r; 
-		ct[iw].i = taper[itemp]*ct[iw].i; 
-	}
-	for(iw=nwf+itaper+1;iw<nw;++iw){
-		ct[iw].r = 0.; 
-		ct[iw].i = 0.; 
-	}
-
-	for(iw=0; iw<=nwf+itaper; ++iw){
-		/* phase shifts PI/4 - Half derivative	*/
-		temp = (ct[iw].r-sgn*ct[iw].i)*amp[iw]*const2;
-		ct[iw].i = (sgn*ct[iw].r + ct[iw].i)*amp[iw]*const2;
-		ct[iw].r = temp;
-	}
-              
-        pfacr(-1, nfft, ct, rt);
-		
-        /* Load traces back in */
-	for (it=0; it<nt; ++it) trace[it] = rt[it];
-
-        /* Integrate traces   */
-	for(iw=0; iw<=nwf+itaper; ++iw){
-		ct[iw].i = ct[iw].i*ampi[iw];
-		ct[iw].r = ct[iw].r*ampi[iw];
-	}
-        pfacr(-1, nfft, ct, rt);
-        for (it=0; it<m; ++it)  trf[it] = rt[nfft-m+it];
-        for (it=0; it<nt+m; ++it)  trf[it+m] = rt[it];
-
-	free1float(rt);
-	free1complex(ct);
+	status = dat2d(tr.data(),nt,ft,dt,0.0f,xm,datr.data(),aperx,nx,fx,dx,nz,fz,dz,mtmax,xm,fmax,nxi,fxi,dxi,angmax,
+		tbr.data(),pbr.data(),angr.data(),nr,tsumr.data(),nzt,fzt,dzt,nxt,fxt,dxt,antiali,sgn,szr.data(),nanglg,
+		sigr.data());
+	return status;
 }

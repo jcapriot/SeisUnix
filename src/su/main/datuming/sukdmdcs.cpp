@@ -4,10 +4,13 @@
 /* SUKDMDCS: $Revision: 1.3 $ ; $Date: 2011/11/16 17:45:18 $	*/
 
 #include "su.h"
+#include <complex>
+#include <vector>
 #include "segy.h"
 #include "header.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 " 									",
 "  SUKDMDCS - 2.5D datuming of sources for prestack common receiver 	",
@@ -70,6 +73,7 @@ char *sdoc[] = {
 "									",
 "                                                                       ",
 NULL};
+#endif
 /*
  * Computational Notes:                                                
  *   
@@ -122,416 +126,54 @@ NULL};
  *
  */
 /**************** end self doc ***********************************/
-/* Prototype */
-  void sum2(int nx,int nz,float a1,float a2,float **t1,float **t2,float **t);
-  void dat2d(float *trace,int nt,float ft,float dt,float sx,float gx,
-             float **dat,float aperx,int nxso,float fxin,float dxso,float nzo,
-             float fzo,float dzo,
-             int nxi,float fxi,float dxi,
-             float **tsum,int sgn, int nzt,float fzt,float dzt,int nxt,
-             float fxt,float dxt,float **szif,float v0,int dc,int ngl,
-             float freq);
-  void filt(float *trace,int nt,float dt,int sgn);
 
-
-/* segy trace */
-segy tr, tro;
-
-int
-main (int argc, char **argv)
+/* Omega domain filtering of a trace by sqrt(-i omega) (the filtering of the program, with the frequency of the
+   negative frequencies by the transform's length also where it is odd).
+   trace[nt]	the trace, replaced by the filtered one
+   Returns 1 if the padded length is too long. */
+static int filt(float *trace,int nt,float dt,int sgn)
 {
-	int   nt,nzt,nxt,nzo,nxso,nxgo,ns,is,io,ixo,it,
-	      ntr,jtr,ktr,mtr,*ng,nxi,sgn,dc,ngl;
-	long  nseek;
-	float ft,fzt,fxt,fzo,fxso,fxgo,fs,dt,dzt,dxt,dzo,dxso,scale,
-	      dxgo,ds,ext,ezt,ezo,exso,exgo,es,s,scal,fxin,as,res;
-	float v0,offmax,aperx,sx,gx,
-	      dxi,fxi,fgl,freq;
-        float ***datg,***ttab,**tsum,**szif;
-	
-	char  *datain="stdin",*dataout="stdout",*ttfile,*jpfile;
-	FILE  *infp,*outfp,*ttfp,*jpfp,*hdrfp;
-
-        int recsurf,datsurf,i;
-        float zrec,zdat,r1,r2;
-
-        char  *recfile,*datfile;
-        FILE  *recfp=NULL,*datfp=NULL;
-
-    
-        /* explicitly define downward continuation */
-        sgn=1;
-
-
-	/* hook up getpar to handle the parameters */
-	initargs(argc, argv);
-	requestdoc(1);
-
-	/* open input and output files	*/
-	if( !getparstring("datain",&datain)) {
-		infp = stdin;
-	} else  
-		if ((infp=fopen(datain,"r"))==NULL)
-			err("cannot open datain=%s\n",datain);
-	if( !getparstring("dataout",&dataout)) {
-		outfp = stdout;
-	} else  
-		outfp = fopen(dataout,"w");
-	fseek(infp,0,1);
-	fseek(outfp,0,1);
-
-	if( !getparstring("ttfile",&ttfile))
-		err("must specify ttfile!\n");
-	if ((ttfp=fopen(ttfile,"r"))==NULL)
-		err("cannot open ttfile=%s\n",ttfile);
-
-	if( !getparstring("jpfile",&jpfile)) {
-		jpfp = stderr;
-	} else  
-		jpfp = fopen(jpfile,"w");
-
-
-	/* get information from the first header */
-	if (!fgettr(infp,&tr)) err("can't get first trace");
-	nt = tr.ns;
-	if (!getparfloat("dt",&dt)) dt = tr.dt/1000000.0; 
-	if (dt<0.0000001) err("dt must be positive!\n");
-	if (!getparfloat("ft",&ft)) ft = (float)tr.delrt/1000.; 
-	
-	/* get traveltime table parameters	*/
-	if (!getparint("nxt",&nxt)) err("must specify nxt!\n");
-	if (!getparfloat("fxt",&fxt)) err("must specify fxt!\n");
-	if (!getparfloat("dxt",&dxt)) err("must specify dxt!\n");
-	if (!getparint("nzt",&nzt)) err("must specify nzt!\n");
-	if (!getparfloat("fzt",&fzt)) err("must specify fzt!\n");
-	if (!getparfloat("dzt",&dzt)) err("must specify dzt!\n");
-	if (!getparint("ns",&ns)) err("must specify ns!\n");
-	if (!getparfloat("fs",&fs)) err("must specify fs!\n");
-	if (!getparfloat("ds",&ds)) err("must specify ds!\n");
-	ext = fxt+(nxt-1)*dxt;
-	ezt = fzt+(nzt-1)*dzt;
-	es = fs+(ns-1)*ds;
-
-	if (!getparint("nxso",&nxso)) err("must specify nxso!\n");
-	if (!getparfloat("fxso",&fxso)) fxso = 0;
-	if (!getparfloat("dxso",&dxso)) err("must specify dxso!\n"); 
-        if (!getparint("nxgo",&nxgo)) err("must specify nxgo!\n"); 
-        if (!getparfloat("fxgo",&fxgo)) fxgo = 0;
-        if (!getparfloat("dxgo",&dxgo)) err("must specify dxgo!\n"); 
-
-        /* errors for illegal survey geometry */        
-        if (nxgo>1 && dxgo != dxso) err("in this implementation, dxso must = dxgo!\n");
-        if (dxgo < 0.) err("in this implementation, dxgo must be >0!\n");
-        if (dxso < 0.) err("in this implementation, dxso must be >0!\n");
-
-        /* calculate the number of independent locations spanning the survey. */
-        dxi = dxso;
-        fxi = fxso;
-        nxi = (int)((fxgo + (nxgo+nxso-2)*dxgo)/dxi) + 1;
-
-        /* calculate the number of independent receiver locations or number of  */
-        /* receiver gathers.                                                    */
-        fgl = fxso + fxgo;
-        ngl = nxgo + (nxso-1); 
- 
-        /* location of last source and receiver */
-        exgo = fxgo + (nxi-1)*dxgo;
-        exso = fxso+(nxso-1)*dxso;
-
-        /* get the depth resolution for interploation */
-	if (!getparfloat("dzo",&dzo)) dzo = dzt*0.2;
-        fzo=fzt;
-        nzo=1+(((nzt-1)*dzt)/dzo);
-        
-        fzo = fzo*sgn;
-        dzo = dzo*sgn;
-	ezo = fzo+(nzo-1)*dzo;
-
-        /* error if survey dimensions exceed those of the travel time table */
-	if(fxt>fxso||fxt>fxgo||ext<exso||ext<exgo||fzt>fzo||ezt<ezo) 
-		err(" output range is out of traveltime table!\n");
-
-        if (!getparint("recsurf",&recsurf)) recsurf=0;
-        if (!getparint("datsurf",&datsurf)) datsurf=0;
-
-        if(recsurf==0){     
-           if (!getparfloat("zrec",&zrec)) err("must specify zrec when recsurf=0!\n");
-        }     
-
-        if(datsurf==0){     
-           if (!getparfloat("zdat",&zdat)) err("must specify zdat when datsurf=0!\n");
-        }    
-
-	if (!getparfloat("v0",&v0)) v0 = 1500;
-	if (!getparfloat("aperx",&aperx)) aperx = 0.5*nxt*dxt;
-	if (!getparfloat("offmax",&offmax)) offmax = 99999.;
-
-        if (!getparint("dc",&dc))   dc = 0;
-        if (dc > 1) err("dc must be 0 or 1!\n");
-
-        if (!getparfloat("freq",&freq))    freq=50;
-        if (freq <= 0.0) err("freq must be positive and non-zero!\n");
-        if (1/(2*freq)<dt) warn("freq set too high - you may have numerical singularities !\n");
-
-        if (!getparfloat("scale",&scale))    scale=1.0;
-
-	if (!getparint("ntr",&ntr))	ntr = 100000;
-	if (!getparint("mtr",&mtr))	mtr = 100;
-
-	fprintf(jpfp,"\n");
-	fprintf(jpfp," Datuming parameters\n");
-	fprintf(jpfp," ================\n");
-	fprintf(jpfp," datain=%s \n",datain);
-	fprintf(jpfp," dataout=%s \n",dataout);
-	fprintf(jpfp," ttfile=%s \n",ttfile);
-        fprintf(jpfp," \n");
-        fprintf(jpfp," nzt=%d fzt=%g dzt=%g\n",nzt,fzt,dzt);
-	fprintf(jpfp," nxt=%d fxt=%g dxt=%g\n",nxt,fxt,dxt);
- 	fprintf(jpfp," ns=%d fs=%g ds=%g\n",ns,fs,ds);
-        fprintf(jpfp," \n");
-        fprintf(jpfp," ngl=%d fgl=%g nxi=%d fxi=%g dxi=%g\n",ngl,fgl,nxi,fxi,dxi);
-        fprintf(jpfp," \n");
-	fprintf(jpfp," nzo=%d fzo=%g dzo=%g\n",nzo,fzo,dzo);
-	fprintf(jpfp," nxso=%d fxso=%g dxso=%g\n",nxso,fxso,dxso);
-        fprintf(jpfp," nxgo=%d fxgo=%g dxgo=%g\n",nxgo,fxgo,dxgo);
-        fprintf(jpfp," \n");        
-        fprintf(jpfp," nt=%d ft=%g dt=%g \n",nt,ft,dt);
-        fprintf(jpfp," freq=%g v0=%g dc=%d\n",freq,v0,dc);
-        fprintf(jpfp," aperx=%g offmax=%g\n",aperx,offmax);
-        fprintf(jpfp," ntr=%d mtr=%d \n",ntr,mtr);
-        fprintf(jpfp," ================\n");
-        fflush(jpfp);
-
-
-        /* read and create recording and datum surfaces */
-
-        if(recsurf==1){
-           if(!getparstring("recfile",&recfile))
-                err("you chose recsurf=1, so you must specify a recfile!\n");
-           recfp = fopen(recfile,"r");
-        }
-
-        if(datsurf==1){
-           if(!getparstring("datfile",&datfile))
-                err("you chose datsurf=1, so you must specify a datfile!\n");
-           datfp = fopen(datfile,"r");
-        }     
-
-        checkpars();
-
-        szif = ealloc2float(2,nxi);    
-
-
-        if(recsurf==0){     
-          for(i=0;i<nxi;i++) szif[i][0]=zrec;
-        }else{
-
-          for(i=0;i<nxi;i++){
-           if(fscanf(recfp,"%f",&r1)<0) err("not enough points in recfile!\n");
-           szif[i][0]=r1;
-          } 
-          fclose(recfp);
-
-        }     
-
-        if(datsurf==0){     
-          for(i=0;i<nxi;i++) szif[i][1]=zdat;
-        }else{
-
-          for(i=0;i<nxi;i++){
-           if(fscanf(datfp,"%f",&r2)<0) err("not enough points in datfile!\n");
-           szif[i][1]=r2;
-          } 
-          fclose(datfp);
-
-        }      
-
-
-        /* allocate array memory */
-        ttab = ealloc3float(nzt,nxt,ns);
-        tsum = alloc2float(nzt,nxt);
-  
-        /* array with length equal to number of receiver gathers */ 
-        ng = ealloc1int(ngl);
-        memset((void *) ng,(int) '\0',ngl*sizeof(int)); 
-
-
-        /* allocate output array */
-        datg = ealloc3float(nt,nxso,ngl);
-        memset((void *) datg[0][0],(int) '\0',ngl*nxso*nt*sizeof
-           (float));           
-
-
- 	fprintf(jpfp," input traveltime tables \n");
-                       
-	/* loop over surface locations and read the corresponding slice  */
-        /* of the travel time array.                                     */
-	for(is=0; is<ns; ++is){
-		nseek = nxt*nzt*is;
-		fseek(ttfp,nseek*((long) sizeof(float)),0);
-		fread(ttab[is][0],sizeof(float),nxt*nzt,ttfp);
-        }
-
-
-
-/*  begin main loop.   */
-
-/*  program flow and loop structure:  the outermost (main) loop cycles once   */
-/*  through the data traces.  for each trace, loop over the output section,   */
-/*  (over an aperture centered on the offset of the data trace), adding to    */
-/*  the sum at each point in the output section [ix,it] the value on the data */
-/*  trace at the retarded or advanced time (depending on extrapolation        */
-/*  direction.  Schematically:                                                */
-/*                                                                            */ 
-/*      loop over data traces [X]                                             */
-/*                                                                            */
-/*       loop over output traces [ix] (in aperture centered at X )            */ 
-/*                                                                            */
-/*         loop over times along output trace [it]                            */
-/*                                                                            */
-/*            add to sum at output point [ix,it] the value                    */
-/*            on data trace at [X,it+-tau]                                    */ 
-/*                                                                            */
-/*            (where tau is the travel time between the                       */
-/*             location [ix,zdatum] on the datum and the trace                */
-/*             location )                                                     */
-/*                                                                            */
-
-
-	fprintf(jpfp," start source datuming... \n");
-	fprintf(jpfp," \n");
-	fflush(jpfp);
-  
-
-	jtr = 1;
-	ktr = 0;
-	fxin = fxso;
-	io = 0;
-	s = 0.;
-
-        for(is=0; is<ngl; ++is)
-                ng[is]=0;               
-
-	/* Store headers in tmpfile while getting a count */
-	hdrfp = etmpfile(); 
-
-	do {
-     
-	    sx = tr.sx;
-	    gx = tr.gx;
-
-            /* determine whehter this is the start of a new gather */
-	    if(gx!=s){
-		fxin = sx;
-		s = gx;
-	    }
-
-            /* determine which output gather this trace belongs to */
-	    io = (int)((gx-fgl)/dxgo);  
-
-
-	    if(MIN(sx,gx)>=fs && MAX(sx,gx)<=es && 
-	        MAX(gx-sx,sx-gx)<=offmax ){
-
-		/* count the number of traces in receiver's gathers  */ 
-                ng[io]++;
-
-                efwrite(&tr, 1, HDRBYTES, hdrfp);
-
-                /* interpolate travel time table to the source location */
-	    	as = (sx-fs)/ds;
-	    	is = (int)as;
-		if(is==ns-1) is=ns-2;
-		res = as-is;
-		if(res<=0.01) res = 0.0;
-		if(res>=0.99) res = 1.0;
-		sum2(nxt,nzt,1-res,res,ttab[is],ttab[is+1],tsum);
-
-
-                /* call to dat2d will take the energy on this data trace */
-                /* and remap it to the output along the appropriate     */
-                /* operators, after taking the required derivatives and */
-                /* multiplying by the appropriate scale factors.        */
-
-
-                dat2d(tr.data,nt,ft,dt,sx,gx,datg[io],aperx,nxso,fxin,
-                      dxso,nzo,fzo,dzo,nxi,fxi,dxi,
-                      tsum,sgn,nzt,fzt,dzt,nxt,fxt,dxt,
-                      szif,v0,dc,ngl,freq);
-
-
-	        ktr++;
-	        if((jtr-1)%mtr ==0 ){
-			fprintf(jpfp," Datumed source in trace %d\n",jtr);
-			fflush(jpfp);
-	    	}
-
-	    }
-	    jtr++;
-	} while (fgettr(infp,&tr) && jtr<=ntr);
-
-/*  end of main loop  */
-
-
-/*  output data  */
-
-	fprintf(jpfp," Datumed sources in %d total traces\n",ktr);
-
-	/* Seg-Y header	*/
-
-	rewind(hdrfp);
-
-
-	/* scale factors representing the constant in the integral */
-
-        scal = dxso*(1/sqrt(2*PI*v0));
-        scal = scal*scale;
-
-
-        for(io=0; io<ngl; io++) {
-        	for(ixo=0; ixo<ng[io]; ixo++)  {
-
-			efread(&tro, 1, HDRBYTES, hdrfp);
-			memcpy((void *) tro.data,
-			   (const void *) datg[io][ixo], nt*sizeof(float));
-
-			for(it=0; it<nt; it++){
-			   tro.data[it] *=scal;
-                        }
-
-			/* write out */
-			fputtr(outfp,&tro); 
-
-		}
+	int  it,iw,sgnw,nfft,n;
+	float temp, const2, amp, omega, dw;
+
+	/* the multiplication by sqrt(-i) is a phase shift of pi/4, applied in Euler form: const2=cos(pi/4)=sin(pi/4) */
+	const2 = 0.5*sqrt(2.0);
+
+	nfft = npfao(2*nt,4*nt);
+	if (nfft >= SU_NFLTS || nfft >= 720720) return 1;
+	n = nfft/2;
+	dw = 2.0*PI/(nfft*dt);
+
+	std::vector<std::complex<float> > ct(nfft, std::complex<float>(0.0f, 0.0f));
+	for(it=0; it<nt; ++it) ct[it] = trace[it];
+
+	pfacc(1,nfft,ct.data());
+
+	/* omega-domain filtering for point source - 2.5D */
+	for(iw=0; iw<nfft; ++iw){
+		float r, i;
+		if (iw<=n) { omega = iw*dw; sgnw = 1; }
+		else { omega = (iw-nfft)*dw; sgnw = -1; }
+		amp = sqrt(ABS(omega));
+		r = ct[iw].real(); i = ct[iw].imag();
+		temp = (r-sgnw*i)*amp*const2;
+		ct[iw] = std::complex<float>(temp, (sgnw*r + i)*amp*const2);
 	}
 
-	fprintf(jpfp," \n");
-	fprintf(jpfp," output done\n");
-	fflush(jpfp);
+	pfacc(-1, nfft, ct.data());
 
-	efclose(jpfp);
-	efclose(outfp);
-	efclose(hdrfp);
-
-	    
-        free2float(tsum);
-        free3float(ttab);
-        free3float(datg);
-	return EXIT_SUCCESS;
+	for (it=0; it<nt; ++it) trace[it] = ct[it].real()/nfft;
+	return 0;
 }
 
-/* sum of two tables	*/
-  void sum2(int nx,int nz,float a1,float a2,float **t1,float **t2,float **t)
+/* the rows of a flat array */
+static void rows_of(const float *base, int nrow, int len, std::vector<float*> &rows)
 {
-	int ix,iz;
-
-	for(ix=0; ix<nx; ++ix) 
-		for(iz=0; iz<nz; ++iz)
-			t[ix][iz] = a1*t1[ix][iz]+a2*t2[ix][iz];
+	int i;
+	rows.resize(nrow);
+	for (i=0; i<nrow; i++) rows[i] = (float *) (base + (size_t) i*len);
 }
- 
-
-  void dat2d(float *trace,int nt,float ft,float dt,float sx,float gx,
+static int dat2d(float *trace,int nt,float ft,float dt,float sx,float gx,
              float **dat,float aperx,int nxso,float fxin,float dxso,
              float nzo,float fzo,float dzo,
              int nxi,float fxi,float dxi,
@@ -570,6 +212,7 @@ dat		Redatumed section
         float p,q,s,ctau,xst=0.0,zst=0.0,ris,ros,rg,t0=0.0,sing;
         float xp,zgx,hp,phi=0.0,sxp,zs,zi,zip,atol;
 	float *tzt;
+	int status = 0;
         float zp=0.0,dzde=0.0,g,xs;
 
 
@@ -578,6 +221,7 @@ dat		Redatumed section
 
 	/* allocate memory for datuming */
 	tzt = alloc1float(nzt);
+	memset((void *) tzt,0,nzt*sizeof(float));
 
         h = (gx>=sx)?(gx-sx)/2.0:(sx-gx)/2.0;
 	/* fxf = fxi + (nxi-2)*dxi; */
@@ -585,7 +229,7 @@ dat		Redatumed section
         /* call to filt will perform the frequency domain filtering  */
         /* on the input data trace, returning in variable trace.     */  
 
-        filt(trace,nt,dt,sgn);                
+        if (filt(trace,nt,dt,sgn)) { status = 6; goto done; }                
 
 
         /* calculate the limits of the aperture in the output */
@@ -604,7 +248,7 @@ dat		Redatumed section
         am0 = 1.0-am;
         if(mr<0) mr = 0;
         if(mr+nxe>nxi-1)
-                err("Topography definition is out of range!\n");
+                { status = 1; goto done; }
 	
 
         /* depth of the input source(zi) on the recording surface */
@@ -618,14 +262,14 @@ dat		Redatumed section
         if(mr<0) mr = 0;
 
         if(mr>=nxi-1){
-           mr=mr-1;
+           mr=nxi-2;
            am0 = 0.0;
            am = 1.0;
         }
 
         zi = ABS(am0*szif[mr][0]+am*szif[mr+1][0]);
         if(zi>=(nzo*dzo)+fzo)
-              err("Recording surface is out of range!\n");
+              { status = 2; goto done; }
 
 
         /* approximate the surface derivative near this input location */
@@ -652,7 +296,7 @@ dat		Redatumed section
         if(mr<0) mr = 0;
 
         if(mr>=nxi-1){
-           mr=mr-1;
+           mr=nxi-2;
            am0 = 0.0;
            am = 1.0;
         }
@@ -661,13 +305,13 @@ dat		Redatumed section
 
             zgx = ABS(am0*szif[mr][0]+am*szif[mr+1][0]);
             if(zgx>=(nzo*dzo)+fzo)
-                  err("Recording surface is out of range!\n");
+                  { status = 2; goto done; }
 
         }else{
 
             zgx = ABS(am0*szif[mr][1]+am*szif[mr+1][1]);
             if(zgx>=(nzo*dzo)+fzo)
-                  err("Datuming surface is out of range!\n");
+                  { status = 2; goto done; }
         }
 
 
@@ -681,6 +325,8 @@ dat		Redatumed section
 		if(ax<=0.01) ax = 0.;
 		if(ax>=0.99) ax = 1.0;
 		ax0 = 1.0-ax;
+		if(jx>nxt-2) jx = nxt-2;
+		if(jx<0) jx = 0;
 
 
                 /* determine the time tio from the source location of this */
@@ -688,7 +334,7 @@ dat		Redatumed section
                 /* by building a vector of times to all depths, then interp- */
                 /* -olating to the exact datuming depth.                     */
 
-		for(iz=t0; iz<nzt; ++iz){
+		for(iz=0; iz<nzt; ++iz){
 		    tzt[iz] = ax0*tsum[jx][iz]+ax*tsum[jx+1][iz];
 		}
 
@@ -704,14 +350,14 @@ dat		Redatumed section
                 if(mr<0) mr = 0;
 
                 if(mr>=nxi-1){
-                     mr=mr-1;
+                     mr=nxi-2;
                      am0 = 0.0;
                      am = 1.0;
                 }
  
                 z = ABS(am0*szif[mr][1]+am*szif[mr+1][1]);
                 if(z<=fzo || z>=fzo+(nzo*dzo))                                                    
-                      err("Datuming surface is out of traveltime range!\n");    
+                      { status = 3; goto done; }    
 
 
 
@@ -719,6 +365,7 @@ dat		Redatumed section
                 az = (z-fzo)/dzt;
                 jz = (int)az;
                 if(jz>=nzt-1) jz = nzt-2;
+                if(jz<0) jz = 0;
                 sz = az-jz;
                 sz0 = 1.0-sz;
                 tio = sz0*tzt[jz]+sz*tzt[jz+1];
@@ -767,12 +414,12 @@ dat		Redatumed section
                   sxp = (sx-gx)*cos(phi)+(zi-zgx)*sin(phi);
                   zip = -(sx-gx)*sin(phi)+(zi-zgx)*cos(phi);
 
-                  if(dc==0 && hp==0.0) err("Datum and recording surface overlap!\n");
+                  if(dc==0 && hp==0.0) { status = 4; goto done; }
 
 
                   /* loop over output times */
                   for (it=0; it<nt; it++){
-		    if(it+jt >= 0 && jt < nt-it-sgn){
+		    if(it+jt >= (sgn<0?1:0) && jt < nt-it-sgn){
   
                      t0 = ft+(it*dt); 
 
@@ -807,7 +454,7 @@ dat		Redatumed section
                               zst = sqrt(s+(p*p))-p;        
                               xst = ((sxp-xp)/zip)*zst + xp;
 
-                              if(zst<0.0) err("Negative zst!\n"); 
+                              if(zst<0.0) { status = 5; goto done; } 
 
                            }
                         }
@@ -833,7 +480,7 @@ dat		Redatumed section
                               zst = sqrt(s+(p*p))-p;        
                               xst = ((sxp-xp)/zip)*zst + xp;
 
-                              if(zst<0.0) err("Negative zst!\n"); 
+                              if(zst<0.0) { status = 5; goto done; } 
 
                            }
                         }
@@ -892,101 +539,52 @@ dat		Redatumed section
               }
 	}
 
+done:
 	free1float(tzt);
+	return status;
 }
 
-void filt(float *trace,int nt,float dt,int sgn)
 
-/*******************************************************************
-  input: 
-    trace(nt)   single seismic trace
-  output:
-    trace(nt)   filtered and phase-shifted seismic trace 
-********************************************************************/
+/* The datuming of the sources of one trace of a receiver gather into the output gather, the loop body of the program
+ * (the datuming is downward: sgn = 1).
+ *
+ * dat[nxso][nt], nxso, fxin, dxso	the output traces (the sources) and their positions
+ * dc			0 for receivers on the recording surface, 1 for those that are on the datum
+ * ngl			the number of receiver gathers
+ * the rest as su_kdmdcr_trace
+ *
+ * Returns 0; 1 if the surfaces do not cover the output, 2 if the recording surface or the datum is out of the depths,
+ * 3 if the datum is out of the traveltime range, 4 if the datum and recording surfaces overlap, 5 if a stationary point
+ * is above the datum, 6 if the trace is too long. Differences from the program, which are its bugs: indices that read
+ * outside of the tables are kept inside.
+ */
+int su_kdmdcs_trace(const float *trace, int nt, float ft, float dt, float sx, float gx, float *dat, float aperx,
+	int nx, float fxin, float dxso, int nzo, float fzo, float dzo, int nxi, float fxi, float dxi, int ns, float fs,
+	float ds, const float *ttab, int nzt, float fzt, float dzt, int nxt, float fxt, float dxt, const float *szif,
+	float v0, int dc, int ngl, float freq)
 {
-        static int nfft, n;
-        static float dw, fw;
-        int  it,iw,sgnw;
-        float temp, const2, amp, omega;
-        complex *ct;
+	int is;
+	float as, res;
+	std::vector<float> tsum((size_t) nxt*nzt), tr(trace, trace+nt);
+	std::vector<float*> tsumr, datr, szr;
 
+	/* interpolate the travel time table to the location of the trace */
+	as = (sx-fs)/ds;
+	is = (int)as;
+	if (is>ns-2) is = ns-2;
+	if (is<0) is = 0;
+	res = as-is;
+	if (res<=0.01) res = 0.0;
+	if (res>=0.99) res = 1.0;
+	{
+		size_t i, n = (size_t) nxt*nzt;
+		const float *t1 = ttab + (size_t) is*n;
+		for (i=0; i<n; i++) tsum[i] = (1-res)*t1[i] + res*t1[i+n];
+	}
+	rows_of(tsum.data(), nxt, nzt, tsumr);
+	rows_of(dat, nx, nt, datr);
+	rows_of(szif, nxi, 2, szr);
 
-        /* later calculations will require multiplication by sqrt(-i) */
-        /* which is equivalent to a phase shift of pi/4.  it will be  */
-        /* applied in Euler form (cos-isin), so define a constant:    */
-        /*                                  const2=cos(pi/4)=sin(pi/4)*/
-        const2 = 0.5*sqrt(2.0);
-
-        if(nfft==0) {   
-                /* Set up FFT parameters */
-
-                nfft = npfao(2*nt,4*nt);              
-
-                if (nfft >= SU_NFLTS || nfft >= 720720)
-                        err("Padded nt=%d -- too big", nfft);
-
-                n = nfft/2;
-                dw = 2.0*PI/(nfft*dt);
-                fw = -PI/dt;
-
-        }        
-
-        /* allocate complex array for fft */
-
-        ct   = ealloc1complex(nfft);
-
-        /* zero the real and complex parts of ct out to nfft */
-        for(it=0; it<nfft; ++it){
-             ct[it].r = 0.0;
-             ct[it].i = 0.0;
-        }
- 
-        /* put the trace values into the real part of ct- already padded */
-        for(it=0; it<nt; ++it){
-             ct[it].r = trace[it];
-        }
-
-
-        /* do the transform for t to omega */
-        pfacc(1,nfft,ct);
-
-
-
-        /* do omega-domain filtering for point source - 2.5D */
-
-           /* do positive frequencies */
-           for(iw=0; iw<=n; ++iw){                           
-               
-                omega = iw*dw; 
-                amp = sqrt(ABS(omega));
-                sgnw = 1;    
-
-                temp = (ct[iw].r-sgnw*ct[iw].i)*amp*const2;        
-                ct[iw].i = (sgnw*ct[iw].r + ct[iw].i)*amp*const2;  
-                ct[iw].r = temp;                                      
-           }                                 
-
-           /* do negative frequencies */
-           for(iw=n+1; iw<=nfft-1; ++iw){
-
-                omega = fw+(iw-n)*dw;
-                amp = sqrt(ABS(omega));
-                sgnw = -1;     
-
-                temp = (ct[iw].r-sgnw*ct[iw].i)*amp*const2;        
-                ct[iw].i = (sgnw*ct[iw].r + ct[iw].i)*amp*const2;  
-                ct[iw].r = temp;                                      
-           }                               
-
-
-        /* do the inverse transform for omega to t */
-
-        pfacc(-1, nfft, ct);            
-                
-        for (it=0; it<nt; ++it) {
-             trace[it] = ct[it].r/nfft;
-        }
-
-        free1complex(ct);
+	return dat2d(tr.data(),nt,ft,dt,sx,gx,datr.data(),aperx,nx,fxin,dxso,nzo,fzo,dzo,nxi,fxi,dxi,tsumr.data(),1,nzt,fzt,
+		dzt,nxt,fxt,dxt,szr.data(),v0,dc,ngl,freq);
 }
-

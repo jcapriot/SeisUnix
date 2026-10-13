@@ -123,6 +123,10 @@ void su_radon_inverse(int np, int ntfft, int nx, const float *ptau, const float 
 void su_radon_xinterp(int nt, int nx, int ninterp, const float *data, float freq1, float freq2, int lagc,
 	int lent, int lenx, int xopt, float dt, float *out);
 
+// datuming
+int su_datumfd(int nt, float dt, int nx, int nsx, int nz, float dz, float dx, float x_0, int buff, int tap_len, int mx,
+	int mz, const float *vel1, const float *vel2, const float *gx, const float *in, float *out);
+
 // multicomponent
 void su_polar_station(int nt, int iwl, int iwin, float rlq, int rl, int theta, int phi, int tau, int ellip, int pln,
 	int f1, int l1, int amp, int dir, float fangle, const float *data, float *out);

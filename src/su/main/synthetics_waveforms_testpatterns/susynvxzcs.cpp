@@ -148,6 +148,7 @@ int su_synvxzcs_shot(const float *vel, const float *pert, int nx, int nz, float 
 		**ts,**as,**sgs,**tg,**ag,**sgg,**bas,**bag,
 		**v,**vp=NULL,**tg1=NULL,**ag1=NULL,**sgg1=NULL;
 
+	eikpex_error = 0;
 	if (nx<2 || nz<2 || nxb<1 || nxd<1 || nxg<1 || nt<1 || nxc<0 || nzc<0) return -3;
 	if (nxc>nxb) nxc = nxb;
 	if (nzc>nz) nzc = nz;
@@ -349,6 +350,7 @@ int su_synvxzcs_shot(const float *vel, const float *pert, int nx, int nz, float 
 		free2float(tg1);
 		free2float(ag1);
   	}
+	if (eikpex_error) return -5;
 	return 0;
 }
 

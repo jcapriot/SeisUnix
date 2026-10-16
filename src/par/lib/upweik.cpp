@@ -121,6 +121,8 @@ Authors: CWP: Zhenuye Liu, based on code by Dave Hale, 1992.
 
 /**************** end self doc ********************************/
 
+thread_local int eikpex_error = 0;
+
 #define TINY 1.0e-3	/* avoid divide by zero */
 #define CFL 0.98	/* Courant/Friedrichs/Lewy stability factor */
 
@@ -268,7 +270,7 @@ Author:  Dave Hale, Colorado School of Mines, 07/16/90
 			wn[i] = wtemp[i];
 			wor = wn[i]*orr;
 			uu = (s[i]-wor)*(s[i]+wor);
-			if(uu<=0) err("\tRaypath has a too large curvature!\n\t A smoother velocity is required. \n");
+			if(uu<=0) { eikpex_error = 1; uu = 0.0; } /* (the raypath has a too large curvature: a smoother velocity is required) */
  			unew = sqrt(uu); 
 			uold = un[i];
 			un[i] = unew;

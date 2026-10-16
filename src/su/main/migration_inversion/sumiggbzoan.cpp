@@ -4,9 +4,11 @@
 /* SUMIGGBZOAN: $Revision: 1.5 $ ; $Date: 2011/11/16 22:14:43 $           */
 
 #include "su.h"
+#include <vector>
 #include "segy.h"
 
 /*********************** self documentation **********************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUMIGGBZOAN - MIGration via Gaussian beams ANisotropic media (P-wave)	",
@@ -45,6 +47,7 @@ char *sdoc[] = {
 " the medium to be isotropic.						",
 "									",
 NULL};
+#endif
 
 /* Credits:
  *	CWP: Tariq Alkhalifah,  based on MIGGBZO by Dave Hale
@@ -73,8 +76,20 @@ NULL};
 /**************** end self doc ********************************/
 
 
-/* functions defined and used internally */
-/* one step along ray */
+/* The complex data of this program are pairs of floats that it reads and writes by .r and .i: the library's complex is
+   std::complex<float>, which has the same layout. */
+struct cwpc { float r, i; };
+#define alloc1complex(n) ((cwpc *) alloc1complex(n))
+#define alloc2complex(n1,n2) ((cwpc **) alloc2complex(n1,n2))
+#define free1complex(p) free1complex((std::complex<float> *)(p))
+#define free2complex(p) free2complex((std::complex<float> **)(p))
+#define pfarc(s,n,a,b) pfarc(s,n,a,(std::complex<float> *)(b))
+#define pfacr(s,n,c,r) pfacr(s,n,(std::complex<float> *)(c),r)
+#define pfacc(s,n,z) pfacc(s,n,(std::complex<float> *)(z))
+#define ints8c(n,d,f,yin,yl,yr,nx,xo,yo) ints8c(n,d,f,(std::complex<float> *)(yin),*(std::complex<float> *)&(yl),*(std::complex<float> *)&(yr),nx,xo,(std::complex<float> *)(yo))
+
+namespace {
+
 typedef struct RayStepStruct {
 	float t;		/* time */
 	float x,z;		/* x,z coordinates */
@@ -123,278 +138,6 @@ static void miggbzoaniso(float bwh, float fmin, float fmax,
 				float **a1133, float **a1313, float **a1113,
 				float **a3313, float **f, float **g,
 				int verbose);
-
-segy tr;
-
-int
-main(int argc, char **argv)
-{
-	int nx;		/* number of traces in input		*/
-	int nz; 	/* number of depth values in output	*/
-	int nt;		/* number of time samples in input	*/
-	int ix,iz;	/* counters				*/
-	int verbose;	/* verbose flag =0 silent, =1 chatty 	*/
-	int ia1111=1,ia1133=1,ia1313=1,ia1113=1,ia3313=1,
-		idelta=1,iepsilon=1;
-	float dx,dz,dt,fmin,fmax,amin,amax,vavg,vavg1,vavg3,bwh,**a1111,**a3333,
-		**a1133,**a1313,**a1113,**a3313,**delta,**epsilon,**f,**g;
-	char *a1111file="",*a3333file="",*a1133file="",*a1313file="",
-		*a1113file="",*a3313file="",*deltafile="",*epsilonfile="";
-	FILE *a1111fp,*a3333fp,*a1133fp,
-		*a1313fp,*a1113fp,*a3313fp,*deltafp,*epsilonfp;
-	FILE *tracefp;	/* temporary file to hold traces */
-
-	/* hook up getpar */
-	initargs(argc,argv);
-	requestdoc(0);
-
-	/* get info from first trace */
-        if (!gettr(&tr))  err("can't get first trace");
-        nt = tr.ns;
-
-	/* get required parameters */
-	MUSTGETPARSTRING("a3333file",&a3333file);
-	MUSTGETPARINT("nx",&nx);
-	MUSTGETPARINT("nz",&nz);
-	if (!getparint("verbose",&verbose)) 	verbose = 0;
-
-	/* let user give dt and/or dx from command line */
-	if (!getparfloat("dt",&dt)) {
-                if (tr.dt) { /* is dt field set? */
-                        dt = (float) tr.dt / 1000000.0;
-                } else { /* dt not set, assume 4 ms */
-                        dt = 0.004;
-                        warn("tr.dt not set, assuming dt=0.004");
-                }
-        }
-	if (!getparfloat("dx",&dx)) {
-                if (tr.d2) { /* is d2 field set? */
-                        dx = tr.d2;
-                } else {
-                        dx = 1.0;
-                        warn("tr.d2 not set, assuming d2=1.0");
-                }
-	}
-	if (!getparfloat("dz",&dz)) dz = 1.0;
-	if (!getparfloat("fmin",&fmin)) fmin = 0.025/dt;
-	if (!getparfloat("fmax",&fmax)) fmax = 10.0*fmin;
-	if (!getparfloat("amax",&amax)) amax = 60.0;
-	if (!getparfloat("amin",&amin)) amin = -amax;
-	
-	/* debugging information */
-	if (verbose) {
-		warn(" dz = %g",dz);		
-		warn(" dx = %g",dx);		
-		warn(" dt = %g",dt);		
-		warn(" fmin = %g",fmin);		
-		warn(" fmax = %g",fmax);		
-		warn(" amin = %g",amin);		
-		warn(" amax = %g",amax);		
-	}
-
-        /* store traces in tmpfile while getting a count */
-        tracefp = etmpfile();
-        nx = 0;
-        do {
-                ++nx;
-                efwrite(tr.data, FSIZE, nt, tracefp);
-        } while (gettr(&tr));
-
-
-	/* allocate workspace */
-	f = alloc2float(nt,nx);
-	a1111 = alloc2float(nz,nx);
-	a3333 = alloc2float(nz,nx);
-	a1133 = alloc2float(nz,nx);
-	a1313 = alloc2float(nz,nx);
-	a1113 = alloc2float(nz,nx);
-	a3313 = alloc2float(nz,nx);
-	delta = alloc2float(nz,nx);
-	epsilon = alloc2float(nz,nx);
-	g = alloc2float(nz,nx);
-
-        /* load traces into the zero-offset array and close tmpfile */
-        rewind(tracefp);
-        efread(*f, FSIZE, nt*nx, tracefp);
-        efclose(tracefp);
-
-	/*anisotropic parameters*/
-	if (!getparstring("a1111file",&a1111file)) 
-			ia1111=0;
-	if (!getparstring("a1133file",&a1133file)) 
-			ia1133=0;
-	if (!getparstring("a1313file",&a1313file)) 
-			ia1313=0;
-	if (!getparstring("a1113file",&a1113file)) 
-			ia1113=0;
-	if (!getparstring("a3313file",&a3313file)) 
-			ia3313=0;
-	if (!getparstring("deltafile",&deltafile)) 
-			idelta=0;
-	if (!getparstring("epsilonfile",&epsilonfile)) 
-			iepsilon=0;
-
-	
-	/* read and halve required velocities*/
-	if ((a3333fp=fopen(a3333file,"r"))==NULL)
-		err("error opening a3333file=%s!\n",a3333file);
-	if (fread(a3333[0],sizeof(float),nz*nx,a3333fp)!=nz*nx)
-		err("error reading a3333file=%s!\n",a3333file);
-
-	/* read and halve velocities*/
-	if(ia1111){
-		if ((a1111fp=fopen(a1111file,"r"))==NULL)
-			err("error opening a1111file=%s!\n",a1111file);
-		if (fread(a1111[0],sizeof(float),nz*nx,a1111fp)!=nz*nx)
-			err("error reading a1111file=%s!\n",a1111file);
-	}else{
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz)
-				a1111[ix][iz] = a3333[ix][iz];
-	}		
-	
-	if(ia1133){
-		if ((a1133fp=fopen(a1133file,"r"))==NULL)
-			err("error opening a1133file=%s!\n",a1133file);
-		if (fread(a1133[0],sizeof(float),nz*nx,a1133fp)!=nz*nx)
-			err("error reading a1133file=%s!\n",a1133file);
-	}else{
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz)
-				a1133[ix][iz] = .4*a3333[ix][iz];
-	}
-
-	if(ia1313){
-		if ((a1313fp=fopen(a1313file,"r"))==NULL)
-			err("error opening a1313file=%s!\n",a1313file);
-		if (fread(a1313[0],sizeof(float),nz*nx,a1313fp)!=nz*nx)
-			err("error reading a1313file=%s!\n",a1313file);
-	}else{
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz)
-				a1313[ix][iz] = .3*a3333[ix][iz];
-	}
-
-	if(ia1113){
-		if ((a1113fp=fopen(a1113file,"r"))==NULL)
-			err("error opening a1113file=%s!\n",a1113file);
-		if (fread(a1113[0],sizeof(float),nz*nx,a1113fp)!=nz*nx)
-			err("error reading a1113file=%s!\n",a1113file);
-	}else{
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz)
-				a1113[ix][iz] = 0;
-	}
-
-	if(ia3313){
-		if ((a3313fp=fopen(a3313file,"r"))==NULL)
-			err("error opening a3313file=%s!\n",a3313file);
-		if (fread(a3313[0],sizeof(float),nz*nx,a3313fp)!=nz*nx)
-			err("error reading a3313file=%s!\n",a3313file);
-	}else{
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz)
-				a3313[ix][iz] = 0;
-	}
-
-	/* if specified read Thomsen's parameters*/
-	if(idelta==1 || iepsilon==1) {
-		if(idelta){
-			if ((deltafp=fopen(deltafile,"r"))==NULL)
-				err("error opening deltafile=%s!\n",deltafile);
-			if (fread(delta[0],sizeof(float),nz*nx,deltafp)!=nz*nx)
-				err("error reading deltafile=%s!\n",deltafile);
-		}else{
-			for (ix=0; ix<nx; ++ix)
-				for (iz=0; iz<nz; ++iz)
-					delta[ix][iz] = 0;
-		}
-		if(iepsilon){
-			if ((epsilonfp=fopen(epsilonfile,"r"))==NULL)
-				err("error opening epsilonfile=%s!\n",epsilonfile);
-			if (fread(epsilon[0],sizeof(float),nz*nx,epsilonfp)!=nz*nx)
-				err("error reading epsilonfile=%s!\n",epsilonfile);
-		}else{
-			for (ix=0; ix<nx; ++ix)
-				for (iz=0; iz<nz; ++iz)
-					epsilon[ix][iz] = 0;
-		}
-		for (ix=0; ix<nx; ++ix)
-			for (iz=0; iz<nz; ++iz){
-				a1111[ix][iz] = a3333[ix][iz]+2*epsilon[ix][iz]
-					*a3333[ix][iz];
-				a1133[ix][iz] = sqrt(2*delta[ix][iz]*a3333[ix][iz]*
-					(a3333[ix][iz]-a1313[ix][iz])+(a3333[ix][iz]-
-					a1313[ix][iz])*(a3333[ix][iz]-a1313[ix][iz]))
-					-a1313[ix][iz];
-			}
-	}
-	
-	/* free workspace */
-	free2float(delta);
-	free2float(epsilon);
-		
-
-	/*determine average velocity*/
-	vavg3=0.0; 
-	for (ix=0,vavg1=0.0; ix<nx; ++ix) {
-		for (iz=0; iz<nz; ++iz) {
-			a1111[ix][iz] *= 0.25;
-			vavg1 += sqrt(a1111[ix][iz]);
-			a3333[ix][iz] *= 0.25;
-			vavg3 += sqrt(a3333[ix][iz]);
-			a1133[ix][iz] *= 0.25;
-			a1313[ix][iz] *= 0.25;
-			a1113[ix][iz] *= 0.25;
-			a3313[ix][iz] *= 0.25;
-		}
-	}
-	vavg = (vavg1+vavg3)/2;
-	vavg /= nx*nz;
-	
-
-	/* get beam half-width */
-	if (!getparfloat("bwh",&bwh)) bwh = vavg/fmin;
-
-        checkpars();
-
-	/* debugging information */
-	if (verbose) {
-		warn(" vavg = %g", vavg);
-		warn(" bwh = %g", bwh);
-	}
-	
-	/* migrate */
-	miggbzoaniso(bwh,fmin,fmax,amin,amax,nt,dt,nx,dx,nz,dz,a1111,a3333,
-		a1133,a1313,a1113,a3313,f,g,verbose);
-
-        /* set header fields and write output */
-        tr.ns = nz;
-        tr.trid = TRID_DEPTH;
-        tr.d1 = dz;
-        tr.d2 = dx;
-
-        for (ix=0; ix<nx; ++ix) {
-              tr.tracl = ix + 1;
-               for (iz=0; iz<nz; ++iz) {
-                        tr.data[iz] = g[ix][iz];
-                }
-                puttr(&tr);
-        }
-
-	/* free workspace */
-	free2float(f);
-	free2float(a1111);
-	free2float(a3333);
-	free2float(a1133);
-	free2float(a1313);
-	free2float(a1113);
-	free2float(a3313);
-	free2float(g);
-	
-	return(CWP_Exit());
-}
-
 
 static void miggbzoaniso (float bwh, float fmin, float fmax, float amin, float amax,
 	int nt, float dt, int nx, float dx, int nz, float dz, 
@@ -501,7 +244,7 @@ g		array[nx][nz] containing migrated image g(x,z)
 	dtau = dt;
 	ntau = nt+2.0*taupad/dtau;
 
-	fprintf(stderr,"npx=%d dpx=%g fpx=%g\n",npx,dpx,fpx);
+	if (verbose) fprintf(stderr,"npx=%d dpx=%g fpx=%g\n",npx,dpx,fpx);
 
 	/* zero migrated image */
 	for (ix=0; ix<nx; ++ix)
@@ -624,7 +367,7 @@ g		array[nx][nz] containing migrated image g(x,z)
 *************************************************************************/
 
 
-/* size of cells in which to linearly interpolate complex time and amplitude */
+/* size of cells in which to linearly interpolate cwpc time and amplitude */
 #define CELLSIZE 8
 
 /* factor by which to oversample time for linear interpolation of traces */
@@ -636,7 +379,7 @@ g		array[nx][nz] containing migrated image g(x,z)
 /* exp(EXPMIN) is assumed to be negligible */
 #define EXPMIN (-5.0)
 
-/* filtered complex beam data as a function of real and imaginary time */
+/* filtered cwpc beam data as a function of real and imaginary time */
 typedef struct BeamDataStruct {
 	int ntr;		/* number of real time samples */
 	float dtr;		/* real time sampling interval */
@@ -644,10 +387,10 @@ typedef struct BeamDataStruct {
 	int nti;		/* number of imaginary time samples */
 	float dti;		/* imaginary time sampling interval */
 	float fti;		/* first imaginary time sample */
-	complex **cf;		/* array[nti][ntr] of complex data */
+	cwpc **cf;		/* array[nti][ntr] of cwpc data */
 } BeamData;
 
-/* one cell in which to linearly interpolate complex time and amplitude */
+/* one cell in which to linearly interpolate cwpc time and amplitude */
 typedef struct CellStruct {
 	int live;	/* random number used to denote a live cell */
 	int dead;	/* random number used to denote a dead cell */
@@ -678,14 +421,14 @@ typedef struct CellsStruct {
 	float lmin;	/* minimum beamwidth for frequency wmin */
 	Cell **cell;	/* cell array[mx][mz] */
 	Ray *ray;	/* ray */
-	BeamData *bd;	/* complex beam data as a function of complex time */
+	BeamData *bd;	/* cwpc beam data as a function of cwpc time */
 	float **g;	/* array[nx][nz] containing g(x,z) */
 } Cells;
 
 /* functions defined and used internally */
 static void xtop (float w,
-	int nx, float dx, float fx, complex *g,
-	int np, float dp, float fp, complex *h);
+	int nx, float dx, float fx, cwpc *g,
+	int np, float dp, float fp, cwpc *h);
 static BeamData* beamData (float wmin, int nt, float dt, float ft, float *f);
 static void setCell (Cells *cells, int jx, int jz);
 static void accCell (Cells *cells, int jx, int jz);
@@ -737,7 +480,7 @@ Credits: CWP: Dave Hale
 	float wmin,pxmax,xmax,x,dw,fw,w,fftscl,
 		amp,phase,scale,a,b,as,bs,es,cfr,cfi,
 		*fpad,*gpad;
-	complex **cf,**cg,*cfx,*cgpx;
+	cwpc **cf,**cg,*cfx,*cgpx;
 
 	/* minimum frequency in radians */
 	wmin = 2.0*PI*fmin;
@@ -785,7 +528,7 @@ Credits: CWP: Dave Hale
 		/* phase shift to account for ft not equal to ftau */
 		phase = w*(ft-ftau);
 
-		/* apply complex filter */
+		/* apply cwpc filter */
 		a = amp*cos(phase);
 		b = amp*sin(phase);
 		for (ix=0,x=fx; ix<nx; ++ix,x+=dx) {
@@ -884,7 +627,7 @@ Credits: CWP: Dave Hale
 	mx = 2+(nx-1)/lx;
 	mz = 2+(nz-1)/lz;
 
-	/* compute complex beam data */
+	/* compute cwpc beam data */
 	bd = beamData(wmin,nt,dt,ft,f);
 
 	/* allocate cells */
@@ -924,7 +667,7 @@ Credits: CWP: Dave Hale
 	/* accumulate beam in first live cell and its neighbors recursively */
 	accCell(cells,jx,jz);
 
-	/* free complex beam data */
+	/* free cwpc beam data */
 	free2complex(bd->cf);
 	free1((void*)bd);
 
@@ -936,8 +679,8 @@ Credits: CWP: Dave Hale
 /* functions for internal use only */
 
 static void xtop (float w,
-	int nx, float dx, float fx, complex *g,
-	int np, float dp, float fp, complex *h)
+	int nx, float dx, float fx, cwpc *g,
+	int np, float dp, float fp, cwpc *h)
 /*****************************************************************************
 Slant stack for one frequency w, where slant stack is defined by
 
@@ -970,7 +713,7 @@ instead, call this function with negative w.
 {
 	int nxfft,nk,nka,ix,ik,ip,lwrap;
 	float dk,fk,ek,fka,k,p,phase,c,s,x=0.0,xshift,temp,*kp;
-	complex czero=cmplx(0.0,0.0),*gx,*gk,*gka,*hp;
+	cwpc czero={0.0f,0.0f},*gx,*gk,*gka,*hp;
 
 	/* number of samples required to make wavenumber k periodic */
 	lwrap = 8;
@@ -1058,7 +801,7 @@ instead, call this function with negative w.
 
 static BeamData* beamData (float wmin, int nt, float dt, float ft, float *f)
 /*****************************************************************************
-Compute filtered complex beam data as a function of real and imaginary time.
+Compute filtered cwpc beam data as a function of real and imaginary time.
 ******************************************************************************
 Input:
 wmin		minimum frequency (in radians per unit time)
@@ -1072,7 +815,7 @@ Returned:	pointer to beam data
 {
 	int ntpad,ntfft,nw,iwnyq,ntrfft,ntr,nti,nwr,it,itr,iti,iw;
 	float dw,fw,dtr,ftr,dti,fti,w,ti,scale,*fa;
-	complex *ca,*cb,*cfi,**cf;
+	cwpc *ca,*cb,*cfi,**cf;
 	BeamData *bd;
 
 	/* pad to avoid wraparound in Hilbert transform */
@@ -1110,7 +853,7 @@ Returned:	pointer to beam data
 	for (it=nt; it<ntfft; ++it)
 		fa[it] = 0.0;
 
-	/* Fourier transform and scale to make complex analytic signal */
+	/* Fourier transform and scale to make cwpc analytic signal */
 	pfarc(1,ntfft,fa,ca);
 	for (iw=1; iw<iwnyq; ++iw) {
 		ca[iw].r *= 2.0;
@@ -1160,7 +903,7 @@ Returned:	pointer to beam data
 
 static void setCell (Cells *cells, int jx, int jz)
 /*****************************************************************************
-Set a cell by computing its Gaussian beam complex time and amplitude.  
+Set a cell by computing its Gaussian beam cwpc time and amplitude.  
 If the amplitude is non-zero, set neighboring cells recursively.
 ******************************************************************************
 Input:
@@ -1170,7 +913,7 @@ jz		z index of the cell to set
 ******************************************************************************
 Notes:
 To reduce the amount of memory required for recursion, the actual 
-computation of complex time and amplitude is performed by the cellTimeAmp() 
+computation of cwpc time and amplitude is performed by the cellTimeAmp() 
 function, so that no local variables are required in this function, except
 for the input arguments themselves.
 *****************************************************************************/
@@ -1184,7 +927,7 @@ for the input arguments themselves.
 	/* make cell live */
 	cells->cell[jx][jz].live = cells->live;
 
-	/* compute complex time and amplitude.  If amplitude is
+	/* compute cwpc time and amplitude.  If amplitude is
 	 * big enough, recursively set neighboring cells. */
 	if (cellTimeAmp(cells,jx,jz)) {
 		setCell(cells,jx+1,jz);
@@ -1196,7 +939,7 @@ for the input arguments themselves.
 
 static int cellTimeAmp (Cells *cells, int jx, int jz)
 /*****************************************************************************
-Compute complex and time and amplitude for a cell.
+Compute cwpc and time and amplitude for a cell.
 ******************************************************************************
 Input:
 cells		pointer to cells
@@ -1288,11 +1031,11 @@ Credits: CWP: Tariq Alkhalifah,  based on MIGGBZO by Dave Hale
 	x = xc-x0;
 	z = zc-z0;
 	
-	/* real and imaginary parts of complex time */
+	/* real and imaginary parts of cwpc time */
 	tr = t0+(px+0.5*wxxr*x)*x+(pz+wxzr*x+0.5*wzzr*z)*z;
 	ti = 0.5*wxxi*x*x+(wxzi*x+0.5*wzzi*z)*z;
 
-	/* real and imaginary parts of complex amplitude */
+	/* real and imaginary parts of cwpc amplitude */
 	kmah = rs->kmah;
 	scale = pow(es/(q2*q2+es*q1*q1),0.25);
 	phase = 0.5*(atan2(q2,q1*e)+2.0*PI*((kmah+1)/2));
@@ -1371,7 +1114,7 @@ jz		z index of the cell in which to accumulate beam
 	BeamData *bd=cells->bd;
 	int ntr=bd->ntr,nti=bd->nti;
 	float dtr=bd->dtr,ftr=bd->ftr,dti=bd->dti,fti=bd->fti;
-	complex **cf=bd->cf;
+	cwpc **cf=bd->cf;
 	int kxlo,kxhi,kzlo,kzhi,kx,kz,itr,iti;
 	float odtr,odti,t00r,t01r,t10r,t11r,t00i,t01i,t10i,t11i,
 		a00r,a01r,a10r,a11r,a00i,a01i,a10i,a11i,
@@ -1381,13 +1124,13 @@ jz		z index of the cell in which to accumulate beam
 		dtxzr,dtxzi,daxzr,daxzi,xdelta,zdelta,
 		trn,tin,trfrac,mtrfrac,tifrac,mtifrac,
 		cf0r,cf0i,cf1r,cf1i,cfr,cfi;
-	complex *cf0,*cf1;
+	cwpc *cf0,*cf1;
 
 	/* inverse of time sampling intervals */
 	odtr = 1.0/dtr;
 	odti = 1.0/dti;
 
-	/* complex time and amplitude for each corner */
+	/* cwpc time and amplitude for each corner */
 	t00r = cell[jx][jz].tr;
 	t01r = cell[jx][jz+1].tr;
 	t10r = cell[jx+1][jz].tr;
@@ -1475,7 +1218,7 @@ jz		z index of the cell in which to accumulate beam
 			trfrac = trn-itr;
 			mtrfrac = 1.0-trfrac;
 
-			/* real and imaginary parts of complex beam data */
+			/* real and imaginary parts of cwpc beam data */
 			cf0r = mtrfrac*cf0[itr].r+trfrac*cf0[itr+1].r;
 			cf1r = mtrfrac*cf1[itr].r+trfrac*cf1[itr+1].r;
 			cfr = mtifrac*cf0r+tifrac*cf1r;
@@ -2356,7 +2099,7 @@ Credits: CWP: Dave Hale
 {
 	int nrs=ray->nrs,ic=ray->ic,nc=ray->nc;
 	RayStep *rs=ray->rs;
-	Circle *c=ray->c;
+	Circle *c=(Circle*)ray->c;
 	int irs,irsf,irsl,irsmin=0,update,jc,js,kc;
 	float dsmin,ds,dx,dz,dmin,rdmin,xrs,zrs;
 
@@ -2591,7 +2334,7 @@ Returned:	pointer to interpolator
 	vel2->vu = v;
 	
 	/* if necessary, build interpolator coefficient tables */
-	if (!tabled) buildTables();
+	{ static int built = (buildTables(), 1); (void) built; }
 
 	return vel2;
 }
@@ -2626,7 +2369,7 @@ vxz		ddv/dxdz
 vzz		ddv/dzdz
 *****************************************************************************/
 {
-	Vel2 *v2=vel2;
+	Vel2 *v2=(Vel2*)vel2;
 	int nx=v2->nx,nz=v2->nz,nxm=v2->nxm,nzm=v2->nzm;
 	float xs=v2->xs,xb=v2->xb,zs=v2->zs,zb=v2->zb,
 		*sx=v2->sx,*sz=v2->sz,**vu=v2->vu;
@@ -2777,3 +2520,58 @@ main()
 	fwrite(vo[0],sizeof(float),nxout*nzout,stdout);
 }
 #endif
+
+
+}  /* namespace */
+
+/* Library version of SUMIGGBZOAN
+ *
+ * The main program (the parameters, the traces and their headers, the files of the elastic coefficients) is left to the
+ * caller.
+ *
+ *	su_miggbzoan:	migrates the zero-offset section f_in[nx][nt] (the traces in order, spaced dx) to g_out[nx][nz]
+ *			by accumulation of Gaussian beams for a medium of elastic coefficients a1111, a3333, a1133, a1313,
+ *			a1113 and a3313 [nx][nz] (z fast: the program takes the quarter of them, which this does too)
+ *
+ * bwh is the half-width of the beams, fmin and fmax the frequencies and amin and amax the angles (degrees) of emergence.
+ * The tables of the interpolators of the coefficients, built the first time (for every thread), are the only state.
+ * Returns 0, -3 for parameters that are not allowed, -4 if the beam half-width is too small for the trace interval (the
+ * program divided by zero).
+ */
+int su_miggbzoan(int nt, float dt, int nx, float dx, int nz, float dz, float bwh, float fmin, float fmax, float amin,
+	float amax, const float *f_in, const float *a1111_in, const float *a3333_in, const float *a1133_in,
+	const float *a1313_in, const float *a1113_in, const float *a3313_in, float *g_out)
+{
+	int ix,iz,k;
+	float dxb;
+	const float *in[6] = {a1111_in,a3333_in,a1133_in,a1313_in,a1113_in,a3313_in};
+	std::vector<float> f((size_t) nx*nt), g((size_t) nx*nz), a[6];
+	std::vector<float*> fr(nx), gr(nx), ar[6];
+
+	if (nt<2 || nx<2 || nz<2 || dt<=0.0 || dx<=0.0 || dz<=0.0 || bwh<=0.0 || fmin<=0.0 || fmax<fmin) return -3;
+	if (amin<=-90.0 || amax>=90.0) return -3;
+	for (ix=0; ix<nx*nz; ix++) if (a1111_in[ix]<=0.0 || a3333_in[ix]<=0.0) return -3;
+	dxb = (float) (NINT((bwh*sqrt(2.0*fmin/fmax))/dx)*dx);
+	if (dxb<=0.0) return -4;
+
+	for (k=0; k<6; k++) {
+		a[k].resize((size_t) nx*nz);
+		ar[k].resize(nx);
+		for (ix=0; ix<nx; ix++) {
+			ar[k][ix] = a[k].data() + (size_t) ix*nz;
+			for (iz=0; iz<nz; iz++) ar[k][ix][iz] = 0.25*in[k][(size_t) ix*nz+iz];
+		}
+	}
+	for (ix=0; ix<nx; ix++) {
+		fr[ix] = f.data() + (size_t) ix*nt;
+		gr[ix] = g.data() + (size_t) ix*nz;
+		for (iz=0; iz<nt; iz++) fr[ix][iz] = f_in[(size_t) ix*nt+iz];
+	}
+
+	miggbzoaniso(bwh,fmin,fmax,amin,amax,nt,dt,nx,dx,nz,dz,ar[0].data(),ar[1].data(),ar[2].data(),ar[3].data(),
+		ar[4].data(),ar[5].data(),fr.data(),gr.data(),0);
+
+	for (ix=0; ix<nx; ix++)
+		for (iz=0; iz<nz; iz++) g_out[(size_t) ix*nz+iz] = gr[ix][iz];
+	return 0;
+}

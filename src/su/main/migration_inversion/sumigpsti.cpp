@@ -4,10 +4,12 @@
 /* SUMIGPSTI: $Revision: 1.4 $ ; $Date: 2011/11/16 22:14:43 $		*/
 
 #include "su.h"
+#include <vector>
 #include "segy.h"
 #include "header.h"
 
 /*********************** self documentation ******************************/
+#if 0 /* the sdoc of the program, which is not part of the library */
 char *sdoc[] = {
 "									",
 " SUMIGPSTI - MIGration by Phase Shift for TI media with turning rays	",
@@ -49,13 +51,9 @@ char *sdoc[] = {
 " Trace header fields accessed:  ns and dt				",
 "									",
 NULL};
+#endif
 
 /**************** end self doc *******************************************/
-
-/* Credits:
- *	CWP: Dave Hale (originally call supsmig.c)
- *		modified to TI media by Tariq Alkhalifah
- */
 
 typedef struct TATableStruct {
 	int np;
@@ -67,269 +65,9 @@ typedef struct TATableStruct {
 	float **a;
 } TATable;
 
-void mig1k (TATable *table, float k, float ffil[4], int ntflag,
-	int nt, float dt, complex *cp,
-	int ntau, float dtau, complex *cq);
-TATable *tableta (int np, int ntau, float dtau, float a3333[],
-	float a1111[], float a1133[], float a1313[],
-	int nt, float dt, int verbose);
-
-segy tr;
-
-int
-main(int argc, char **argv)
-{
-	int nt,nx,nxfft,nxpad,ix,it,nk,ik,nfil,ntflag,
-		ltaper,ntmig,nvmig,nvnmig,netamig,itmig,verbose,np;
-	float dt,dx,dk,taper,t,k,fftscl,ffil[4],
-		*a1111,*a3333,*a1313,*a1133,
-		*tmig,*vmig,*vnmig,*etamig,*vt,*vnt,*etat,**gtx;
-	float vnt2,vt2,delta;
-	complex **gtk;
-	char *vfile="",*vnfile="",*etafile="";
-	FILE *hfp,*tfp;
-	TATable *table;
-
-	/* hook up getpar */
-	initargs(argc, argv);
-	requestdoc(1);
-
-	/* get information from the first header */
-	if (!gettr(&tr)) err("can't get first trace");
-	nt = tr.ns;
-
-	/* let user give dt and/or dx from command line */
-	if (!getparfloat("dt", &dt)) {
-		if (tr.dt) { /* is dt field set? */
-			dt = (float) tr.dt / 1000000.0;
-		} else { /* dt not set, assume 4 ms */
-			dt = 0.004;
-			warn("tr.dt not set, assuming dt=0.004");
-		}
-	}
-	if (!getparfloat("dx",&dx)) {
-		if (tr.d2) { /* is d2 field set? */
-			dx = tr.d2;
-		} else {
-			dx = 1.0;
-			warn("tr.d2 not set, assuming d2=1.0");
-		}
-	}
-
-
-	/* get parameters */
-	if (!(nfil=getparfloat("ffil",ffil))) {
-		ffil[0] = ffil[1] = 0.0;
-		ffil[2] = ffil[3] = 0.5/dt;
-	} else if (nfil!=4) {
-		err("if ffil specified, exactly 4 values must be provided");
-	}
-	if (!getparint("nxpad",&nxpad)) nxpad=0;
-	if (!getparint("ltaper",&ltaper)) ltaper=0;
-	if (!getparint("verbose",&verbose)) verbose=0;
-	if (!getparint("np",&np)) np=200;
-	if (!getparint("ntflag",&ntflag)) ntflag=1;
-
-	/* determine NMO velocity function vnm(t) */
-	vnt = ealloc1float(nt);
-        if (!getparstring("vnfile",&vnfile)) {
-                ntmig = countparval("tmig");
-                if (ntmig==0) ntmig = 1;
-                tmig = ealloc1float(ntmig);
-                if (!getparfloat("tmig",tmig)) tmig[0] = 0.0;
-                nvnmig = countparval("vnmig");
-                if (nvnmig==0) nvnmig = 1;
-                if (nvnmig!=ntmig) err("number of tmig and vnmig must be equal");
-                vnmig = ealloc1float(nvnmig);
-                if (!getparfloat("vnmig",vnmig)) vnmig[0] = 1500.0;
-                for (itmig=1; itmig<ntmig; ++itmig)
-                        if (tmig[itmig]<=tmig[itmig-1])
-                                err("tmig must increase monotonically");
-                for (it=0,t=0.0; it<nt; ++it,t+=dt)
-                        intlin(ntmig,tmig,vnmig,vnmig[0],vnmig[ntmig-1],
-                                1,&t,&vnt[it]);
-        } else {
-                if (fread(vnt,sizeof(float),nt,fopen(vnfile,"r"))!=nt)
-                        err("cannot read %d velocities from file %s",nt,vnfile);
-        }
-
-	/* determine function eta(t) */
-	etat = ealloc1float(nt);
-        if (!getparstring("etafile",&etafile)) {
-                ntmig = countparval("tmig");
-                if (ntmig==0) ntmig = 1;
-                tmig = ealloc1float(ntmig);
-                if (!getparfloat("tmig",tmig)) tmig[0] = 0.0;
-                netamig = countparval("etamig");
-                if (netamig==0) netamig = 1;
-                if (netamig!=ntmig) err("number of tmig and etamig must be equal");
-                etamig = ealloc1float(netamig);
-                if (!getparfloat("etamig",etamig)) etamig[0] = 0.0;
-                for (itmig=1; itmig<ntmig; ++itmig)
-                        if (tmig[itmig]<=tmig[itmig-1])
-                                err("tmig must increase monotonically");
-                for (it=0,t=0.0; it<nt; ++it,t+=dt)
-                        intlin(ntmig,tmig,etamig,etamig[0],etamig[ntmig-1],
-                                1,&t,&etat[it]);
-        } else {
-                if (fread(etat,sizeof(float),nt,fopen(etafile,"r"))!=nt)
-                        err("cannot read %d velocities from file %s",nt,etafile);
-        }
-	
-	/* determine velocity function v(t) */
-	vt = ealloc1float(nt);
-	if (!getparstring("vfile",&vfile)) {
-		ntmig = countparval("tmig");
-		if (ntmig==0) ntmig = 1;
-		tmig = ealloc1float(ntmig);
-		if (!getparfloat("tmig",tmig)) tmig[0] = 0.0;
-		nvmig = countparval("vmig");
-		if (nvmig!=ntmig) {
-			for(it=0; it<nt; ++it)
-				vt[it] = vnt[it];
-		} else {
-			vmig = ealloc1float(nvmig);
-			if (!getparfloat("vmig",vmig)) vmig[0] = vnt[0];
-			for (itmig=1; itmig<ntmig; ++itmig)
-				if (tmig[itmig]<=tmig[itmig-1])
-					err("tmig must increase monotonically");
-			for (it=0,t=0.0; it<nt; ++it,t+=dt)
-				intlin(ntmig,tmig,vmig,vmig[0],vmig[ntmig-1],
-					1,&t,&vt[it]);
-		}
-	} else {
-		if (fread(vt,sizeof(float),nt,fopen(vfile,"r"))!=nt)
-			err("cannot read %d velocities from file %s",nt,vfile);
-	}
-        checkpars();
-
-	/* allocate space for velocity arrays */
-	a1111 = ealloc1float(nt);
-	a3333 = ealloc1float(nt);
-	a1313 = ealloc1float(nt);
-	a1133 = ealloc1float(nt);
-
-	/*convert eta and NMO velocity values to elastic coeffecients*/
-	for(it=0; it<nt; ++it){
-		vnt2   =vnt[it]*vnt[it];
-		vt2    =vt[it]*vt[it];
-		a1111[it]=vnt2*(1+2*etat[it]);
-		a3333[it]=vt2;
-		a1313[it]=0.25*vt2;
-		delta= 0.5*(vnt2/vt2-1);
-		a1133[it]=sqrt(2*delta*a3333[it]*
-			(a3333[it]-a1313[it])+(a3333[it]-
-			a1313[it])*(a3333[it]-a1313[it]))-a1313[it];
-	}
-	
-	/* copy traces and headers to temporary files */
-	tfp = tmpfile();
-	hfp = tmpfile();
-	nx = 0;
-	do {
-		nx++;
-		fwrite(&tr,HDRBYTES,1,hfp);
-		fwrite(tr.data,sizeof(float),nt,tfp);
-	} while(gettr(&tr));
-	efseeko(hfp,(off_t) 0,SEEK_SET);
-	efseeko(tfp,(off_t) 0,SEEK_SET);
-	if (verbose) fprintf(stderr,"\t%d traces input\n",nx);
-	
-	/* determine wavenumber sampling */
-	nxfft = npfaro(nx+nxpad,2*(nx+nxpad));
-	nk = nxfft/2+1;
-	dk = 2.0*PI/(nxfft*dx);
-
-	/* allocate space for Fourier transform */
-	gtk = ealloc2complex(nt,nk);
-	gtx = ealloc1(nxfft,sizeof(float*));
-	for (ix=0; ix<nxfft; ++ix)
-		gtx[ix] = (float*)gtk[0]+ix*nt;
-
-	/* read and apply fft scaling to traces and pad with zeros */
-	fftscl = 1.0/nxfft;
-	for (ix=0; ix<nx; ++ix) {
-		efread(gtx[ix],sizeof(float),nt,tfp);
-		for (it=0; it<nt; ++it)
-			gtx[ix][it] *= fftscl;
-		if (ix<ltaper) {
-			taper = (float)(ix+1)/(float)(ltaper+1);
-			for (it=0; it<nt; ++it)
-				gtx[ix][it] *= taper;
-		} else if (ix>=nx-ltaper) {
-			taper = (float)(nx-ix)/(float)(ltaper+1);
-			for (it=0; it<nt; ++it)
-				gtx[ix][it] *= taper;
-		}
-	}
-	for (ix=nx; ix<nxfft; ++ix)
-		for (it=0; it<nt; ++it)
-			gtx[ix][it] = 0.0;
-	
-	/* Fourier transform g(t,x) to g(t,k) */
-	pfa2rc(-1,2,nt,nxfft,gtx[0],gtk[0]);
-	if (verbose) fprintf(stderr,"\tFourier transform done\n");
-	
-	/* build time/amplitude table */
-	table = tableta(np,nt,dt,a3333,a1111,a1133,a1313,nt,dt,verbose);
-	if (verbose) fprintf(stderr,"\tTime/amplitude table built\n");
-
-	/*free space*/
-	free1float(vt);
-	free1float(vnt);
-	free1float(etat);
-	free1float(a1111);
-	free1float(a3333);
-	free1float(a1133);
-	free1float(a1313);
-	
-	/* loop over wavenumbers */
-	for (ik=0,k=0.0; ik<nk; ++ik,k+=dk) {
-	
-		/* report */
-		if (verbose && ik%(nk/10>0?nk/10:1)==0)
-			fprintf(stderr,"\t%d of %d wavenumbers done\n",
-				ik,nk);
-		
-		/* migrate */
-		mig1k(table,k,ffil,ntflag,nt,dt,gtk[ik],nt,dt,gtk[ik]);
-	}
-	
-	/* Fourier transform g(t,k) to g(t,x) */
-	pfa2cr(1,2,nt,nxfft,gtk[0],gtx[0]);
-	if (verbose) fprintf(stderr,"\tinverse Fourier transform done\n");
-	
-	/* output migrated traces with headers */
-	for (ix=0; ix<nx; ++ix) {
-		efread(&tr,HDRBYTES,1,hfp);
-		memcpy((void *) tr.data,
-				(const void *) gtx[ix], nt*sizeof(float));
-		puttr(&tr);
-	}
-
-	return(CWP_Exit());
-}
-
-void mig1k (TATable *table, float k, float ffil[4], int ntflag,
+static void mig1k (TATable *table, float k, float ffil[4], int ntflag,
 	int nt, float dt, complex *cp,
 	int ntau, float dtau, complex *cq)
-/*****************************************************************************
-phase shift migration for one wavenumber k via tabulated times and amps
-******************************************************************************
-Input:
-table	 	pointer to the TATable
-k		wavenumber
-ffil[4]		four frequencies (in Hz) defining trapezoidal filter
-ntflag		=1 for normal, 2 for turned, 3 for normal+turned
-nt		number of time samples
-dt		time sampling interval
-cp		array[nt] of data to be migrated
-ntau		number of vertical two-way times tau
-dtau		vertical time sampling interval
-
-Output:
-cq		array[ntau] of migrated data
-******************************************************************************/
 {
 	int ntfft,nw,iwnyq,iwmin,iwmax,iw,itau,it,np,
 		ip1,ip2,iwfil0,iwfil1,iwfil2,iwfil3,
@@ -339,23 +77,18 @@ cq		array[ntau] of migrated data
 		ampi,phsi,phsn,
 		*p,*taumax,*taumin,*tturn,**t,**a;
 	complex *pt,*pw,*qn,*qt;
-	static int tabbed=0;
-	static float fntab,*ctab,*stab,opi2=1.0/(PI*2.0);
+	int ntab=1025;
+	float fntab=(float)ntab,*ctab,*stab,opi2=1.0/(PI*2.0);
+	float angle,dangle=2.0*PI/(ntab-1);
 
-	/* if not already built, build cosine/sine tables */
-	if (!tabbed) {
-		int itab,ntab=1025;
-		float angle,dangle=2.0*PI/(ntab-1);
-		ctab = alloc1float(ntab);
-		stab = alloc1float(ntab);
-		for (itab=0,angle=0.0; itab<ntab; ++itab,angle+=dangle) {
-			ctab[itab] = cos(angle);
-			stab[itab] = sin(angle);
-		}
-		tabbed = 1;
-		fntab = (float)ntab;
+	/* cosine/sine tables */
+	ctab = alloc1float(ntab);
+	stab = alloc1float(ntab);
+	for (itab=0,angle=0.0; itab<ntab; ++itab,angle+=dangle) {
+		ctab[itab] = cos(angle);
+		stab[itab] = sin(angle);
 	}
-	
+
 	/* parts of time/amplitude table */
 	np = table->np;
 	p = table->p;
@@ -364,46 +97,44 @@ cq		array[ntau] of migrated data
 	tturn = table->tturn;
 	t = table->t;
 	a = table->a;
-	
+
 	/* frequency sampling */
 	ntfft = npfao(2*nt,4*nt);
 	nw = ntfft;
 	dw = 2.0*PI/(ntfft*dt);
-	
+
 	/* allocate workspace */
 	pt = pw = alloc1complex(ntfft);
 	qn = alloc1complex(ntau);
 	qt = alloc1complex(ntau);
-	
+
 	/* nyquist frequency */
 	wnyq = PI/dt;
-	
+
 	/* index of smallest frequency >= nyquist */
 	iwnyq = (ntfft%2)?ntfft/2:ntfft/2+1;
-	
+
 	/* determine frequency filter sample indices */
 	iwfil0 = MAX(0,MIN(iwnyq,NINT(2.0*PI*ffil[0]/dw)));
 	iwfil1 = MAX(0,MIN(iwnyq,NINT(2.0*PI*ffil[1]/dw)));
 	iwfil2 = MAX(0,MIN(iwnyq,NINT(2.0*PI*ffil[2]/dw)));
 	iwfil3 = MAX(0,MIN(iwnyq,NINT(2.0*PI*ffil[3]/dw)));
-	
+
 	/* pad p(t) with zeros */
 	for (it=0; it<nt; ++it)
 		pt[it] = cp[it];
 	for (it=nt; it<ntfft; ++it)
-		pt[it].r = pt[it].i = 0.0;
-	
+		pt[it] = complex(0.0f,0.0f);
+
 	/* Fourier transform p(t) to p(w) (include scaling) */
 	pfacc(1,ntfft,pt);
-	for (iw=0; iw<nw; ++iw) {
-		pw[iw].r *= 1.0/ntfft;
-		pw[iw].i *= 1.0/ntfft;
-	}
-	
+	for (iw=0; iw<nw; ++iw)
+		pw[iw] *= 1.0f/ntfft;
+
 	/* initially zero normal and turned images */
 	for (itau=0; itau<ntau; ++itau)
-		qn[itau].r = qn[itau].i = qt[itau].r = qt[itau].i = 0.0;
-	
+		qn[itau] = qt[itau] = complex(0.0f,0.0f);
+
 	/* minimum and maximum frequency indices */
 	wmin = ABS(k)/p[np-1];
 	iwmin = MAX(MAX(1,iwfil0),(int)(wmin/dw));
@@ -412,14 +143,14 @@ cq		array[ntau] of migrated data
 	else
 		wmax = ABS(k)/p[0];
 	iwmax = MIN(MIN(iwnyq-1,iwfil3),(int)(wmax/dw));
-	
+
 	/* loop over frequencies */
 	for (iw=iwmin,w=iwmin*dw; iw<=iwmax; ++iw,w+=dw) {
-			
+
 		/* if slope not within range of table, continue */
 		kow = ABS(k)/w;
 		if (kow>p[np-1]) continue;
-		
+
 		/* amplitude of frequency filter */
 		if (iwfil0<=iw && iw<iwfil1)
 			ampf = (float)(iw-iwfil0)/(float)(iwfil1-iwfil0);
@@ -427,7 +158,7 @@ cq		array[ntau] of migrated data
 			ampf = (float)(iwfil3-iw)/(float)(iwfil3-iwfil2);
 		else
 			ampf = 1.0;
-		
+
 		/* weights for interpolation in table */
 		xindex(np,p,kow,&ip1);
 		ip1 = MIN(ip1,np-2);
@@ -438,68 +169,65 @@ cq		array[ntau] of migrated data
 		a2 = (kow*kow-p1*p1)/(p2*p2-p1*p1);
 		wa1 = w*a1;
 		wa2 = w*a2;
-		
+
 		/* maximum tau index for normal image */
 		taumaxi = a1*taumax[ip1]+a2*taumax[ip2];
 		itaumax = MIN(ntau-1,NINT(taumaxi/dtau));
-		
+
 		/* minimum tau index for turned image */
 		taumini = a1*taumin[ip1]+a2*taumin[ip2];
 		itaumin = MAX(0,NINT(taumini/dtau));
-		
+
 		/* phase at turning point */
 		phst = 2.0*(wa1*tturn[ip1]+wa2*tturn[ip2]);
-		
+
 		/* filtered sum and differences for positive and negative w */
-		pwsr = ampf*(pw[iw].r+pw[nw-iw].r);
-		pwsi = ampf*(pw[iw].i+pw[nw-iw].i);
-		pwdr = ampf*(pw[iw].r-pw[nw-iw].r);
-		pwdi = ampf*(pw[iw].i-pw[nw-iw].i);
-		
+		pwsr = ampf*(pw[iw].real()+pw[nw-iw].real());
+		pwsi = ampf*(pw[iw].imag()+pw[nw-iw].imag());
+		pwdr = ampf*(pw[iw].real()-pw[nw-iw].real());
+		pwdi = ampf*(pw[iw].imag()-pw[nw-iw].imag());
+
 		/* accumulate normal image */
 		if (ntflag&1) {
 		for (itau=0; itau<itaumax; ++itau) {
 			ampi = a1*a[ip1][itau]+a2*a[ip2][itau];
 			phsi = wa1*t[ip1][itau]+wa2*t[ip2][itau];
 			phsn = phsi*opi2;
-			itab = fntab*(phsn-(int)phsn);
-			qn[itau].r = qn[itau].r +
-				ampi*(pwsr*ctab[itab]+pwdi*stab[itab]);
-			qn[itau].i = qn[itau].i +
-				ampi*(pwsi*ctab[itab]-pwdr*stab[itab]);
+			itab = fntab*(phsn-floor(phsn));
+			qn[itau] += complex(ampi*(pwsr*ctab[itab]+pwdi*stab[itab]),
+				ampi*(pwsi*ctab[itab]-pwdr*stab[itab]));
 		}
 		}
-		
+
 		/* accumulate turned image */
 		if (ntflag&2) {
 		for (itau=itaumin+1; itau<itaumax; ++itau) {
 			ampi = a1*a[ip1][itau]+a2*a[ip2][itau];
 			phsi = phst-(wa1*t[ip1][itau]+wa2*t[ip2][itau]);
 			phsn = phsi*opi2;
-			itab = fntab*(phsn-(int)phsn);
-			qt[itau].r = qt[itau].r +
-				ampi*(pwsr*stab[itab]-pwdi*ctab[itab]);
-			qt[itau].i = qt[itau].i +
-				ampi*(pwsi*stab[itab]+pwdr*ctab[itab]);
+			itab = fntab*(phsn-floor(phsn));
+			qt[itau] += complex(ampi*(pwsr*stab[itab]-pwdi*ctab[itab]),
+				ampi*(pwsi*stab[itab]+pwdr*ctab[itab]));
 		}
 		}
 	}
-	
+
 	/* sum normal and turned images */
-	for (itau=0; itau<ntau; ++itau) {
-		cq[itau].r = qn[itau].r+qt[itau].r;
-		cq[itau].i = qn[itau].i+qt[itau].i;
-	}
-	
+	for (itau=0; itau<ntau; ++itau)
+		cq[itau] = qn[itau]+qt[itau];
+
 	/* free workspace */
 	free1complex(pt);
 	free1complex(qn);
 	free1complex(qt);
-}	
+	free1float(ctab);
+	free1float(stab);
+}
 
-TATable *tableta (int np, int ntau, float dtau, float a3333[],
+
+static TATable *tableta (int np, int ntau, float dtau, float a3333[],
 	float a1111[], float a1133[], float a1313[],
-	int nt, float dt, int verbose)
+	int nt, float dt)
 /*****************************************************************************
 tabulate time shifts and amplitudes for use in phase-shift migration
 ******************************************************************************
@@ -528,7 +256,7 @@ Returned: 	pointer to the TATable
 	TATable *table;
 	
 	/* allocate table */
-	table = alloc1(1,sizeof(TATable));
+	table = (TATable *) alloc1(1,sizeof(TATable));
 	table->np = np;
 	table->p = p = alloc1float(np);
 	table->taumax = taumax = alloc1float(np);
@@ -536,6 +264,12 @@ Returned: 	pointer to the TATable
 	table->tturn = tturn = alloc1float(np);
 	table->t = t = alloc2float(ntau,np);
 	table->a = a = alloc2float(ntau,np);
+	memset((void *) p,0,np*sizeof(float));
+	memset((void *) taumax,0,np*sizeof(float));
+	memset((void *) taumin,0,np*sizeof(float));
+	memset((void *) tturn,0,np*sizeof(float));
+	memset((void *) t[0],0,np*ntau*sizeof(float));
+	memset((void *) a[0],0,np*ntau*sizeof(float));
 	
 	for (it=0; it<nt; ++it){
 		a1111[it] = .25*a1111[it];
@@ -548,7 +282,7 @@ Returned: 	pointer to the TATable
 	for (jp=0; jp<np; ++jp) {
 	
 		/* slope p */
-		p[jp] = pj = 2.0/sqrt(a1111[0])*sqrt((float)(jp)/(float)(np-1));
+		p[jp] = pj = 1.0/sqrt(a1111[0])*sqrt((float)(jp)/(float)(np-1));
 			
 		/* time and amplitude at tau = 0 */
 		t[jp][0] = 0.0;
@@ -650,16 +384,16 @@ Returned: 	pointer to the TATable
 			} else {
 				a1111t = a1111[ntau-1] +
 					(taui-(ntau-1)*dtau)*
-					(a1111[itau]-a1111[itau-1])/dtau;
+					(a1111[ntau-1]-a1111[ntau-2])/dtau;
 				a3333t = a3333[ntau-1] +
 					(taui-(ntau-1)*dtau)*
-					(a3333[itau]-a3333[itau-1])/dtau;
+					(a3333[ntau-1]-a3333[ntau-2])/dtau;
 				a1313t = a1313[ntau-1] +
 					(taui-(ntau-1)*dtau)*
-					(a1313[itau]-a1313[itau-1])/dtau;
+					(a1313[ntau-1]-a1313[ntau-2])/dtau;
 				a1133t = a1133[ntau-1] +
 					(taui-(ntau-1)*dtau)*
-					(a1133[itau]-a1133[itau-1])/dtau;
+					(a1133[ntau-1]-a1133[ntau-2])/dtau;
 			}
 			
 		
@@ -704,4 +438,109 @@ Returned: 	pointer to the TATable
 		*/
 	}
 	return table;
+}
+
+static void freetable(TATable *table)
+{
+	free1float(table->p);
+	free1float(table->taumax);
+	free1float(table->taumin);
+	free1float(table->tturn);
+	free2float(table->t);
+	free2float(table->a);
+	free1(table);
+}
+
+
+
+/* Library version of SUMIGPSTI
+ *
+ * The main program (the parameters, the traces and their headers, the velocity files) is left to the caller.
+ *
+ *	su_migpsti:	migrates the section data[nx][nt] (the traces in order of the cdps) to out[nx][nt] for a TI medium
+ *			with turning rays, with the NMO velocities vnt[nt], vertical velocities vt[nt] and etat[nt] of the
+ *			times of the samples
+ *
+ * The migration is that of SUMIGPS (mig1k, with the phase wrapped with floor where the program truncated it) with the table
+ * of the times and amplitudes of the rays of a TI medium. The parameters of the table (the elastic coefficients) are made
+ * here from the three functions, and are not changed in the caller. Where a slope has no ray (the program left the values that
+ * the allocation had) the table is zero. Returns 0, or -3 for parameters that are not allowed.
+ */
+int su_migpsti(int nx, int nt, float dt, float dx, const float *ffil_in, int nxpad, int ltaper, int np, int ntflag,
+	const float *vnt, const float *vt, const float *etat, const float *data, float *out)
+{
+	int nxfft,nk,ix,it,ik;
+	float dk,taper,k,fftscl,ffil[4];
+	float vnt2,vt2,delta;
+	float **gtx;
+	complex **gtk;
+	TATable *table;
+	std::vector<float> a1111(nt), a3333(nt), a1313(nt), a1133(nt);
+
+	if (nx<1 || nt<2 || dt<=0.0 || dx<=0.0 || np<2 || nxpad<0 || ltaper<0 || ntflag<1 || ntflag>3) return -3;
+	for (it=0; it<nt; ++it) if (vnt[it]<=0.0 || vt[it]<=0.0) return -3;
+	for (it=0; it<4; ++it) ffil[it] = ffil_in[it];
+
+	/* convert eta and NMO velocity values to elastic coeffecients */
+	for (it=0; it<nt; ++it) {
+		vnt2 = vnt[it]*vnt[it];
+		vt2 = vt[it]*vt[it];
+		a1111[it] = vnt2*(1+2*etat[it]);
+		a3333[it] = vt2;
+		a1313[it] = 0.25*vt2;
+		delta = 0.5*(vnt2/vt2-1);
+		a1133[it] = sqrt(2*delta*a3333[it]*(a3333[it]-a1313[it])+(a3333[it]-a1313[it])*(a3333[it]-a1313[it]))-a1313[it];
+	}
+
+	/* determine wavenumber sampling */
+	nxfft = npfaro(nx+nxpad,2*(nx+nxpad));
+	nk = nxfft/2+1;
+	dk = 2.0*PI/(nxfft*dx);
+
+	/* allocate space for Fourier transform */
+	gtk = ealloc2complex(nt,nk);
+	gtx = (float**)ealloc1(nxfft,sizeof(float*));
+	for (ix=0; ix<nxfft; ++ix)
+		gtx[ix] = (float*)gtk[0]+ix*nt;
+
+	/* apply fft scaling to traces and pad with zeros */
+	fftscl = 1.0/nxfft;
+	for (ix=0; ix<nx; ++ix) {
+		for (it=0; it<nt; ++it)
+			gtx[ix][it] = data[(size_t)ix*nt+it]*fftscl;
+		if (ix<ltaper) {
+			taper = (float)(ix+1)/(float)(ltaper+1);
+			for (it=0; it<nt; ++it)
+				gtx[ix][it] *= taper;
+		} else if (ix>=nx-ltaper) {
+			taper = (float)(nx-ix)/(float)(ltaper+1);
+			for (it=0; it<nt; ++it)
+				gtx[ix][it] *= taper;
+		}
+	}
+	for (ix=nx; ix<nxfft; ++ix)
+		for (it=0; it<nt; ++it)
+			gtx[ix][it] = 0.0;
+
+	/* Fourier transform g(t,x) to g(t,k) */
+	pfa2rc(-1,2,nt,nxfft,gtx[0],gtk[0]);
+
+	/* build time/amplitude table */
+	table = tableta(np,nt,dt,a3333.data(),a1111.data(),a1133.data(),a1313.data(),nt,dt);
+
+	/* loop over wavenumbers */
+	for (ik=0,k=0.0; ik<nk; ++ik,k+=dk)
+		mig1k(table,k,ffil,ntflag,nt,dt,gtk[ik],nt,dt,gtk[ik]);
+
+	/* Fourier transform g(t,k) to g(t,x) */
+	pfa2cr(1,2,nt,nxfft,gtk[0],gtx[0]);
+
+	for (ix=0; ix<nx; ++ix)
+		for (it=0; it<nt; ++it)
+			out[(size_t)ix*nt+it] = gtx[ix][it];
+
+	freetable(table);
+	free1(gtx);
+	free2complex(gtk);
+	return 0;
 }

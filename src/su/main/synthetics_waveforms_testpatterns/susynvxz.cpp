@@ -112,6 +112,7 @@ int su_synvxz_offset(const float *vel, int nx, int nz, float dx, float dz, float
 		**v,**ts1=NULL,**as1=NULL,**sgs1=NULL,
 		**tg1=NULL,**ag1=NULL,**sgg1=NULL;
 
+	eikpex_error = 0;
 	if (nx<2 || nz<2 || nxb<1 || nxd<1 || nxm<1 || nt<1) return -3;
 
 	/* check the ranges of shots and receivers */
@@ -263,6 +264,7 @@ int su_synvxz_offset(const float *vel, int nx, int nz, float dx, float dz, float
 		free2float(ag1);
 		free2float(sgg1);
   	}
+	if (eikpex_error) return -5;
 	return 0;
 }
 

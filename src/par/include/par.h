@@ -219,6 +219,9 @@ void addsinc (float time, float amp,
 void makericker (float fpeak, float dt, Wavelet **w);
 
 /* upwind eikonal stuff */
+/* set to 1 (for the thread) by eikpex where a raypath has too large a curvature: the program
+   stopped there with err(), which a library cannot do; the callers clear it and check it */
+extern thread_local int eikpex_error;
 void eikpex (int na, float da, float r, float dr, 
 	float sc[], float uc[], float wc[], float tc[],
 	float sn[], float un[], float wn[], float tn[]);
